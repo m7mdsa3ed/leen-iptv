@@ -19,7 +19,9 @@ html[data-layout=netflix][data-mode=mobile] .nf-hsearch input { width: 8rem; fon
 html[data-layout=netflix] .nf-hbtn { display: grid; place-items: center; min-width: 2.75rem; min-height: 2.75rem; color: var(--foreground); border-radius: .25rem; }
 html[data-layout=netflix] .nf-hbtn[data-nav]:focus-visible, html[data-layout=netflix] .nf-tab[data-nav]:focus-visible { box-shadow: none !important; transform: none !important; outline: none; }
 html[data-layout=netflix] .nf-hbtn:focus-visible { background: var(--fg-10); }
-html[data-layout=netflix] .nf-tab:focus-visible { color: var(--foreground); font-weight: 700; }
+html[data-layout=netflix] .nf-tab:focus-visible { color: var(--foreground); font-weight: 700; background: var(--fg-10); border-radius: .25rem; }
+/* TV: focused must differ from the active tab / selected entry: solid light fill */
+html[data-layout=netflix][data-mode=tv] :is(.nf-tab, .nf-hbtn, .nf-pick)[data-nav]:focus-visible { background: var(--focus-bg); color: var(--focus-fg); }
 
 /* ---------- menus ---------- */
 html[data-layout=netflix] .nf-menu { position: absolute; top: 100%; margin-top: .5rem; z-index: 50; min-width: 12rem; max-height: 60vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--fg-10); border-radius: .25rem; padding: .25rem; }
@@ -95,7 +97,7 @@ html[data-layout=netflix] .nf-media { position: relative; overflow: hidden; bord
 html[data-layout=netflix] .nf-live { background-image: linear-gradient(135deg, var(--surface-3), var(--surface)); }
 html[data-layout=netflix] .nf-cap { position: absolute; inset: auto 0 0 0; padding: 1.5rem .5rem .4rem; color: #fff; font-size: .8rem; background-image: linear-gradient(to top, rgba(0, 0, 0, .85), rgba(0, 0, 0, 0)); }
 html[data-layout=netflix] .nf-ring { position: absolute; inset: 0; border-radius: .25rem; box-shadow: 0 0 0 3px var(--focus-bg); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
-html[data-layout=netflix] [data-mode=tv] .nf-img:focus-visible .nf-ring { opacity: 1; }
+html[data-layout=netflix][data-mode=tv] .nf-img:focus-visible .nf-ring { opacity: 1; }
 /* base focus rules of the app (scale/shadow on [data-nav]) are replaced by the pop */
 html[data-layout=netflix] .nf-img:focus-visible, html[data-layout=netflix] .nf-round:focus-visible { box-shadow: none !important; transform: none !important; outline: none; }
 html[data-layout=netflix] .nf-round:focus-visible { outline: 2px solid var(--foreground) !important; outline-offset: 2px; }

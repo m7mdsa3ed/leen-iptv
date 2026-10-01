@@ -22,7 +22,7 @@ export default function Shell({ page, title, children }: ShellProps) {
     setScrolled(t.scrollTop > 24)
   }
   const search = sq === null ? (
-    <button data-nav data-autofocus={page === "search" ? "" : undefined} aria-label="Search" onClick={() => { if (page === "search" || mobile) go("search"); else { setSq(""); requestAnimationFrame(() => inp.current?.focus()) } }} className="nf-hbtn"><Search className="size-6" /></button>
+    <button data-nav data-autofocus={page === "search" ? "" : undefined} data-nav-home={page === "search" ? "" : undefined} aria-label="Search" onClick={() => { if (page === "search" || mobile || tv) go("search") /* TV: the Search page has the full-size field */; else { setSq(""); requestAnimationFrame(() => inp.current?.focus()) } }} className="nf-hbtn"><Search className="size-6" /></button>
   ) : (
     <form onSubmit={(e) => { e.preventDefault(); setSq(null); go("search") }} className="nf-hsearch">
       <Search className="size-5 shrink-0" />

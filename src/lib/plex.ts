@@ -1,6 +1,7 @@
 // Plex Media Server as a source: plex.tv PIN sign-in, server discovery, catalog, detail, HLS URL, progress sync.
 // All identity values and the token ride in the query string and requests only send Accept, so GETs stay CORS-simple.
 // No EPG / live TV for Plex in this version.
+import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Source } from "./types"
 import { mixed, plexFetch, px } from "./net"
 import { useApp } from "./store"
@@ -177,11 +178,17 @@ export async function plexDetail(s: Source, px_: string, item: Item): Promise<{ 
 
 /* ---------- playback ---------- */
 /** HLS from the server's universal transcoder (direct URL; the Player wraps it with pxStream on mixed content). */
-export const plexStreamUrl = (s: Source, item: Item) =>
+const profileExtra = (q: StreamQ) => q.kbps ? "" : [
+  VIDEO_CODECS.includes("hevc") && "append-transcode-target-codec(type=videoProfile&context=streaming&protocol=hls&videoCodec=hevc)",
+  AUDIO_CODECS.includes("ac3") && "append-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=ac3)",
+].filter(Boolean).join("+")
+export const plexStreamUrl = (s: Source, item: Item, q: StreamQ = STREAM_QS[0]) =>
   plexUrl(base(s), "/video/:/transcode/universal/start.m3u8", {
     path: `/library/metadata/${item.sid}`, mediaIndex: 0, partIndex: 0, protocol: "hls", offset: 0, fastSeek: 1, directPlay: 0, directStream: 1,
-    subtitleSize: 100, audioBoost: 100, videoResolution: "1920x1080", maxVideoBitrate: 20000,
+    subtitleSize: 100, audioBoost: 100, videoResolution: q.height ? `${Math.round(q.height * 16 / 9)}x${q.height}` : "3840x2160", maxVideoBitrate: q.kbps ?? 200000,
     "X-Plex-Platform": "Chrome", "X-Plex-Session-Identifier": plexSessionId, session: plexTranscodeId(item),
+    // Original: let Plex copy hevc/ac3 as-is when this device decodes them. Plex HLS is TS-only and hls.js reads hevc and ac3 in TS but not av1/eac3.
+    ...(profileExtra(q) ? { "X-Plex-Client-Profile-Extra": profileExtra(q) } : {}),
   }, s.token)
 
 // Fire-and-forget: reports must never break playback.

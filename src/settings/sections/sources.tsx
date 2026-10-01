@@ -57,8 +57,8 @@ export default function SourcesSection() {
             <Row label="Color" stack><Swatches label="Color" value={s.color} colors={SOURCE_SWATCHES} onChange={(c) => updateSource(s.id, { color: c })} /></Row>
             <ToggleRow label="Enabled" description="Disabled sources are not loaded or shown." checked={s.enabled} onChange={(v) => updateSource(s.id, { enabled: v })} />
             <Row label="Priority" description="When a title is in several sources, the higher one plays first.">
-              <RoundButton label="Move up" disabled={i === 0} onClick={() => moveSource(s.id, -1)}><ArrowUp /></RoundButton>
-              <RoundButton label="Move down" disabled={i === sources.length - 1} onClick={() => moveSource(s.id, 1)}><ArrowDown /></RoundButton>
+              <RoundButton label="Move up" aria-disabled={i === 0} className={i === 0 ? "opacity-50" : ""} onClick={() => i > 0 && moveSource(s.id, -1)}><ArrowUp /></RoundButton>
+              <RoundButton label="Move down" aria-disabled={i === sources.length - 1} className={i === sources.length - 1 ? "opacity-50" : ""} onClick={() => i < sources.length - 1 && moveSource(s.id, 1)}><ArrowDown /></RoundButton>
             </Row>
             <div className="flex flex-wrap gap-2">
               <Pill disabled={!s.enabled || st?.status === "loading"} onClick={() => void useCatalog.getState().retry(s.id)}>Refresh</Pill>

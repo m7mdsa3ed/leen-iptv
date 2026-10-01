@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useSync, badKey } from "@/lib/sync"
+import { useSync } from "@/lib/sync"
 import { explain } from "@/lib/net"
 import { ConfirmButton, Field, Pill, Row, SectionCard, Toggle } from "./controls"
 
@@ -17,27 +17,16 @@ function useAct() {
   return { busy, err, ok, run }
 }
 
-function Setup() {
-  const s = useSync()
-  const [url, setUrl] = useState(s.config.url), [key, setKey] = useState(s.config.anonKey)
-  const a = useAct()
-  const keyErr = key ? badKey(key) ?? undefined : undefined
+/** Shown when the build has no Supabase project (.env). Sync is configured by whoever builds the app, not by each user. */
+function NotAvailable() {
   return (
-    <SectionCard title="Set up sync" description="Sync profiles, sources, favorites, progress and settings across your devices through your own free Supabase project.">
-      <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-        <li>Create a project at supabase.com (free tier is fine).</li>
-        <li>Open SQL Editor and run the file supabase/schema.sql from this app's source.</li>
-        <li>Paste the Project URL and the anon (public) key from Settings &gt; API below.</li>
-      </ol>
-      <Field label="Project URL" value={url} onChange={setUrl} placeholder="https://xxxx.supabase.co" inputMode="url" />
-      <Field label="Anon (public) key" value={key} onChange={setKey} error={keyErr} placeholder="eyJ..." />
-      <Pill variant="primary" disabled={a.busy || !url || !key || !!keyErr} onClick={() => a.run(async () => { s.setConfig({ url, anonKey: key }) })}>Save</Pill>
-      {a.err && <p role="alert" className="text-sm text-destructive">{a.err}</p>}
+    <SectionCard title="Cloud sync isn't available" description="This build of Leen is not connected to a sync service.">
+      {import.meta.env.DEV && <p className="text-sm text-muted-foreground">Developer: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env (see .env.example and the README), then restart the dev server or rebuild.</p>}
     </SectionCard>
   )
 }
 
-function SignIn() {
+export function SignIn() {
   const s = useSync()
   const [email, setEmail] = useState(""), [code, setCode] = useState(""), [pw, setPw] = useState("")
   const [step, setStep] = useState<"email" | "code">("email"), [usePw, setUsePw] = useState(false)
@@ -72,15 +61,9 @@ function SignIn() {
   )
   return (
     <>
-      <SectionCard title="Sign in to sync" description="Type your email, then enter the 6-digit code we send you. No password needed.">{form}</SectionCard>
-      {!s.fromEnv && <ChangeProject />}
+      <SectionCard title="Sign in to sync" description="Sync your profiles, sources, favorites and watch progress across all your devices, restore everything on a new TV in seconds, and keep a backup. Type your email, then enter the 6-digit code we send you.">{form}</SectionCard>
     </>
   )
-}
-
-function ChangeProject() {
-  const [open, setOpen] = useState(false)
-  return open ? <Setup /> : <Pill variant="ghost" className="self-start" onClick={() => setOpen(true)}>Change Supabase project</Pill>
 }
 
 function SignedIn() {
@@ -131,5 +114,5 @@ function SignedIn() {
 
 export default function AccountSync() {
   const s = useSync()
-  return <div className="flex flex-col gap-4">{!s.configured ? <Setup /> : s.session ? <SignedIn /> : <SignIn />}</div>
+  return <div className="flex flex-col gap-4">{!s.configured ? <NotAvailable /> : s.session ? <SignedIn /> : <SignIn />}</div>
 }

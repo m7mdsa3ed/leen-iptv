@@ -38,7 +38,7 @@ export default function Guide() {
             {mob && <button aria-label="Close guide" onClick={() => reset("home")} className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-full bg-surface-2"><X className="size-5" /></button>}
             <div className="min-w-0 flex-1"><Chips items={[FAV, ALL, ...groups.live]} active={g} onPick={setG} /></div>
           </div>
-          <div ref={ref} className="mt-1 min-h-0 flex-1 overflow-auto rounded-3xl bg-surface" style={{ scrollPaddingLeft: CH_W + 8, scrollPaddingTop: 48 * k }}>
+          <div ref={ref} data-vscroll className="mt-1 min-h-0 flex-1 overflow-auto rounded-3xl bg-surface" style={{ scrollPaddingLeft: CH_W + 8, scrollPaddingTop: 48 * k }}>
             <div style={{ width, position: "relative" }}>
               <div className="sticky top-0 z-20 h-10 border-b border-border bg-surface" style={{ width }}>
                 {Array.from({ length: HOURS * 2 }, (_, i) => (

@@ -15,7 +15,7 @@ export default function Sources() {
   const reset = useRoute((s) => s.reset)
   const [type, setType] = useState<Type>("Xtream")
   const [f, setF] = useState({ name: "", url: "", epgUrl: "", server: "", user: "", pass: "", token: "" })
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value.trim() })
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === "name" ? e.target.value : e.target.value.trim() })
   // Plex sign-in: pin (waiting for the code at plex.tv/link) -> servers -> test connections -> save
   const [pin, setPin] = useState<Pin | null>(null)
   const [servers, setServers] = useState<PlexServer[] | null>(null)
@@ -124,7 +124,7 @@ export default function Sources() {
     <div className="flex h-full flex-col items-center gap-6 overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] md:justify-center">
       <div className="flex w-full max-w-[40rem] flex-col gap-3 rounded-[28px] bg-surface p-6">
         <h1 className="text-3xl font-medium tracking-tight md:text-4xl">Add a source</h1>
-        <div className="flex gap-2 py-2">
+        <div className="flex flex-wrap gap-2 py-2">
           {(["Xtream", "M3U", "Plex", "Jellyfin"] as const).map((t) => (
             <Pill key={t} variant="tonal" className={type === t ? "bg-accent-blue-container text-foreground" : ""} onClick={() => { setType(t); setErr(""); setQc(null); setBusy("") }}>{t}</Pill>
           ))}

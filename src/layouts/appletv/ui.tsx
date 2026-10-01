@@ -200,7 +200,7 @@ export function Hero({ picks, onPlay, onInfo, isFav, onFav, playLabel = "Play", 
       {picks.length > 1 && (
         <div role="group" aria-label="Featured" className="absolute inset-x-0 bottom-10 flex items-center justify-center">
           {picks.map((f, i) => (
-            <button key={f.item.id} tabIndex={-1} aria-label={`Featured ${i + 1}: ${f.item.name}`} aria-current={i === n ? "true" : undefined} onClick={() => setN(i)} className="atv-dot grid h-8 w-7 place-items-center">
+            <button key={f.item.id} data-nav aria-label={`Featured ${i + 1}: ${f.item.name}`} aria-current={i === n ? "true" : undefined} onFocus={() => setN(i)} onClick={() => setN(i)} className="atv-dot grid h-8 w-7 place-items-center">
               <span />
             </button>
           ))}

@@ -4,7 +4,7 @@ import { get as idbGet, set as idbSet } from "idb-keyval"
 import { useApp } from "../store"
 import { useHistory, flushHistory } from "../history"
 import { explain } from "../net"
-import { api, ApiError, badKey, envConfigured, loadConfig, saveConfig, type Config, type Session } from "./client"
+import { api, ApiError, badKey, envConfigured, loadConfig, type Config, type Session } from "./client"
 import { canEncrypt, deriveKey, exportKey, importKey, newSalt, NEEDS_HTTPS, open, parseBlob, seal, WrongPassphrase, type Key } from "./crypto"
 import { applySnapshot, buildSnapshot, flatten, merge, stable, stamp, type AppSlice, type Day, type Snapshot } from "./merge"
 import { useSyncMeta } from "./meta"
@@ -220,7 +220,6 @@ const actions = {
     if (session) try { await api.logout(cfg, session) } catch { /* local sign-out is what matters */ }
   },
   syncNow,
-  setConfig(c: Config) { saveConfig(c); useS.setState({ cfg: loadConfig() }); idle() },
   async setPassphrase(p: string, remember: boolean) {
     if (!canEncrypt()) throw new Error(NEEDS_HTTPS)
     if (p.length < 8) throw new Error("Use at least 8 characters.")

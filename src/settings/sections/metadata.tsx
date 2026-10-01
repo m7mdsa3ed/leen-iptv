@@ -28,8 +28,8 @@ export default function MetadataSection() {
             {p.needsKey && <Field label="API key" type="password" value={c.key ?? ""} onChange={(v) => patch(c.id, { key: v.trim() })} error={c.enabled && !c.key ? "A key is needed for this provider." : undefined} />}
             {p.hasLang && <Field label="Language" placeholder="e.g. en-US or ar-SA" className="max-w-[20rem]" value={c.lang ?? ""} onChange={(v) => patch(c.id, { lang: v.trim() })} />}
             <div className="flex gap-2">
-              <RoundButton label="Move up" disabled={i === 0} onClick={() => move(i, -1)}><ChevronUp /></RoundButton>
-              <RoundButton label="Move down" disabled={i === cfgs.length - 1} onClick={() => move(i, 1)}><ChevronDown /></RoundButton>
+              <RoundButton label="Move up" aria-disabled={i === 0} className={i === 0 ? "opacity-50" : ""} onClick={() => move(i, -1)}><ChevronUp /></RoundButton>
+              <RoundButton label="Move down" aria-disabled={i === cfgs.length - 1} className={i === cfgs.length - 1 ? "opacity-50" : ""} onClick={() => move(i, 1)}><ChevronDown /></RoundButton>
             </div>
           </SectionCard>
         )

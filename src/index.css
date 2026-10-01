@@ -175,24 +175,28 @@ html:not([data-mode=tv]) button, html:not([data-mode=tv]) [role=button] { touch-
 [data-card]:focus-visible { outline: none; }
 [data-card]:focus-visible [data-tile] { outline: 2px solid var(--ring); outline-offset: 2px; }
 html[data-mode=tv] [data-nav] { transition: transform var(--dur-fast) var(--ease); }
-html[data-mode=tv] [data-nav]:focus-visible, html[data-mode=tv] [data-nav][data-focused="true"] {
+html[data-mode=tv] [data-nav]:focus, html[data-mode=tv] [data-nav][data-focused="true"] {
   outline: none;
   transform: scale(var(--s, 1.06)); /* --s: wide containers (lists) set a smaller scale so they never outgrow their padding */
   z-index: 5;
   /* shadow kept small (<= ~24px) so it fits inside the padding of scroll containers: overflow clips shadows */
   box-shadow: 0 0 0 3px var(--focus-bg), 0 6px 16px rgba(0, 0, 0, .45);
 }
-html[data-mode=tv] [data-card]:focus-visible, html[data-mode=tv] [data-card][data-focused="true"] { box-shadow: none; transform: none; }
-html[data-mode=tv] [data-card]:focus-visible [data-tile], html[data-mode=tv] [data-card][data-focused="true"] [data-tile] { outline: none; }
+html[data-mode=tv] [data-card]:focus, html[data-mode=tv] [data-card][data-focused="true"] { box-shadow: none; transform: none; }
+html[data-mode=tv] [data-card]:focus [data-tile], html[data-mode=tv] [data-card][data-focused="true"] [data-tile] { outline: none; }
 /* Card focus: the tile wrapper scales (transform) and the ring/shadow overlay fades in (opacity). Nothing animates box-shadow. */
 [data-tilewrap] { transition: transform var(--dur-fast) var(--ease); }
 [data-ring] { opacity: 0; box-shadow: 0 0 0 3px var(--focus-bg), 0 8px 20px rgba(0, 0, 0, .55); transition: opacity var(--dur-fast) var(--ease); }
-html[data-mode=tv] [data-card]:focus-visible [data-tilewrap], html[data-mode=tv] [data-card][data-focused="true"] [data-tilewrap] { transform: scale(1.06); will-change: transform; }
-html[data-mode=tv] [data-card]:focus-visible [data-ring], html[data-mode=tv] [data-card][data-focused="true"] [data-ring] { opacity: 1; }
-html[data-mode=tv] [data-pill]:focus-visible, html[data-mode=tv] [data-pill][data-focused="true"] { background: var(--focus-bg) !important; color: var(--focus-fg) !important; box-shadow: none; } /* the white fill is the focus: no drop shadow, so pills inside scrolling rows/headers are never clipped */
-html[data-mode=tv] [data-guide]:focus-visible, html[data-mode=tv] [data-guide][data-focused="true"] { transform: none; box-shadow: inset 0 0 0 3px var(--focus-bg); }
+html[data-mode=tv] [data-card]:focus [data-tilewrap], html[data-mode=tv] [data-card][data-focused="true"] [data-tilewrap] { transform: scale(1.06); will-change: transform; }
+html[data-mode=tv] [data-card]:focus [data-ring], html[data-mode=tv] [data-card][data-focused="true"] [data-ring] { opacity: 1; }
+html[data-mode=tv] [data-pill]:focus, html[data-mode=tv] [data-pill][data-focused="true"] { background: var(--focus-bg) !important; color: var(--focus-fg) !important; box-shadow: none; } /* the white fill is the focus: no drop shadow, so pills inside scrolling rows/headers are never clipped */
+html[data-mode=tv] [data-guide]:focus, html[data-mode=tv] [data-guide][data-focused="true"] { transform: none; box-shadow: inset 0 0 0 3px var(--focus-bg); }
 
-html[data-mode=tv] [data-pill][data-primary]:focus-visible, html[data-mode=tv] [data-pill][data-primary][data-focused="true"] { box-shadow: 0 0 0 3px var(--accent-blue), 0 0 0 6px var(--focus-bg); }
+html[data-mode=tv] [data-pill][data-primary]:focus, html[data-mode=tv] [data-pill][data-primary][data-focused="true"] { box-shadow: 0 0 0 3px var(--accent-blue), 0 0 0 6px var(--focus-bg); }
+
+/* TV: every focusable that is NOT a [data-nav] (plain buttons, links, fields, switches, radios, tabs) still gets a clear ring. Pointer focus is not :focus-visible, so TV uses :focus. */
+html[data-mode=tv] :is(button, a[href], input, textarea, select, summary, [role=button], [role=switch], [role=radio], [role=checkbox], [role=tab], [role=menuitem], [role=option], [tabindex]):not([data-nav]):not([tabindex="-1"]):focus { outline: 3px solid var(--focus-bg); outline-offset: 2px; }
+html[data-mode=tv] [data-nav]:is(input, textarea, select):focus, html[data-mode=tv] [data-nav][role=switch]:focus, html[data-mode=tv] [data-nav][role=radio]:focus { outline: 3px solid var(--focus-bg); outline-offset: 2px; }
 
 /* press feedback (transform only); after the TV focus rules so it wins on ties */
 [data-pill] { transition: transform var(--dur-fast) var(--ease); }

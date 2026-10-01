@@ -176,6 +176,7 @@ export function Dropdown({ trigger, className, align = "left", panelClass, child
 }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+  const close = () => { setOpen(false); box.current?.querySelector<HTMLElement>("[data-trig]")?.focus() } // focus returns to the trigger (the picked entry unmounts)
   useEffect(() => {
     if (!open) return
     requestAnimationFrame(() => (box.current?.querySelector<HTMLElement>("[data-pick][aria-current]") ?? box.current?.querySelector<HTMLElement>("[data-pick]"))?.focus())
@@ -191,7 +192,7 @@ export function Dropdown({ trigger, className, align = "left", panelClass, child
       onBlur={(e) => { if (open && e.relatedTarget && !box.current?.contains(e.relatedTarget as Node)) setOpen(false) }}
     >
       <button data-nav data-trig aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} className={className}>{trigger}</button>
-      {open && <div role="menu" className={cn("nf-menu", align === "right" ? "right-0" : "left-0", panelClass)}>{children(() => setOpen(false))}</div>}
+      {open && <div role="menu" data-nav-wrap={align === "right" ? "" : undefined} className={cn("nf-menu", align === "right" ? "right-0" : "left-0", panelClass)}>{children(close)}</div>}
     </div>
   )
 }

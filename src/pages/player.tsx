@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Hls from "hls.js"
 import mpegts from "mpegts.js"
-import { ArrowLeft, Captions, RotateCcw, RotateCw, Expand, Maximize, Minimize, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Star, Volume1, Volume2, VolumeX } from "lucide-react"
+import { ArrowLeft, Captions, Gauge, RotateCcw, RotateCw, Expand, Maximize, Minimize, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Star, Volume1, Volume2, VolumeX } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { hm, nowNext, useCatalog } from "@/lib/catalog"
 import { isTv } from "@/lib/device"
@@ -10,7 +10,7 @@ import { KEY, navState, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
 import { useSourceOf } from "@/lib/sources"
 import type { Item } from "@/lib/types"
-import { rate, type Quality } from "@/lib/quality"
+import { rate, STREAM_QS, type Quality, type StreamQ } from "@/lib/quality"
 import { plexScrobble, plexStopTranscode, plexStreamUrl, plexTimeline } from "@/lib/plex"
 import { jellyfinMarkPlayed, jellyfinReport, jellyfinStopTranscode, jellyfinStreamUrl } from "@/lib/jellyfin"
 import { xtreamUrl } from "@/lib/xtream"
@@ -22,6 +22,9 @@ const FIT_LABEL = { contain: "Fit", cover: "Zoom", fill: "Stretch" }
 type Track = { id: number; label: string }
 const mmss = (s: number) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600); return `${h ? h + ":" : ""}${String(Math.floor((s % 3600) / 60)).padStart(h ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")}` }
 
+// ponytail: module-level so the picked quality carries to the next episode; resets to Original on reload
+let lastQ: StreamQ = STREAM_QS[0]
+
 export default function Player({ queue, index }: { queue: Item[]; index: number }) {
   const back = useRoute((s) => s.back)
   const { settings, toggleFav, pushRecent, setProgress } = useApp()
@@ -32,7 +35,8 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   const [idx, setIdx] = useState(index)
   const [show, setShow] = useState(true)
   const [banner, setBanner] = useState(true)
-  const [menu, setMenu] = useState<null | "audio" | "subs">(null)
+  const [menu, setMenu] = useState<null | "audio" | "subs" | "quality">(null)
+  const [sq, setSq] = useState<StreamQ>(lastQ) // media-server quality, kept for the next item this session
   const [err, setErr] = useState("")
   const [buf, setBuf] = useState(true)
   const [paused, setPaused] = useState(false)
@@ -58,7 +62,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   const [muted, setMuted] = useState(false)
   const [fs, setFs] = useState(false)
   const [pip, setPip] = useState(false)
-  const [stats, setStats] = useState<{ q: Quality; bw?: number; bitrate?: number; height?: number; buf: number; dropped: number; stalls: number } | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
   const mp = useRef<mpegts.Player | null>(null)
   const stalls = useRef<number[]>([]) // timestamps of rebuffer events in the last minute
   const played = useRef(false)
@@ -68,11 +72,12 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   const attachAt = useRef(0)
   const startupMs = useRef<number | undefined>(undefined)
   const statsRef = useRef(stats)
+  const aud = useRef<{ codec?: string; ch?: number }>({}) // audio as demuxed (hls.js / mpegts.js); unknown for native <video>
   statsRef.current = stats
 
   const plex = src?.type === "plex" ? src : null
   const jf = src?.type === "jellyfin" ? src : null
-  const raw = item.url ?? (plex ? plexStreamUrl(plex, item) : jf ? jellyfinStreamUrl(jf, item) : xtreamUrl(src!, live ? "live" : "movie", item.sid!, live ? settings.liveExt : item.ext || "mp4"))
+  const raw = item.url ?? (plex ? plexStreamUrl(plex, item, sq) : jf ? jellyfinStreamUrl(jf, item, sq) : xtreamUrl(src!, live ? "live" : "movie", item.sid!, live ? settings.liveExt : item.ext || "mp4"))
   // Jellyfin plays DIRECT from the browser to the server (it can be on the viewer's LAN while this app is served from elsewhere,
   // e.g. over Tailscale, where the app's own proxy could not reach it). Proxy only for mixed content, when the user forces it,
   // or after a network/CORS failure (proxied flag below).
@@ -96,7 +101,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   const firstAttach = useRef(true)
   useEffect(() => {
     const v = vref.current!
-    setErr(""); setBuf(true); setStats(null)
+    setErr(""); setBuf(true); setStats(null); aud.current = {}
     stalls.current = []; played.current = false
     attachAt.current = Date.now(); startupMs.current = undefined
     const isHls = viaHls === url || /\.m3u8(\?|$)/i.test(raw) || /[?&]output=m3u8/i.test(raw)
@@ -107,6 +112,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
         hls.current = h
         let net = 0
         h.loadSource(url); h.attachMedia(v)
+        h.on(Hls.Events.BUFFER_CODECS, (_e, d) => { const a = d.audio ?? d.audiovideo; if (a?.codec) aud.current = { codec: a.codec, ch: a.metadata?.channelCount } })
         h.on(Hls.Events.MANIFEST_PARSED, () => void v.play().catch(() => {}))
         h.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => setAudio(h.audioTracks.map((t, i) => ({ id: i, label: t.name || t.lang || `Audio ${i + 1}` }))))
         h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => setSubs(h.subtitleTracks.map((t, i) => ({ id: i, label: t.name || t.lang || `Subtitle ${i + 1}` }))))
@@ -124,6 +130,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
         const p = mpegts.createPlayer({ type: "mpegts", isLive: true, url }, { enableWorker: true, liveBufferLatencyChasing: true })
         mp.current = p
         p.attachMediaElement(v); p.load()
+        p.on(mpegts.Events.MEDIA_INFO, (mi: { audioCodec?: string; audioChannelCount?: number }) => { if (mi.audioCodec) aud.current = { codec: mi.audioCodec, ch: mi.audioChannelCount } })
         void Promise.resolve(p.play()).catch(() => {})
         p.on(mpegts.Events.ERROR, (_t, _d, info: { code?: number }) => setErr(info?.code && info.code >= 400 ? statusMsg(info.code) : "Stream unavailable. The channel may be offline, or the browser blocked it (CORS)."))
         stop = () => { p.pause(); p.unload(); p.detachMediaElement(); p.destroy(); mp.current = null } // unload() aborts the open live connection
@@ -259,15 +266,26 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
     else Array.from(vref.current!.textTracks).forEach((t, j) => (t.mode = j === i ? "showing" : "disabled"))
     setMenu(null)
   }
+  const pickQ = (q: StreamQ) => {
+    setMenu(null)
+    if (q.id === sq.id) return
+    const v = vref.current
+    if (v && v.currentTime > 0) resume.current = v.currentTime // the new stream resumes where this one is
+    if (plex) plexStopTranscode(plex, item)
+    if (jf) jellyfinStopTranscode(jf, item)
+    setSq((lastQ = q))
+  }
   const pickAudio = (i: number) => { if (hls.current) hls.current.audioTrack = i; setMenu(null) }
   const openSubs = () => {
     if (!hls.current) setSubs(Array.from(vref.current!.textTracks).map((t, i) => ({ id: i, label: t.label || t.language || `Subtitle ${i + 1}` })))
     setMenu("subs")
   }
 
-  navState.lock = !show && !menu
+  navState.lock = !show && !menu && !err
   useEffect(() => () => { navState.lock = false }, [])
-  useEffect(() => { if (show && !menu) requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-play]")?.focus()) }, [show, menu])
+  // focus enters the audio/subtitle menu or the error buttons (both are [data-modal], so the D-pad stays inside them)
+  useEffect(() => { if (menu || err) requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-modal] [data-autofocus], [data-modal] [data-nav]")?.focus()) }, [menu, err])
+  useEffect(() => { if (show && !menu && !err) requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-play]")?.focus()) }, [show, menu, err])
 
   /* desktop/mobile extras: fullscreen state, idle hide, wake lock */
   useEffect(() => {
@@ -294,6 +312,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
         stop()
         if (!isTv && fsEl()) toggleFs()
         else if (menu) setMenu(null)
+        else if (err) back()
         else if (show && (isTv || k !== KEY.esc)) { setShow(false); (document.activeElement as HTMLElement)?.blur() }
         else back()
         return
@@ -387,7 +406,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
       const bwOk = bw && isFinite(bw) ? bw : undefined
       const pq = v.getVideoPlaybackQuality?.()
       const dropped = pq && pq.totalVideoFrames > 60 ? (pq.droppedVideoFrames / pq.totalVideoFrames) * 100 : 0
-      setStats({ q: rate({ bufAhead: buf, stalls: stalls.current.length, bw: bwOk, bitrate: lv?.bitrate }), bw: bwOk, bitrate: lv?.bitrate, height: lv?.height || v.videoHeight || undefined, buf, dropped, stalls: stalls.current.length })
+      setStats({ q: rate({ bufAhead: buf, stalls: stalls.current.length, bw: bwOk, bitrate: lv?.bitrate }), bw: bwOk, bitrate: lv?.bitrate, height: lv?.height || v.videoHeight || undefined, buf, dropped, stalls: stalls.current.length, audio: audioLabel(aud.current) })
     }, 2000)
     return () => clearInterval(t)
   }, [])
@@ -417,7 +436,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
       {buf && !err && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><div className="size-16 animate-spin rounded-full border-4 border-white/30 border-t-white" /></div>}
       {num && <div className="absolute right-4 top-4 rounded-[28px] bg-black/70 px-6 py-3 text-3xl sm:right-12 sm:top-10 sm:text-5xl">{num}</div>}
       {err && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 p-4 text-center">
+        <div data-modal className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/85 p-4 text-center">
           <div className="max-w-2xl px-6 text-center"><div className="mb-2 text-base text-white/60">{item.name}</div><div className="text-xl font-medium sm:text-3xl">{err}</div></div>
           <div className="flex flex-wrap justify-center gap-3"><Pill variant="primary" data-autofocus="" onClick={() => setRetry((r) => r + 1)}>Retry</Pill>{queue.length > 1 && <Pill onClick={() => zap(1)}>Next</Pill>}<Pill onClick={back}>Back</Pill></div>
         </div>
@@ -445,7 +464,8 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
                 <span className="w-14 text-right sm:w-20">{mmss(cur)}</span>
                 <button
                   data-nav data-seek aria-label="Seek"
-                  className="flex h-8 flex-1 touch-none items-center"
+                  className="flex h-8 flex-1 touch-none items-center rounded-full focus-visible:bg-white/15"
+                  onClick={(e) => e.detail === 0 && toggle()}
                   onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); seekTo(e) }}
                   onPointerMove={(e) => e.buttons && seekTo(e)}
                 >
@@ -474,6 +494,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
                 {stats && <QualityBadge s={stats} />}
                 <RoundButton label="Favorite" active={isFav} onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} /></RoundButton>
                 <Pill aria-label="Audio" className="h-12 px-3 lg:px-6" onClick={() => setMenu("audio")}><Volume1 className={ic} /><span className={lbl}>Audio</span></Pill>
+                {mediaServer && !live && <Pill aria-label="Quality" className="h-12 px-3 lg:px-6" onClick={() => setMenu("quality")}><Gauge className={ic} /><span className={lbl}>{sq.id === "original" ? "Original" : `${sq.height}p`}</span></Pill>}
                 <Pill aria-label="Subtitles" className="h-12 px-3 lg:px-6" onClick={openSubs}><Captions className={ic} /><span className={lbl}>Subtitles</span></Pill>
                 <Pill aria-label="Aspect" className="h-12 px-3 lg:px-6" onClick={() => setFit((f) => (f + 1) % FITS.length)}><Maximize className={ic} /><span className={lbl}>{FIT_LABEL[FITS[fit]]}</span></Pill>
                 {canPip && <RoundButton label="Picture in picture" active={pip} onClick={togglePip}><PictureInPicture2 className={pip ? "text-primary" : ""} /></RoundButton>}
@@ -487,13 +508,15 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
       {menu && (
         <div data-modal className="absolute inset-0 z-10 flex items-center justify-center bg-black/60" onAnimationStart={() => {}}>
           <div className="flex max-h-[90vh] w-[28rem] max-w-[92vw] flex-col gap-2 overflow-y-auto rounded-[28px] bg-surface p-6 shadow-2xl">
-            <div className="mb-2 text-2xl font-semibold">{menu === "audio" ? "Audio" : "Subtitles"}</div>
+            <div className="mb-2 text-2xl font-semibold">{menu === "audio" ? "Audio" : menu === "quality" ? "Quality" : "Subtitles"}</div>
+            {menu === "quality" && STREAM_QS.map((q) => <Pill key={q.id} data-autofocus={q.id === sq.id ? "" : undefined} variant={q.id === sq.id ? "primary" : "tonal"} className="justify-start" onClick={() => pickQ(q)}>{q.label}</Pill>)}
             {menu === "subs" && <Pill data-autofocus="" className="justify-start" onClick={() => setSub(-1)}>Off</Pill>}
-            {(menu === "audio" ? audio : subs).map((t) => (
+            {menu !== "quality" && (menu === "audio" ? audio : subs).map((t) => (
               <Pill key={t.id} className="justify-start" onClick={() => (menu === "audio" ? pickAudio(t.id) : setSub(t.id))}>{t.label}</Pill>
             ))}
             {menu === "audio" && !audio.length && <div className="text-muted-foreground">Only the default audio track is available.</div>}
             {menu === "subs" && !subs.length && <div className="text-muted-foreground">No subtitle tracks in this stream.</div>}
+            <Pill variant="ghost" className="justify-start" onClick={() => setMenu(null)}>Close</Pill>
           </div>
         </div>
       )}
@@ -504,7 +527,15 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
 const QC = { good: "bg-emerald-400", fair: "bg-amber-400", poor: "bg-red-500" } as const
 const QL = { good: "Good", fair: "Fair", poor: "Poor" } as const
 
-type Stats = { q: Quality; bw?: number; bitrate?: number; height?: number; buf: number; dropped: number; stalls: number }
+type Stats = { q: Quality; bw?: number; bitrate?: number; height?: number; buf: number; dropped: number; stalls: number; audio?: string }
+
+/** "mp4a.40.2" + 6 ch -> "AAC 5.1", "ec-3" -> "EAC3". Unknown codecs show their raw id. */
+function audioLabel({ codec, ch }: { codec?: string; ch?: number }) {
+  if (!codec) return undefined
+  const c = codec.toLowerCase()
+  const name = c === "ac-3" ? "AC3" : c === "ec-3" ? "EAC3" : c === "opus" ? "Opus" : c === "mp3" || c === "mp4a.40.34" || c === "mp4a.6b" ? "MP3" : c.startsWith("mp4a") ? "AAC" : c.split(".")[0].toUpperCase()
+  return name + (ch === 1 ? " mono" : ch === 2 ? " stereo" : ch ? ` ${ch - 1}.1` : "")
+}
 const mbps = (n?: number) => (n ? `${(n / 1e6).toFixed(1)} Mbps` : "")
 
 /** The numbers behind the rating, shown above the controls while they are open. */
@@ -521,6 +552,7 @@ function QualityBadge({ s }: { s: Stats }) {
       </span>
       <span>{QL[s.q]}</span>
       {s.height ? <span className="text-white/60">{s.height}p</span> : null}
+      {s.audio ? <span className="text-white/60">{s.audio}</span> : null}
     </div>
   )
 }

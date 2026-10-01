@@ -6,6 +6,7 @@ import { isTv, useMode } from "@/lib/device"
 import { useLayoutAttr, useLayoutDef } from "@/layouts"
 import { useMotion } from "@/lib/motion"
 import { useTheme } from "@/lib/theme"
+import { ExitConfirm, askExit, closeExit, useExitAsk } from "@/components/tv/exit-confirm"
 import { installNav, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
 import Browse from "@/pages/browse"
@@ -21,6 +22,7 @@ import Live from "@/pages/live"
 import PersonPage from "@/pages/person"
 import Player from "@/pages/player"
 import Profiles from "@/pages/profiles"
+import Welcome from "@/pages/welcome"
 import Search from "@/pages/search"
 import Settings from "@/pages/settings"
 import Sources from "@/pages/sources"
@@ -41,7 +43,7 @@ const SHELL_PAGES = new Set(["home", "live", "guide", "movies", "series", "searc
 
 /** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
 const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-  profiles: Profiles, live: Live, guide: Guide, movies: Browse, series: Browse, search: Search, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, person: PersonPage, detail: Detail, history: HistoryPage, stats: StatsPage,
+  profiles: Profiles, welcome: Welcome, live: Live, guide: Guide, movies: Browse, series: Browse, search: Search, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, person: PersonPage, detail: Detail, history: HistoryPage, stats: StatsPage,
 }
 
 function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
@@ -71,13 +73,13 @@ export default function App() {
   const tvScale = useApp((s) => s.settings.tvScale)
   useEffect(() => { document.documentElement.style.setProperty("--tv-scale", String(tvScale)) }, [tvScale])
 
-  // exit-on-back at root, close PIN prompt first
+  // Back: close the PIN prompt / exit prompt first; at the root page on TV ask before leaving the app
   useEffect(() =>
     installNav(() => {
       const ask = usePinAsk.getState().ask
       if (ask) return ask.resolve(false), usePinAsk.setState({ ask: null })
-      const { stack, back } = useRoute.getState()
-      if (!back() && isTv && stack[0].name !== "profiles") window.close()
+      if (useExitAsk.getState().open) return closeExit()
+      if (!useRoute.getState().back() && isTv) askExit()
     }), [])
 
   // load every enabled source (already-loaded ones are skipped) when the profile or the source list / enabled flags / order change
@@ -115,6 +117,7 @@ export default function App() {
         </div>
       ))}
       <PinModal />
+      <ExitConfirm />
     </>
   )
 }

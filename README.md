@@ -44,6 +44,6 @@ Android uses the PWA (no native wrapper). Open the app in Chrome on the phone an
 ## Supabase setup (optional cloud sync)
 1. Create a project at supabase.com (Authentication > Providers: Email enabled; turn off "Confirm email" if you want instant sign-in).
 2. Open SQL Editor and run `supabase/schema.sql` once (creates `public.user_data` with row-level security).
-3. Project Settings > API: copy the Project URL and the **anon** public key. Either put them in `.env.local` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (restart dev / rebuild), or paste them in Settings > Account & sync.
-4. Sign up / sign in there on each device. Optionally set an encryption passphrase (needs https or localhost; use the same one on every device). Sources hold IPTV credentials, so encrypt.
+3. Project Settings > API: copy the Project URL and the **anon** public key into `.env` (copy `.env.example`) as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, then restart the dev server / rebuild. The project is set at build time for the whole app; users never enter it. Without these, the app hides sync and runs without accounts.
+4. On first launch users choose "Sign in" (sync, backup, restore on a new TV) or "Continue without an account" (private, offline, no sign-up); they can sign in later in Settings > Account & sync. Optionally set an encryption passphrase (needs https or localhost; use the same one on every device). Sources hold IPTV credentials, so encrypt.
 5. Never use the service-role key in this app.

@@ -30,7 +30,7 @@ export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups
     <div className="shrink-0">
       <div className="rail no-scrollbar -mb-2 !gap-2">
         {list.map((g) => (
-          <button key={g} data-nav data-pill onKeyDown={(e) => onKey(e, g)} onContextMenu={(e) => onCtx(e, g)} onClick={() => onPick(g)}
+          <button key={g} data-nav data-pill aria-pressed={g === active} onKeyDown={(e) => onKey(e, g)} onContextMenu={(e) => onCtx(e, g)} onClick={() => onPick(g)}
             className={cn("flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-5 text-base", g === active ? "bg-accent-blue-container text-[#d3e3fd]" : "bg-surface-2 text-foreground/80")}>
             {g === FAV && <Star className="size-4" />}
             {lockKey(g) && <Lock className="size-3.5" />}

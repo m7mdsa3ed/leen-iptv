@@ -13,7 +13,7 @@ export default function Genre({ id }: { id: string }) {
           <div className="flex flex-wrap items-center gap-3 pb-1 pt-4">
             <h1 className="atv-h1 mr-auto min-w-0 truncate text-[2.5rem]">{genre}</h1>
             {related.map((g) => <Capsule key={g} className="!min-h-11 !px-6 !text-base" onClick={() => openCategory(g)}>{g}</Capsule>)}
-            {available && hasMore && <Capsule primary disabled={loading} className="!min-h-11 !px-6 !text-base" onClick={() => void more()}>{loading ? "Searching..." : "Find more"}</Capsule>}
+            {available && hasMore && <Capsule primary aria-disabled={loading} className="!min-h-11 !px-6 !text-base aria-disabled:opacity-50" onClick={() => { if (!loading) void more() }}>{loading ? "Searching..." : "Find more"}</Capsule>}
           </div>
           <SourceFilter className="mt-2" />
           {!available ? (

@@ -39,7 +39,7 @@ export default function Shell({ page, title, children }: ShellProps) {
             <h1 className="sr-only">{title}</h1>
             <LeenMark className="mr-1 size-10" />
             {search}
-            <nav data-nav-wrap className="-m-3 ml-0 flex min-w-0 gap-1 overflow-x-auto p-3 no-scrollbar">
+            <nav data-nav-wrap aria-label="Main" className="-m-3 ml-0 flex min-w-0 gap-1 overflow-x-auto p-3 no-scrollbar">
               {tabs.map(({ key: k, label, route }) => (
                 <button key={k} data-nav data-pill data-nav-home={k === page ? "" : undefined} aria-current={k === page ? "page" : undefined} data-autofocus={k === page ? "" : undefined} onClick={() => go(route)}
                   className={cn("gtv-tab min-h-11 rounded-full px-3 py-2 text-base font-medium lg:px-5", k === page ? "text-foreground" : "text-muted-foreground hover:bg-[var(--fg-10)] hover:text-foreground")}>
@@ -53,9 +53,9 @@ export default function Shell({ page, title, children }: ShellProps) {
       </header>
       <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6")}>{children}</main>
       {mobile && (
-        <nav className="flex shrink-0 bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <nav data-nav-wrap aria-label="Main" className="flex shrink-0 bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
           {tabs.map(({ key: k, label, route, icon: Icon }) => (
-            <button key={k} data-nav data-nav-home={k === page ? "" : undefined} onClick={() => go(route)} className={cn("flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[11px] [@media(max-height:500px)]:h-12", k === page ? "text-foreground" : "text-muted-foreground")}>
+            <button key={k} data-nav data-pill data-nav-home={k === page ? "" : undefined} aria-current={k === page ? "page" : undefined} onClick={() => go(route)} className={cn("flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[11px] [@media(max-height:500px)]:h-12", k === page ? "text-foreground" : "text-muted-foreground")}>
               <span className={cn("grid h-8 w-16 place-items-center rounded-full", k === page && "bg-accent-blue-container")}><Icon className="size-5" /></span>
               {label}
             </button>

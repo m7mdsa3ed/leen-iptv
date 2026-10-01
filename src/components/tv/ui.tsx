@@ -69,6 +69,7 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx }: { items: 
           key={g}
           data-nav
           data-pill
+          aria-pressed={g === active}
           onClick={() => onPick(g)}
           onKeyDown={onKey && ((e) => onKey(e, g))}
           onContextMenu={onCtx && ((e) => onCtx(e, g))}
@@ -145,7 +146,7 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render }:
   const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3 })
   useEffect(() => v.measure(), [rowH, v])
   return (
-    <div ref={ref} className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4">
+    <div ref={ref} data-vscroll className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4">
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((r) => (
           <div key={r.key} className="absolute inset-x-0 grid" style={{ top: r.start, gap, gridTemplateColumns: `repeat(${c}, minmax(0, 1fr))` }}>
@@ -163,7 +164,7 @@ export function VList<T>({ items, rowH: baseH, render, className }: { items: T[]
   const v = useVirtualizer({ count: items.length, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 8 })
   useEffect(() => v.measure(), [rowH, v])
   return (
-    <div ref={ref} className={cn("h-full overflow-y-auto [--s:1.025]", className)}>
+    <div ref={ref} data-vscroll className={cn("h-full overflow-y-auto [--s:1.025]", className)}>
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((r) => (
           <div key={r.key} className="absolute inset-x-0 px-5" style={{ top: r.start, height: rowH }}>

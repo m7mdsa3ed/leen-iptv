@@ -7,7 +7,7 @@ import type { LayoutId } from "./layouts"
 import type { Profile, Source } from "./types"
 
 type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }> }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; theme: "system" | "dark" | "light"; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; meta?: ProviderCfg[] }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; meta?: ProviderCfg[] }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
 const empty = (): PData => ({ favs: [], recents: [], progress: {} })
@@ -52,7 +52,7 @@ export const useApp = create<S>()(
       sourceId: null,
       sourceFilter: null,
       data: {},
-      settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, trackHistory: true, theme: "system", layout: "googletv", motion: isTv ? "reduced" : "full", sourceBadges: true },
+      settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, trackHistory: true, accountChoice: "unset", theme: "system", layout: "googletv", motion: isTv ? "reduced" : "full", sourceBadges: true },
       addProfile: (name, pin) =>
         set((s) => ({ profiles: [...s.profiles, { id: uid(), name, pin, color: COLORS[s.profiles.length % COLORS.length], locked: [] }] })),
       updateProfile: (id, p) => set((s) => ({ profiles: s.profiles.map((x) => (x.id === id ? { ...x, ...p } : x)) })),

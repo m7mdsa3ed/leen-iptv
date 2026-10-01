@@ -17,20 +17,11 @@ export function badKey(k: string): string | null {
 
 export const normUrl = (u: string) => u.trim().replace(/\/+$/, "").replace(/\/(rest|auth)\/v1$/, "")
 
+/** The Supabase project comes ONLY from the build environment (.env: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) - one project for the whole app,
+ *  never entered per user. Leftover per-device config from earlier builds is removed. */
 export function loadConfig(): Config {
-  try {
-    const c = JSON.parse(localStorage.getItem(CFG_KEY) || "null") as Config | null
-    if (c?.url && c.anonKey && !badKey(c.anonKey)) return c
-  } catch { /* fall through */ }
-  return ENV.url && ENV.anonKey && !badKey(ENV.anonKey) ? ENV : { url: "", anonKey: "" }
-}
-export function saveConfig(c: Config) {
-  const url = normUrl(c.url), anonKey = c.anonKey.trim()
-  if (!url && !anonKey) { localStorage.removeItem(CFG_KEY); return }
-  const bad = badKey(anonKey)
-  if (bad) throw new Error(bad)
-  if (!/^https?:\/\/.+/.test(url)) throw new Error("The project URL should look like https://xxxx.supabase.co")
-  localStorage.setItem(CFG_KEY, JSON.stringify({ url, anonKey }))
+  try { localStorage.removeItem(CFG_KEY) } catch { /* ignore */ }
+  return ENV.url && ENV.anonKey && !badKey(ENV.anonKey) ? { url: normUrl(ENV.url), anonKey: ENV.anonKey.trim() } : { url: "", anonKey: "" }
 }
 export const envConfigured = !!(ENV.url && ENV.anonKey)
 

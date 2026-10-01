@@ -66,7 +66,7 @@ export default function SettingsPage() {
                     {g.map((k) => {
                       const s = SECTIONS.find((x) => x.key === k)!
                       return (
-                        <button key={k} data-nav data-pill data-sec={k} data-nav-home={i === 0 && k === "account" ? "" : undefined} onClick={() => select(k)} className="atv-set-row">
+                        <button key={k} data-nav data-pill data-sec={k} onClick={() => select(k)} className="atv-set-row">
                           <s.icon className="atv-set-ico" />
                           <span className="min-w-0 flex-1 truncate text-left">{s.title}</span>
                           {value[k] && <span className="atv-set-val truncate">{value[k]}</span>}

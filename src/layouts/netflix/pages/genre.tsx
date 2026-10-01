@@ -16,7 +16,7 @@ export default function GenrePage({ id }: { id: string }) {
             {!isTv && <button data-nav aria-label="Back" onClick={back} className="nf-hbtn"><ArrowLeft className="size-6" /></button>}
             <h1 className="nf-h1">{genre}</h1>
             {related.map((g) => <button key={g} data-nav onClick={() => openCategory(g)} className="nf-drop">{g}</button>)}
-            {available && hasMore && <button data-nav disabled={loading} onClick={() => void more()} className="nf-drop">{loading ? "Searching..." : "Find more"}</button>}
+            {available && hasMore && <button data-nav aria-disabled={loading} onClick={() => { if (!loading) void more() }} className="nf-drop aria-disabled:opacity-50">{loading ? "Searching..." : "Find more"}</button>}
           </div>
           <SourceBar />
           {!available ? (

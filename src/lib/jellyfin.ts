@@ -1,5 +1,6 @@
 // Jellyfin server as a source: username/password or Quick Connect sign-in, catalog (per library), live TV + guide when the
 // server has it, detail, HLS URL, progress reporting. The token rides as api_key in the query so GETs stay CORS-simple.
+import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Prog, Source } from "./types"
 import { mixed, plexFetch, px } from "./net"
 import { useApp } from "./store"
@@ -143,11 +144,15 @@ export const jfPlaySession = (item: Item) => `${jfSessionId}${item.sid}`
 /** HLS (h264/aac: plays on Chrome 94 / webOS). Direct URL; the Player wraps it with px/pxStream on mixed content. */
 // ponytail: live uses the channel id as MediaSourceId (the server falls back to the channel's first source); tuners that
 // need an opened live stream would need POST /Items/{id}/PlaybackInfo with AutoOpenLiveStream and its LiveStreamId.
-export const jellyfinStreamUrl = (s: Source, item: Item) =>
-  jfUrl(base(s), `/Videos/${item.sid}/master.m3u8`, {
-    MediaSourceId: item.sid, PlaySessionId: jfPlaySession(item), DeviceId: jfDeviceId(), VideoCodec: "h264", AudioCodec: "aac",
-    MaxStreamingBitrate: 20000000, TranscodingMaxAudioChannels: 2, SegmentContainer: "ts", BreakOnNonKeyFrames: "true",
+export const jellyfinStreamUrl = (s: Source, item: Item, q: StreamQ = STREAM_QS[0]) => {
+  const codecs = q.kbps ? ["h264"] : VIDEO_CODECS // original: copy hevc/av1 untouched when this device decodes them
+  const audio = q.kbps ? ["aac"] : AUDIO_CODECS // and ac3/eac3
+  return jfUrl(base(s), `/Videos/${item.sid}/master.m3u8`, {
+    MediaSourceId: item.sid, PlaySessionId: jfPlaySession(item), DeviceId: jfDeviceId(), VideoCodec: codecs.join(","), AudioCodec: audio.join(","),
+    MaxStreamingBitrate: (q.kbps ?? 200000) * 1000, MaxHeight: q.height, TranscodingMaxAudioChannels: q.kbps ? 2 : 6,
+    SegmentContainer: codecs.length > 1 || audio.includes("eac3") ? "mp4" : "ts", BreakOnNonKeyFrames: "true", // hevc/av1/eac3 need fMP4 segments (hls.js rejects eac3 in TS)
   }, s.token)
+}
 
 // Fire-and-forget: reports must never break playback.
 function send(s: Source, method: string, path: string, params: Record<string, string | number | undefined> = {}, body?: unknown) {
