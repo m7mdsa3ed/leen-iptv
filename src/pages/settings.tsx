@@ -1,7 +1,11 @@
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { Pill } from "@/components/gtv"
+import { ChevronDown, ChevronUp } from "lucide-react"
+import { Pill, RoundButton } from "@/components/gtv"
+import { normalizeCfg } from "@/lib/meta"
+import { PROVIDERS } from "@/lib/meta/providers"
+import type { ProviderCfg } from "@/lib/meta/types"
 import { cn } from "@/lib/utils"
 import { Shell, TvButton, askPin } from "@/components/tv/ui"
 import { useCatalog } from "@/lib/catalog"
@@ -12,7 +16,44 @@ import { useApp, useProfile } from "@/lib/store"
 const Sec = ({ children }: { children: React.ReactNode }) => (
   <section className="flex flex-wrap items-center gap-3 rounded-[28px] bg-surface p-5 md:p-6">{children}</section>
 )
-const TABS = ["Sources", "Profile & PIN", "Display", "Network"] as const
+const TABS = ["Sources", "Profile & PIN", "Display", "Metadata", "Network"] as const
+
+/** Movie/series info providers, tried top to bottom (first non-empty value per field wins; ratings from all are kept). */
+function MetaSettings() {
+  const { settings, setSettings } = useApp()
+  const cfgs = normalizeCfg(settings.meta)
+  const save = (next: ProviderCfg[]) => setSettings({ meta: next })
+  const patch = (id: string, p: Partial<ProviderCfg>) => save(cfgs.map((c) => (c.id === id ? { ...c, ...p } : c)))
+  const move = (i: number, d: number) => {
+    const n = [...cfgs]
+    const j = i + d
+    if (j < 0 || j >= n.length) return
+    ;[n[i], n[j]] = [n[j], n[i]]
+    save(n)
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-muted-foreground">Details, cast, ratings and similar titles for movies and series. Providers are tried top to bottom and the first one with a value wins; ratings from all are shown. Similar titles only appear when they are in your catalog. Results are cached for a week.</p>
+      {cfgs.map((c, i) => {
+        const p = PROVIDERS.find((x) => x.id === c.id)!
+        return (
+          <section key={c.id} className="flex flex-col gap-3 rounded-[28px] bg-surface p-5 md:p-6">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1 text-xl font-medium">{i + 1}. {p.name}</div>
+              <RoundButton label="Move up" onClick={() => move(i, -1)}><ChevronUp /></RoundButton>
+              <RoundButton label="Move down" onClick={() => move(i, 1)}><ChevronDown /></RoundButton>
+              <Switch data-nav checked={c.enabled} onCheckedChange={(v) => patch(c.id, { enabled: v })} aria-label={`Use ${p.name}`} />
+            </div>
+            {p.needsKey && <Input data-nav className="h-12 w-full max-w-[32rem] rounded-2xl text-base focus-visible:ring-0 md:text-lg [html[data-mode=mobile]_&]:text-[16px]" type="password" autoComplete="off" spellCheck={false} placeholder="API key" value={c.key ?? ""} onChange={(e) => patch(c.id, { key: e.target.value.trim() })} />}
+            {p.hasLang && <Input data-nav className="h-12 w-full max-w-[20rem] rounded-2xl text-base focus-visible:ring-0 md:text-lg [html[data-mode=mobile]_&]:text-[16px]" autoComplete="off" spellCheck={false} placeholder="Language, e.g. en-US or ar-SA" value={c.lang ?? ""} onChange={(e) => patch(c.id, { lang: e.target.value.trim() })} />}
+            {p.hint && <div className="text-sm text-muted-foreground">{p.hint}</div>}
+            {c.id === "xtream" && <div className="text-sm text-muted-foreground">What your panel already provides (plot, genre, cast names, rating, and TMDB/IMDb ids that make the other providers exact).</div>}
+          </section>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function SettingsPage() {
   const { sources, sourceId, settings, setSettings, setSource, removeSource, updateProfile, removeProfile, profiles } = useApp()
@@ -73,6 +114,7 @@ export default function SettingsPage() {
           ))}
           <div className="w-full text-muted-foreground">Layout: {mode}{getOverride() === "auto" ? " (auto-detected)" : " (manual)"}. Changing it reloads the app. Add ?tv=1 to the URL to force TV layout.</div>
         </Sec>}
+        {tab === "Metadata" && <MetaSettings />}
         {tab === "Network" && <Sec>
           <Input data-nav className="h-12 w-full rounded-2xl max-w-[32rem] text-base focus-visible:ring-0 md:text-lg [html[data-mode=mobile]_&]:text-[16px]" type="url" inputMode="url" autoComplete="off" spellCheck={false} placeholder="CORS proxy: http://host:8787 or https://proxy.corsfix.com/?" value={settings.proxy} onChange={(e) => setSettings({ proxy: e.target.value.trim() })} />
           <label className="flex min-h-11 items-center gap-3 text-lg"><Switch data-nav className="after:-inset-y-3.5" checked={settings.proxyStreams} onCheckedChange={(v) => setSettings({ proxyStreams: v })} /> Proxy streams too</label>

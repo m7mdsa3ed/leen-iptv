@@ -12,6 +12,7 @@
     <link rel="alternate icon" href="./icon.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <title>Leen IPTV</title>
+    <style>html{background:#0e0f11;color:#fff}html:not(.dark){background:#f4f5f7;color:#1f1f1f}</style>
     <script>
       // set the theme before first paint (no flash); mirrors src/lib/theme.ts
       var t
@@ -21,7 +22,13 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- boot splash: shown until React mounts (replaced automatically) -->
+      <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;font:500 1.5rem system-ui,sans-serif;opacity:.85">
+        <img src="./logo.svg" alt="" width="96" height="96" />
+        <span>Leen IPTV</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   <script>
       if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !/Web0S|webOS|SmartTV/i.test(navigator.userAgent))

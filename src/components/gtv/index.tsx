@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode, WheelEvent } from "react"
-import { Info, Lock, Play, Star } from "lucide-react"
+import { ChevronRight, Info, Lock, Play, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/lib/store"
 import { Logo, useLocked } from "@/components/tv/ui"
@@ -19,10 +19,18 @@ const wheel = (e: WheelEvent<HTMLDivElement>) => {
 }
 
 /** Title over a horizontally scrolling row. Children are Cards (or anything shrink-0). Bleeds to the screen edges. */
-export const Rail = ({ title, children, className }: { title?: ReactNode; children: ReactNode; className?: string }) => (
-  <section className={cn("mb-2 [content-visibility:auto] [contain-intrinsic-size:auto_18rem]", className)}>
-    {title ? <SectionTitle className="mb-1">{title}</SectionTitle> : null}
-    <div className="rail" onWheel={wheel}>{children}</div>
+export const Rail = ({ title, children, className, onSeeAll }: { title?: ReactNode; children: ReactNode; className?: string; onSeeAll?: () => void }) => (
+  // No content-visibility here: off-screen rails would have no layout boxes, so D-pad navigation could not find the rail above/below
+  // and focus jumped to the top bar. Cards are capped per rail and images are lazy, so rendering them all is cheap enough.
+  <section className={cn("-mx-[var(--gx)] mb-2", className)}>
+    {title && onSeeAll ? (
+      <div className="px-[var(--gx)]">
+        <button data-nav data-pill onClick={onSeeAll} aria-label={`See all: ${typeof title === "string" ? title : ""}`} className="-ml-3 mb-1 inline-flex items-center gap-1 rounded-full px-3 py-1 text-2xl font-medium tracking-tight text-foreground">
+          {title}<ChevronRight className="size-6 text-muted-foreground" />
+        </button>
+      </div>
+    ) : title ? <SectionTitle className="mb-1 px-[var(--gx)]">{title}</SectionTitle> : null}
+    <div className="rail !mx-0" onWheel={wheel}>{children}</div>
   </section>
 )
 
@@ -114,7 +122,7 @@ export function Hero({ item, onPlay, onInfo, onFav, isFav, kicker, children }: {
       <div className="absolute inset-0 bg-background/40" />
       <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-      <div className="relative flex min-h-[min(20rem,55vh)] flex-col justify-end gap-3 px-[var(--gx)] pb-6 pt-10 md:min-h-[min(24rem,50vh)]">
+      <div className="relative flex min-h-[min(20rem,55vh)] flex-col justify-end gap-3 px-[var(--gx)] pb-6 pt-[calc(var(--hdr)+2.5rem)] md:min-h-[min(24rem,50vh)]">
         {kicker ? <div className="text-sm font-medium uppercase tracking-widest text-accent-blue">{kicker}</div> : null}
         {item && (
           <>
@@ -151,5 +159,53 @@ export function LeenMark({ className }: { className?: string }) {
       <rect x="28" y="60" width="46" height="14" rx="7" fill="#fff" />
       <path d="M52 30v22l20-11z" fill="#fff" stroke="#fff" strokeWidth="5" strokeLinejoin="round" />
     </svg>
+  )
+}
+
+/* ---------- loading skeletons (same footprints as the real Card / Rail / Hero so nothing jumps when data arrives) ---------- */
+const sk = "animate-pulse bg-surface-2"
+
+export const SkelBar = ({ className }: { className?: string }) => <div aria-hidden className={cn(sk, "h-4 rounded-full", className)} />
+
+export function SkelCard({ variant = "poster", fluid }: { variant?: "poster" | "wide"; fluid?: boolean }) {
+  return (
+    <div aria-hidden className={cn("shrink-0", fluid ? "w-full" : variant === "wide" ? "w-64" : "w-[9.5rem]")}>
+      <div className={cn(sk, "rounded-2xl", variant === "wide" ? "aspect-video" : "aspect-[2/3]")} />
+      <SkelBar className="mx-1 mt-3 w-3/4" />
+    </div>
+  )
+}
+
+export function SkelRail({ variant = "poster", n = 10, title = true }: { variant?: "poster" | "wide"; n?: number; title?: boolean }) {
+  return (
+    <section aria-hidden className="-mx-[var(--gx)] mb-2">
+      {title && <div className={cn(sk, "mx-[var(--gx)] mb-1 h-7 w-56 rounded-full")} />}
+      <div className="rail !mx-0 overflow-hidden">{Array.from({ length: n }, (_, i) => <SkelCard key={i} variant={variant} />)}</div>
+    </section>
+  )
+}
+
+export function SkelGrid({ variant = "poster", n = 18 }: { variant?: "poster" | "wide"; n?: number }) {
+  return (
+    <div aria-hidden className="grid gap-4 pt-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${variant === "wide" ? "14rem" : "9.5rem"}, 1fr))` }}>
+      {Array.from({ length: n }, (_, i) => <SkelCard key={i} variant={variant} fluid />)}
+    </div>
+  )
+}
+
+export function SkelHero() {
+  return (
+    <section aria-hidden className="relative -mx-[var(--gx)] mb-4 overflow-hidden bg-gradient-to-br from-accent-blue-container via-surface to-background">
+      <div className="relative flex min-h-[min(20rem,55vh)] flex-col justify-end gap-3 px-[var(--gx)] pb-6 pt-[calc(var(--hdr)+2.5rem)] md:min-h-[min(24rem,50vh)]">
+        <SkelBar className="w-28" />
+        <div className={cn(sk, "h-10 w-96 max-w-full rounded-full")} />
+        <SkelBar className="w-64 max-w-full" />
+        <div className="mt-2 flex items-center gap-3">
+          <div className={cn(sk, "h-12 w-32 rounded-full")} />
+          <div className={cn(sk, "size-12 rounded-full")} />
+          <div className={cn(sk, "size-12 rounded-full")} />
+        </div>
+      </div>
+    </section>
   )
 }

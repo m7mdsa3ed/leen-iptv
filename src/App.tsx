@@ -7,10 +7,13 @@ import { useTheme } from "@/lib/theme"
 import { installNav, useRoute } from "@/lib/nav"
 import { useApp, useSource } from "@/lib/store"
 import Browse from "@/pages/browse"
+import CategoryPage from "@/pages/category"
 import Detail from "@/pages/detail"
+import GenrePage from "@/pages/genre"
 import Guide from "@/pages/guide"
 import Home from "@/pages/home"
 import Live from "@/pages/live"
+import PersonPage from "@/pages/person"
 import Player from "@/pages/player"
 import Profiles from "@/pages/profiles"
 import Search from "@/pages/search"
@@ -39,6 +42,9 @@ function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
     case "series": return <Browse kind="series" />
     case "search": return <Search />
     case "settings": return <Settings />
+    case "genre": return <GenrePage id={r.p!.id as string} />
+    case "category": return <CategoryPage id={r.p!.id as string} />
+    case "person": return <PersonPage id={r.p!.id as string | undefined} name={r.p!.name as string | undefined} />
     case "detail": return <Detail id={r.p!.id as string} />
     case "player": return r.p!.queue ? <Player queue={r.p!.queue as never} index={r.p!.index as number} /> : <RestorePlayer id={r.p!.id as string} />
     default: return null

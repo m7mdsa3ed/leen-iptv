@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { isTv, useMode } from "@/lib/device"
 import { focusFirst, useRoute } from "@/lib/nav"
 import { useApp, useProfile, useSource } from "@/lib/store"
-import { Avatar, Card, LeenMark, RoundButton } from "@/components/gtv"
+import { Avatar, Card, LeenMark, RoundButton, SkelGrid, SkelRail } from "@/components/gtv"
 import { useCatalog } from "@/lib/catalog"
 import type { Item } from "@/lib/types"
 
@@ -109,7 +109,9 @@ export function useOpen() {
   const p = useProfile()
   return async (item: Item, queue?: Item[]) => {
     if (p?.pin && p.locked.includes(`${item.kind}|${item.group}`) && !(await askPin(p.pin))) return
-    if (item.kind === "live") go("player", { queue: queue ?? [item], index: Math.max(0, (queue ?? [item]).indexOf(item)) })
+    // the zapping list must contain the channel, otherwise indexOf is -1 and the player would start the first channel of the list
+    const q = queue?.includes(item) ? queue : [item]
+    if (item.kind === "live") go("player", { queue: q, index: q.indexOf(item) })
     else go("detail", { id: item.id })
   }
 }
@@ -204,8 +206,9 @@ export function Shell({ page, title, children }: { page: string; title?: string;
   )
   const state = <span className={cn("text-muted-foreground", tv ? "text-xl" : "text-sm")}>{status === "loading" ? "Updating... " : ""}<Clock /></span>
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-background text-foreground">
-      <header className={cn("flex shrink-0 items-center gap-2 px-[var(--gx)]", mobile ? "min-h-14 pt-[max(0.25rem,env(safe-area-inset-top))]" : tv ? "pb-2 pt-6" : "pb-2 pt-4")}>
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background text-foreground">
+      <div aria-hidden className="hdr-fade pointer-events-none absolute inset-x-0 top-0 z-20 h-[calc(var(--hdr)+1.5rem)]" />
+      <header className={cn("absolute inset-x-0 top-0 z-30 flex items-center gap-2 px-[var(--gx)]", mobile ? "min-h-14 pt-[max(0.25rem,env(safe-area-inset-top))]" : tv ? "pb-2 pt-6" : "pb-2 pt-4")}>
         {mobile ? (
           <>
             <LeenMark className="size-8" />
@@ -219,7 +222,7 @@ export function Shell({ page, title, children }: { page: string; title?: string;
             <h1 className="sr-only">{title}</h1>
             <LeenMark className="mr-1 size-10" />
             {search}
-            <nav className="ml-2 flex min-w-0 gap-1 overflow-x-auto no-scrollbar">
+            <nav className="-m-2 ml-0 flex min-w-0 gap-1 overflow-x-auto p-2 no-scrollbar">
               {TABS.map(([k, label]) => (
                 <button key={k} data-nav data-pill data-autofocus={k === page ? "" : undefined} onClick={() => go(k)}
                   className={cn("min-h-11 rounded-full px-3 py-2 text-base font-medium lg:px-5", k === page ? "bg-surface-2 text-foreground" : "text-foreground/60 hover:bg-foreground/10 hover:text-foreground")}>
@@ -231,7 +234,7 @@ export function Shell({ page, title, children }: { page: string; title?: string;
           </>
         )}
       </header>
-      <main className={cn("min-h-0 flex-1 px-[var(--gx)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6")}>{children}</main>
+      <main className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6")}>{children}</main>
       {mobile && (
         <nav className="flex shrink-0 bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
           {BOTTOM.map(([k, label, Icon]) => (
@@ -254,10 +257,16 @@ export const Empty = ({ children }: { children: ReactNode }) => (
 export const focusFirstSoon = () => { requestAnimationFrame(() => requestAnimationFrame(focusFirst)) }
 
 /** Catalog not ready: show progress, or the reason it failed with a retry. */
-export function Pending() {
+export function Pending({ shape = "rails" }: { shape?: "rails" | "grid" }) {
   const { status, msg } = useCatalog()
   const src = useSource()
-  if (status !== "error") return <Empty>{msg || "Loading"}...</Empty>
+  if (status !== "error")
+    return (
+      <div role="status" className="h-full overflow-hidden pt-2">
+        <div className="mb-3 text-base text-muted-foreground">{msg || "Loading"}...</div>
+        {shape === "grid" ? <SkelGrid variant="wide" /> : <><SkelRail variant="wide" /><SkelRail /><SkelRail /></>}
+      </div>
+    )
   return (
     <Empty>
       <div className="flex max-w-xl flex-col items-center gap-4 px-6 text-center">

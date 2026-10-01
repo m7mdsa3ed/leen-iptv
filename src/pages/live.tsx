@@ -25,7 +25,7 @@ export default function Live() {
 
   return (
     <Shell page="live" title="Live TV">
-      {status !== "ready" ? <Pending /> : (
+      {status !== "ready" ? <Pending shape="grid" /> : (
         <div className="flex h-full flex-col gap-3">
           <GroupList kind="live" groups={groups.live} active={g} onPick={setG} />
           <div className="flex min-h-[5.5rem] shrink-0 items-center gap-4 rounded-3xl bg-surface p-3 pr-5">

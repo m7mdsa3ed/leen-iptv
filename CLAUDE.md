@@ -25,14 +25,14 @@ One React app for LG webOS 23+ (Chromium 94), desktop browsers and Android (inst
 - TV: `pnpm package` then `pnpm install:tv`. Desktop and Android: installable PWA (HTTPS needed for the install prompt, e.g. `tailscale serve --bg 4010`).
 
 ## Layout
-- `src/lib/`: `store.ts` (profiles, sources, favorites, progress, settings; zustand persist), `catalog.ts` (catalog + EPG loading, IndexedDB cache), `nav.ts` (stack router, hash URLs, History sync, D-pad spatial nav, key codes), `device.ts` (mode tv/desktop/mobile + manual override), `net.ts` (proxy, errors), `parse.ts` (M3U, XMLTV), `xtream.ts`, `quality.ts`.
+- `src/lib/`: `store.ts` (profiles, sources, favorites, progress, settings; zustand persist), `catalog.ts` (catalog + EPG loading, IndexedDB cache), `nav.ts` (stack router, hash URLs, History sync, D-pad spatial nav, key codes), `device.ts` (mode tv/desktop/mobile + manual override), `net.ts` (proxy, errors), `parse.ts` (M3U, XMLTV), `xtream.ts`, `quality.ts`, `meta/` (movie/series info providers: `providers.ts` registry with Xtream/TMDB/OMDb adapters, `index.ts` merge + cache + hooks, `title.ts` name cleaner; add a source by writing one `Provider` (optional `person()` for cast profiles) and listing it in `PROVIDERS`). Cast tiles on Detail open `pages/person.tsx` (`#/person/<tmdbId|name>`).
 - Google TV look: `src/components/gtv/` (SectionTitle, Rail, Card poster|wide, Pill, RoundButton, Avatar, Hero). Pages are vertical stacks of rails; focused item = white pill/3px ring + scale. Dark neutral surfaces, one blue accent.
 - `src/pages/*`: one file per screen. `src/components/tv/`: shared UI (`ui.tsx` Shell = top nav bar (search, tabs, avatar, clock; mobile: app bar + bottom nav), VGrid/VList/Poster/PinModal, `groups.tsx`, `boundary.tsx`). `src/components/ui/`: shadcn (Base UI).
 - `server/proxy-core.mjs`: `/p?url=` proxy used by Vite dev/preview and `server/proxy.mjs`.
 
 ## Things that are easy to break
 - **Modes:** `html[data-mode=tv|desktop|mobile]`; `isTv` is a load-time constant, so changing the override reloads. TV text scale is `--tv-scale` (Settings); pixel-sized layouts multiply by `useK()`.
-- **Routing:** hash URLs (`#/live`, `#/detail/<id>`, `#/player/<id>`) so refresh keeps the page; entry 0 in history is a guard so Back never leaves the app. The picked profile lives in `sessionStorage`.
+- **Routing:** hash URLs (`#/live`, `#/detail/<id>`, `#/player/<id>`, `#/category/<kind>|<name>`, `#/genre/<kind>|<genre>` (TMDB discover matched to the catalog), `#/person/<id|name>`) so refresh keeps the page; entry 0 in history is a guard so Back never leaves the app. The picked profile lives in `sessionStorage`.
 - **CORS:** providers 302 streams to hosts without CORS headers. `px()` / `pxStream()` use the same-origin `/p` proxy automatically when the server has it (probed at startup), else an explicit proxy from Settings. HLS playlists are rewritten so segments go through `/p`.
 - **Playback:** `.m3u8` (judged on the raw URL) -> hls.js; live non-HLS -> mpegts.js; VOD -> native, falling back to hls.js when a `.mp4` URL redirects to a playlist. Errors are mapped to plain messages in `net.ts` (`explain`, `statusMsg`).
 - Provider-side 404s (a title missing on their server) are not app bugs; the player says so.

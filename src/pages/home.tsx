@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Shell, TvButton, useOpen, Empty } from "@/components/tv/ui"
-import { Card, Hero, Rail } from "@/components/gtv"
+import { Card, Hero, Rail, SkelHero, SkelRail } from "@/components/gtv"
 import { hm, nowNext, useCatalog } from "@/lib/catalog"
 import { usePData, useApp, useSource } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
@@ -77,20 +77,27 @@ export default function Home() {
   const liveQ = live
   const track = (i: Item, kicker: string) => () => heroBind.current?.({ item: i, kicker })
   const wide = (items: Item[], kicker: string, showPct?: boolean) => items.map((i) => (
-    <Card key={i.id} item={i} variant="wide" pct={showPct ? pct(i) : undefined} onOpen={() => open(i, liveQ)} onFocus={track(i, kicker)} />
+    <Card key={i.id} item={i} variant="wide" pct={showPct ? pct(i) : undefined} onOpen={() => open(i, items.filter((x) => x.kind === "live"))} onFocus={track(i, kicker)} />
   ))
   const poster = (items: Item[], kicker: string) => items.map((i) => <Card key={i.id} item={i} onOpen={() => open(i)} onFocus={track(i, kicker)} />)
   const sub = (i: Item) => { const n = nowNext(epg, i.epgId).now; return n ? `${hm(n.s)} ${n.t}` : undefined }
 
   return (
     <Shell page="home" title={src?.name ?? "Home"}>
-      {status === "loading" && <Empty>{msg}...</Empty>}
+      {status === "loading" && (
+        <div role="status" className="-mx-[var(--gx)] -mt-[var(--hdr)] h-[calc(100%+var(--hdr))] overflow-hidden px-[var(--gx)]">
+          <SkelHero />
+          <div className="mb-2 text-base text-muted-foreground">{msg}...</div>
+          <SkelRail variant="wide" />
+          <SkelRail />
+        </div>
+      )}
       {status === "error" && (
         <Empty><div className="flex flex-col items-center gap-4"><div className="text-destructive">{msg}</div>
           <div className="flex gap-3"><TvButton onClick={() => src && useCatalog.getState().load(src, proxy, true)}>Retry</TvButton><TvButton variant="secondary" onClick={() => go("sources")}>Change source</TvButton></div></div></Empty>
       )}
       {status === "ready" && (
-        <div ref={scroller} className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] [scroll-padding-block:4rem]">
+        <div ref={scroller} className="-mx-[var(--gx)] -mt-[var(--hdr)] h-[calc(100%+var(--hdr))] overflow-y-auto px-[var(--gx)] [scroll-padding-top:calc(var(--hdr)+1rem)] [scroll-padding-bottom:4rem]">
           <div onFocus={() => scroller.current?.scrollTo({ top: 0 })}>
           <HeroSlot base={base} bind={heroBind} queue={liveQ} />
           </div>
@@ -102,7 +109,7 @@ export default function Home() {
               {live.map((i) => <Card key={i.id} item={i} variant="wide" sub={sub(i)} onOpen={() => open(i, liveQ)} onFocus={track(i, "Live now")} />)}
             </Rail>
           )}
-          {genres.map((r) => <Rail key={r.k + r.g} title={`${r.k === "movie" ? "Movies" : "Series"} · ${r.g}`}>{poster(r.items, `${r.k === "movie" ? "Movies" : "Series"} · ${r.g}`)}</Rail>)}
+          {genres.map((r) => <Rail key={r.k + r.g} title={`${r.k === "movie" ? "Movies" : "Series"} · ${r.g}`} onSeeAll={() => go("category", { id: `${r.k}|${r.g}` })}>{poster(r.items, `${r.k === "movie" ? "Movies" : "Series"} · ${r.g}`)}</Rail>)}
         </div>
       )}
     </Shell>

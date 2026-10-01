@@ -1,9 +1,10 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
+import type { ProviderCfg } from "./meta/types"
 import type { Profile, Source } from "./types"
 
 type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }> }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; theme: "system" | "dark" | "light" }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; theme: "system" | "dark" | "light"; meta?: ProviderCfg[] }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
 const empty = (): PData => ({ favs: [], recents: [], progress: {} })

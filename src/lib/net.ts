@@ -45,11 +45,11 @@ export function explain(e: unknown): string {
 }
 
 // AbortSignal.timeout is Chrome 103; webOS 23 is Chromium 94.
-export async function fetchT(url: string, ms = 60000): Promise<Response> {
+export async function fetchT(url: string, ms = 60000, init?: RequestInit): Promise<Response> {
   const c = new AbortController()
   const t = setTimeout(() => c.abort(), ms)
   try {
-    const r = await fetch(url, { signal: c.signal })
+    const r = await fetch(url, { ...init, signal: c.signal })
     if (!r.ok) throw new HttpError(r.status)
     return r
   } finally {

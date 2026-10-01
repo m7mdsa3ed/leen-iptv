@@ -9,5 +9,7 @@
   "largeIcon": "largeIcon.png",
   "bgColor": "#0e0f11",
   "resolution": "1920x1080",
-  "disableBackHistoryAPI": true
+  "disableBackHistoryAPI": true,
+  "bgImage": "splash.png",
+  "splashBackground": "splash.png"
 }

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react"
 import { ALL, FAV } from "@/components/tv/groups"
-import { Card, Rail } from "@/components/gtv"
+import { Card, Rail, SectionTitle } from "@/components/gtv"
+import { useGenres } from "@/lib/meta"
 import { Chips, Empty, Shell, VGrid, useOpen, Pending, askPin } from "@/components/tv/ui"
 import { useCatalog } from "@/lib/catalog"
 import { useMode } from "@/lib/device"
-import { KEY } from "@/lib/nav"
+import { KEY, useRoute } from "@/lib/nav"
 import { useApp, usePData, useProfile } from "@/lib/store"
 import type { Item, Kind } from "@/lib/types"
 
@@ -18,7 +19,10 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
   const toggleLock = useApp((s) => s.toggleLock)
   const open = useOpen()
   const mode = useMode()
+  const go = useRoute((s) => s.go)
+  const genreNames = useGenres(kind)
   const [g, setG] = useState(ALL)
+  const openCategory = (c: string) => go("category", { id: `${kind}|${c}` })
   const lockKey = (c: string) => `${kind}|${c}`
   const pct = (i: Item) => d.progress[i.id] && (d.progress[i.id].pos / d.progress[i.id].dur) * 100
   const items = useMemo(() => (g === FAV ? byKind[kind].filter((i) => d.favs.includes(i.id)) : g === ALL ? [] : byKind[kind].filter((i) => i.group === g)), [g, byKind, kind, d.favs])
@@ -39,12 +43,12 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
     <Shell page={kind === "movie" ? "movies" : "series"} title={kind === "movie" ? "Movies" : "Series"}>
       {status !== "ready" ? <Pending /> : (
         <div className="flex h-full flex-col">
-          <Chips items={[ALL, FAV, ...groups[kind]]} active={g} onPick={setG} locked={(c) => !!p?.locked.includes(lockKey(c))}
+          <Chips items={[ALL, FAV, ...groups[kind]]} active={g} onPick={(c) => (c === ALL || c === FAV ? setG(c) : openCategory(c))} locked={(c) => !!p?.locked.includes(lockKey(c))}
             onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
             onCtx={(e, c) => { if (mode !== "tv" && p?.pin && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
           <div className="min-h-0 flex-1">
             {g === ALL ? (
-              rails.length ? <div className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] no-scrollbar">{rails.map(([c, a]) => <Rail key={c} title={c}>{a.map(card)}</Rail>)}</div> : <Empty>Nothing here</Empty>
+              rails.length ? <div className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] no-scrollbar">{genreNames.length > 0 && <section className="mb-2"><SectionTitle>Genres</SectionTitle><Chips items={genreNames} active="" onPick={(n) => go("genre", { id: `${kind}|${n}` })} /></section>}{rails.map(([c, a]) => <Rail key={c} title={c} onSeeAll={() => openCategory(c)}>{a.map(card)}</Rail>)}</div> : <Empty>Nothing here</Empty>
             ) : items.length ? <VGrid items={items} render={card} /> : <Empty>Nothing here</Empty>}
           </div>
         </div>

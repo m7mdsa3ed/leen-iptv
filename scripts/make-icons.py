@@ -35,4 +35,22 @@ for name, size, kw in [
     ("apple-touch-icon.png", 180, {"rounded": False}),
 ]:
     mark(size, **kw).save(f"public/{name}")
+# webOS launch splash (appinfo bgImage/splashBackground): 1920x1080, mark + wordmark on the dark surface
+from PIL import ImageFont
+bg = Image.new("RGB", (1920, 1080), (0x0E, 0x0F, 0x11))
+m = mark(260)
+bg.paste(m, ((1920 - 260) // 2, 330), m)
+font = None
+for f in ("/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Medium.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "DejaVuSans-Bold.ttf"):
+    try:
+        font = ImageFont.truetype(f, 84)
+        break
+    except OSError:
+        pass
+d = ImageDraw.Draw(bg)
+text = "Leen IPTV"
+if font:
+    w = d.textlength(text, font=font)
+    d.text(((1920 - w) / 2, 640), text, font=font, fill=(255, 255, 255, 222))
+bg.save("public/splash.png")
 print("ok")

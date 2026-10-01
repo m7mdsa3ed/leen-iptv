@@ -14,9 +14,9 @@ interface R {
 /* URL <-> stack. Each history entry carries a hash (#/live, #/detail/<id>, #/player/<id>) so a refresh lands on the same page.
    Hash routing works from file:// (webOS) and any static host. Entry d=0 is a guard (Back never leaves the app),
    entry d=n shows stack[n-1]. */
-const PAGES = ["profiles", "sources", "home", "live", "guide", "movies", "series", "search", "settings", "detail", "player"]
+const PAGES = ["profiles", "sources", "home", "live", "guide", "movies", "series", "search", "settings", "detail", "player", "person", "category", "genre"]
 const hashOf = (r: Route) => {
-  const id = r.name === "detail" ? r.p?.id : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
+  const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "detail" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
   return `#/${r.name}${id ? "/" + encodeURIComponent(String(id)) : ""}`
 }
 const baseFor = (id: string): Route["name"] => (id.includes("|live|") ? "live" : id.includes("|movie|") ? "movies" : id.includes("|series|") ? "series" : "home")
@@ -29,6 +29,8 @@ function initialStack(): Route[] {
   if (!sources.length) return [{ name: "sources" }]
   if (!PAGES.includes(name) || name === "profiles" || name === "sources") return [{ name: "home" }]
   if ((name === "detail" || name === "player") && id) return [{ name: baseFor(id) }, { name, p: { id } }]
+  if ((name === "category" || name === "genre") && id) return [{ name: id.startsWith("series|") ? "series" : "movies" }, { name, p: { id } }]
+  if (name === "person" && id) return [{ name: "home" }, { name, p: { id } }]
   return [{ name }]
 }
 

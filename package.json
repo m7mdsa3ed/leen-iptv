@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "proxy": "node server/proxy.mjs",
-    "package": "pnpm build && ares-package dist -o out",
+    "package": "pnpm build && ares-package dist --no-minify -o out",
     "install:tv": "ares-install -d tv out/com.leen.iptv_1.0.0_all.ipk && ares-launch -d tv com.leen.iptv",
     "build:web": "pnpm build"
   },
