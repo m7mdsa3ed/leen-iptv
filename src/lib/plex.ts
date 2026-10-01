@@ -4,6 +4,7 @@
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Source } from "./types"
 import { mixed, plexFetch, px } from "./net"
+import { t } from "./i18n"
 import { useApp } from "./store"
 import { allowedConns, buildUrl, connKind, identity, mapDetail, mapMeta, photoUrl, sortConns, type Conn, type ConnMode } from "./plex-pure"
 
@@ -47,7 +48,7 @@ export async function checkPin(id: number): Promise<string | null> {
     const r = await plexFetch(plexUrl("https://plex.tv", `/api/v2/pins/${id}`), proxy(), { headers: JSON_H }, 15000)
     return (await r.json()).authToken || null
   } catch (e) {
-    if (e instanceof Error && e.message === "HTTP 404") throw new Error("The code expired. Start again.")
+    if (e instanceof Error && e.message === "HTTP 404") throw new Error(t("errors.plex.codeExpired"))
     throw e
   }
 }
@@ -65,10 +66,7 @@ const reach = async (uri: string, token: string, ms = 5000) => {
   await plexFetch(plexUrl(uri, "/identity", {}, token), proxy(), { headers: JSON_H }, ms)
   return uri.replace(/\/+$/, "")
 }
-const noRoute = (name: string, mode: ConnMode) =>
-  mode === "local" ? `"${name}" isn't reachable on your local network. Connect to the same network, or switch the connection mode in Settings > Sources.`
-  : mode === "norelay" ? `Couldn't reach "${name}" without Plex's relay. Check that the server is online and remote access is on.`
-  : `Couldn't reach "${name}" on any of its addresses. Check that the server is online and remote access is on.`
+const noRoute = (name: string, mode: ConnMode) => t(mode === "local" ? "errors.plex.noRouteLocal" : mode === "norelay" ? "errors.plex.noRouteNoRelay" : "errors.plex.noRouteAny", { name })
 
 /** First reachable address the mode allows, in priority order (GET /identity, 5s each). */
 export async function pickConnection(s: PlexServer, mode: ConnMode = "auto"): Promise<string> {
@@ -125,7 +123,7 @@ export async function loadPlex(src: Source, px_: string, step: (m: string) => vo
   const out: Item[] = []
   const img = (p: string, w: number, h: number) => plexImg(s, p, w, h)
   for (const d of secs) {
-    step(`Loading ${d.title}`)
+    step(t("errors.source.loadingItem", { name: d.title }))
     for (let start = 0, total = 1; start < total; ) {
       const c = (await get<Container>(s, px_, `/library/sections/${d.key}/all`, { includeGuids: 1, "X-Plex-Container-Start": start, "X-Plex-Container-Size": 500 })).MediaContainer
       const list = c?.Metadata ?? []
@@ -133,7 +131,7 @@ export async function loadPlex(src: Source, px_: string, step: (m: string) => vo
       total = c?.totalSize ?? list.length
       start += 500
       if (!list.length) break
-      step(`Loading ${d.title} (${Math.min(start, total)}/${total})`)
+      step(t("errors.source.loadingProgress", { name: d.title, done: Math.min(start, total), total }))
     }
   }
   return out
@@ -158,7 +156,7 @@ export async function plexDetail(s: Source, px_: string, item: Item): Promise<{ 
       season,
       num,
       title: String(e.title ?? `Episode ${num}`),
-      dur: e.duration ? `${Math.round(e.duration / 60000)}m` : undefined,
+      dur: e.duration ? Math.round(e.duration / 1000) : undefined,
       item: {
         id: `${s.id}|ep|${e.ratingKey}`,
         kind: "movie",

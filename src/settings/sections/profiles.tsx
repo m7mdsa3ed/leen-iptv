@@ -2,10 +2,12 @@ import { useState } from "react"
 import { Pill, Row, SectionCard, Field } from "../controls"
 import { askPin } from "@/components/tv/ui"
 import { useRoute } from "@/lib/nav"
+import { useT } from "@/lib/i18n"
 import { isTv } from "@/lib/device"
 import { useApp, useProfile } from "@/lib/store"
 
 export default function ProfilesSection() {
+  const t = useT()
   const p = useProfile()
   const { updateProfile, removeProfile, profiles } = useApp()
   const reset = useRoute((s) => s.reset)
@@ -13,19 +15,19 @@ export default function ProfilesSection() {
   if (!p) return null
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title={`Profile: ${p.name}`}>
-        <Row label="Switch profile"><Pill onClick={() => reset("profiles")}>Switch profile</Pill></Row>
+      <SectionCard title={<>{t("settings.profiles.profile")} <bdi>{p.name}</bdi></>}>
+        <Row label={t("settings.profiles.switch")}><Pill onClick={() => reset("profiles")}>{t("settings.profiles.switch")}</Pill></Row>
         {profiles.length > 1 && (
-          <Row label="Delete profile" description="Removes this profile's favorites, progress and history.">
-            <Pill onClick={async () => { if (p.pin && !(await askPin(p.pin))) return; removeProfile(p.id); reset("profiles") }}>Delete profile</Pill>
+          <Row label={t("settings.profiles.delete")} description={t("settings.profiles.delete.desc")}>
+            <Pill onClick={async () => { if (p.pin && !(await askPin(p.pin))) return; removeProfile(p.id); reset("profiles") }}>{t("settings.profiles.delete")}</Pill>
           </Row>
         )}
       </SectionCard>
-      <SectionCard title="PIN" description={isTv ? "With a PIN set, press Yellow on a category in Live/Movies/Series to lock it." : "With a PIN set, right-click (or long-press) a category in Live/Movies/Series to lock it."}>
-        <Field label={p.pin ? "New PIN (4 digits)" : "Set PIN (4 digits)"} inputMode="numeric" maxLength={4} value={pin} onChange={(v) => setPin(v.replace(/\D/g, ""))} error={pin && pin.length !== 4 ? "The PIN must be 4 digits." : undefined} />
+      <SectionCard title={t("settings.profiles.pin")} description={t(isTv ? "settings.profiles.pin.tv" : "settings.profiles.pin.other")}>
+        <Field label={t(p.pin ? "settings.profiles.pin.new" : "settings.profiles.pin.set")} dir="ltr" inputMode="numeric" maxLength={4} value={pin} onChange={(v) => setPin(v.replace(/\D/g, ""))} error={pin && pin.length !== 4 ? t("settings.profiles.pin.bad") : undefined} />
         <div className="flex flex-wrap gap-2">
-          <Pill variant="primary" disabled={pin.length !== 4} onClick={async () => { if (p.pin && !(await askPin(p.pin))) return; updateProfile(p.id, { pin }); setPin("") }}>Save PIN</Pill>
-          {p.pin && <Pill onClick={async () => (await askPin(p.pin!)) && updateProfile(p.id, { pin: undefined, locked: [] })}>Remove PIN</Pill>}
+          <Pill variant="primary" disabled={pin.length !== 4} onClick={async () => { if (p.pin && !(await askPin(p.pin))) return; updateProfile(p.id, { pin }); setPin("") }}>{t("settings.profiles.pin.save")}</Pill>
+          {p.pin && <Pill onClick={async () => (await askPin(p.pin!)) && updateProfile(p.id, { pin: undefined, locked: [] })}>{t("settings.profiles.pin.remove")}</Pill>}
         </div>
       </SectionCard>
     </div>

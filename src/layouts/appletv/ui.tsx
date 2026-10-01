@@ -7,6 +7,7 @@ import { useApp } from "@/lib/store"
 import type { Item } from "@/lib/types"
 import { useSourceOf } from "@/lib/sources"
 import { useSourceFilter } from "../hooks/use-source-filter"
+import { fmt, useT } from "@/lib/i18n"
 
 /** Artwork for wide tiles/hero: Plex/TMDB backdrop when the item has one. */
 export const wideArt = (i: Item): Item => (i.backdrop && i.kind !== "live" ? { ...i, logo: i.backdrop } : i)
@@ -24,7 +25,7 @@ export function SourceBadge({ item, className }: { item: Item; className?: strin
   if (!show || !src) return null
   const n = item.alts?.length ?? 0
   return (
-    <span title={src.name} className={cn("pointer-events-none absolute z-[1] rounded-full px-2 py-0.5 text-[11px] font-bold leading-4 shadow-sm", className)} style={{ background: src.color, color: onColor(src.color) }}>
+    <span dir="auto" title={src.name} className={cn("pointer-events-none absolute z-[1] rounded-full px-2 py-0.5 text-[11px] font-bold leading-4 shadow-sm", className)} style={{ background: src.color, color: onColor(src.color) }}>
       {src.label}{n > 0 ? ` +${n}` : ""}
     </span>
   )
@@ -32,6 +33,7 @@ export function SourceBadge({ item, className }: { item: Item; className?: strin
 
 /** "All" + one capsule per source (color dot + count); the picked one gets a colored underline. Hidden with one source. */
 export function SourceFilter({ className }: { className?: string }) {
+  const t = useT()
   const { sources, filter, setFilter, multi } = useSourceFilter()
   if (!multi) return null
   const pill = (id: string | null, name: string, color?: string, count?: number) => {
@@ -40,30 +42,31 @@ export function SourceFilter({ className }: { className?: string }) {
       <button key={id ?? "all"} data-nav data-pill aria-pressed={on} onClick={() => setFilter(id)}
         style={on && color ? { boxShadow: `inset 0 -3px 0 ${color}` } : undefined}
         className={cn("atv-pillbtn inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap", on ? "bg-foreground text-background" : "atv-glass text-foreground")}>
-        {color && <Dot color={color} />}{name}{count != null && <span className="font-normal opacity-70">{count}</span>}
+        {color && <Dot color={color} />}<bdi>{name}</bdi>{count != null && <span dir="ltr" className="font-normal opacity-70">{fmt.compact(count)}</span>}
       </button>
     )
   }
   return (
-    <div data-nav-group role="group" aria-label="Source" className={cn("no-scrollbar flex items-center gap-2 overflow-x-auto p-1", className)}>
-      {pill(null, "All")}
-      {sources.map((s) => pill(s.id, s.name, s.color, s.count))}
+    <div data-nav-group role="group" aria-label={t("atv.source.aria")} className={cn("no-scrollbar flex items-center gap-2 overflow-x-auto p-1", className)}>
+      {pill(null, t("atv.source.all"))}
+      {sources.map((s) => pill(s.id, s.title, s.color, s.count))}
     </div>
   )
 }
 
 /** Detail: "Available on" pills, one per source that has the title; picking one switches what plays. */
 export function SourceChooser({ options, selectedId, onPick }: { options: { item: Item; source: { name: string; label: string; color: string } }[]; selectedId?: string; onPick: (i: Item) => void }) {
+  const t = useT()
   if (options.length < 2) return null
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="atv-kicker mr-1">Available on</span>
+      <span className="atv-kicker me-1">{t("atv.source.availableOn")}</span>
       {options.map(({ item, source }) => {
         const on = item.id === selectedId
         return (
           <button key={item.id} data-nav data-pill aria-pressed={on} onClick={() => onPick(item)} style={on ? { boxShadow: `inset 0 -3px 0 ${source.color}` } : undefined}
             className={cn("atv-pillbtn inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap", on ? "bg-foreground text-background" : "atv-glass text-foreground")}>
-            <Dot color={source.color} />{source.name}
+            <Dot color={source.color} /><bdi>{source.name}</bdi>
           </button>
         )
       })}
@@ -85,9 +88,10 @@ export function Circle({ label, className, type = "button", ...p }: Btn & { labe
 }
 
 /** "+ Up Next" toggle = favorite. */
-export const UpNextButton = ({ on, onClick }: { on?: boolean; onClick: () => void }) => (
-  <Circle label={on ? "Remove from Up Next" : "Add to Up Next"} aria-pressed={!!on} onClick={onClick}>{on ? <Check /> : <Plus />}</Circle>
-)
+export function UpNextButton({ on, onClick }: { on?: boolean; onClick: () => void }) {
+  const t = useT()
+  return <Circle label={on ? t("atv.upNext.remove") : t("atv.upNext.add")} aria-pressed={!!on} onClick={onClick}>{on ? <Check /> : <Plus />}</Circle>
+}
 
 /** Shelf: bold title aligned with the first card, then a rail. `onTitle` makes the title a "see all" button. */
 export function Shelf({ title, onTitle, locked, titleProps, children, className }: { title?: ReactNode; onTitle?: () => void; locked?: boolean; titleProps?: Btn; children: ReactNode; className?: string }) {
@@ -96,8 +100,8 @@ export function Shelf({ title, onTitle, locked, titleProps, children, className 
       {title ? (
         <div className="px-[var(--gx)]">
           {onTitle ? (
-            <button data-nav data-pill onClick={onTitle} {...titleProps} className="atv-shelf-title -ml-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-foreground">
-              {title}{locked && <Lock className="size-5" />}<ChevronRight className="size-6 text-muted-foreground" />
+            <button data-nav data-pill onClick={onTitle} {...titleProps} className="atv-shelf-title -ms-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-foreground">
+              {title}{locked && <Lock className="size-5" />}<ChevronRight className="rtl-flip size-6 text-muted-foreground" />
             </button>
           ) : <h2 className="atv-shelf-title text-foreground">{title}</h2>}
         </div>
@@ -122,16 +126,16 @@ export function Tile({ item, shape = "wide", size = "up", pct, sub, title, alway
       <div className="atv-lift">
         <div className={cn("atv-art", wide ? "aspect-video" : "aspect-[2/3]", live && "bg-gradient-to-br from-surface-3 to-surface")}>
           <Logo item={wide ? wideArt(item) : item} className={cn("size-full", live ? "object-contain p-[14%]" : "object-cover")} />
-          {fav && <span className={cn(chip, "right-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
-          {locked && <span className={cn(chip, "left-2")}><Lock className="size-4 text-white" /></span>}
-          <SourceBadge item={item} className={cn("left-2", pct ? "bottom-3.5" : "bottom-2")} />
-          {pct ? <div className="atv-bar absolute inset-x-0 bottom-0 h-1.5"><div style={{ width: `${Math.min(100, pct)}%` }} /></div> : null}
+          {fav && <span className={cn(chip, "end-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
+          {locked && <span className={cn(chip, "start-2")}><Lock className="size-4 text-white" /></span>}
+          <SourceBadge item={item} className={cn("start-2", pct ? "bottom-3.5" : "bottom-2")} />
+          {pct ? <div dir="ltr" data-ltr className="atv-bar absolute inset-x-0 bottom-0 h-1.5"><div style={{ width: `${Math.min(100, pct)}%` }} /></div> : null}
         </div>
         <span aria-hidden className="atv-glow" />
       </div>
       <div className="atv-cap" data-always={always ? "" : undefined}>
-        <div className="truncate text-base font-semibold text-foreground">{title ?? item.name}</div>
-        {sub ? <div className="truncate text-sm text-muted-foreground">{sub}</div> : <div className="h-5" />}
+        <div dir="auto" className="truncate text-base font-semibold text-foreground">{title ?? item.name}</div>
+        {sub ? <div dir="auto" className="truncate text-sm text-muted-foreground">{sub}</div> : <div className="h-5" />}
       </div>
     </button>
   )
@@ -148,8 +152,8 @@ export function PersonTile({ name, role, photo, onOpen }: { name: string; role?:
         <span aria-hidden className="atv-glow" />
       </div>
       <div className="atv-cap" data-always="">
-        <div className="truncate text-base font-semibold">{name}</div>
-        {role ? <div className="truncate text-sm text-muted-foreground">{role}</div> : <div className="h-5" />}
+        <div dir="auto" className="truncate text-base font-semibold">{name}</div>
+        {role ? <div dir="auto" className="truncate text-sm text-muted-foreground">{role}</div> : <div className="h-5" />}
       </div>
     </button>
   )
@@ -158,9 +162,10 @@ export function PersonTile({ name, role, photo, onOpen }: { name: string; role?:
 export type Pick = { item: Item; kicker: string }
 
 /** Full-bleed hero carousel. Slides crossfade by opacity; auto-advances only with motion=full and no focus/pointer inside. */
-export function Hero({ picks, onPlay, onInfo, isFav, onFav, playLabel = "Play", tall = true }: {
+export function Hero({ picks, onPlay, onInfo, isFav, onFav, playLabel, tall = true }: {
   picks: Pick[]; onPlay: (i: Item) => void; onInfo?: (i: Item) => void; isFav: (i: Item) => boolean; onFav: (i: Item) => void; playLabel?: string; tall?: boolean
 }) {
+  const t = useT()
   const [n, setN] = useState(0)
   const [paused, setPaused] = useState(false)
   const motion = useApp((s) => s.settings.motion)
@@ -168,12 +173,12 @@ export function Hero({ picks, onPlay, onInfo, isFav, onFav, playLabel = "Play", 
   useEffect(() => setN(0), [picks])
   useEffect(() => {
     if (paused || picks.length < 2 || motion !== "full") return
-    const t = setInterval(() => { if (!document.hidden) setN((i) => (i + 1) % picks.length) }, 8000)
-    return () => clearInterval(t)
+    const iv = setInterval(() => { if (!document.hidden) setN((i) => (i + 1) % picks.length) }, 8000)
+    return () => clearInterval(iv)
   }, [paused, picks.length, n, motion])
   if (!cur) return null
   const item = cur.item
-  const meta = [item.genres?.slice(0, 2).join(", ") || item.group, item.year, item.rating ? `★ ${item.rating}` : ""].filter(Boolean).join("  ·  ")
+  const meta = [item.genres?.slice(0, 2).join(", ") || item.group, item.year && fmt.digits(item.year), item.rating ? `★ ${fmt.digits(item.rating)}` : ""].filter(Boolean).join("  ·  ")
   return (
     <section data-tall={tall ? "" : undefined} className="atv-hero relative -mx-[var(--gx)] overflow-hidden"
       onFocus={() => setPaused(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false) }}
@@ -187,20 +192,20 @@ export function Hero({ picks, onPlay, onInfo, isFav, onFav, playLabel = "Play", 
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 px-[var(--gx)] pb-[4.5rem]">
         <div key={item.id} className="m-rise flex max-w-3xl flex-col gap-3">
           <div className="atv-kicker">{cur.kicker}</div>
-          <h1 className="atv-h1 line-clamp-2">{item.name}</h1>
-          {meta ? <p className="text-lg text-[var(--fg-80)]">{meta}</p> : null}
-          {item.plot ? <p className="line-clamp-1 text-lg text-[var(--fg-80)]">{item.plot}</p> : null}
+          <h1 dir="auto" className="atv-h1 line-clamp-2">{item.name}</h1>
+          {meta ? <p dir="auto" className="text-lg text-[var(--fg-80)]">{meta}</p> : null}
+          {item.plot ? <p dir="auto" className="line-clamp-1 text-lg text-[var(--fg-80)]">{item.plot}</p> : null}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-3 p-1 -m-1">
-          <Capsule primary onClick={() => onPlay(item)}><Play className="fill-current" />{item.kind === "live" ? "Watch live" : playLabel}</Capsule>
+          <Capsule primary onClick={() => onPlay(item)}><Play className="fill-current" />{item.kind === "live" ? t("atv.hero.watchLive") : playLabel ?? t("atv.hero.play")}</Capsule>
           <UpNextButton on={isFav(item)} onClick={() => onFav(item)} />
-          {onInfo && item.kind !== "live" && <Circle label="More info" onClick={() => onInfo(item)}><Info /></Circle>}
+          {onInfo && item.kind !== "live" && <Circle label={t("atv.hero.moreInfo")} onClick={() => onInfo(item)}><Info /></Circle>}
         </div>
       </div>
       {picks.length > 1 && (
-        <div role="group" aria-label="Featured" className="absolute inset-x-0 bottom-10 flex items-center justify-center">
+        <div role="group" aria-label={t("atv.hero.featured")} className="absolute inset-x-0 bottom-10 flex items-center justify-center">
           {picks.map((f, i) => (
-            <button key={f.item.id} data-nav aria-label={`Featured ${i + 1}: ${f.item.name}`} aria-current={i === n ? "true" : undefined} onFocus={() => setN(i)} onClick={() => setN(i)} className="atv-dot grid h-8 w-7 place-items-center">
+            <button key={f.item.id} data-nav aria-label={t("atv.hero.featuredN", { n: i + 1, name: f.item.name })} aria-current={i === n ? "true" : undefined} onFocus={() => setN(i)} onClick={() => setN(i)} className="atv-dot grid h-8 w-7 place-items-center">
               <span />
             </button>
           ))}

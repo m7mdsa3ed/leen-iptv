@@ -1,0 +1,33 @@
+import type { Dict } from "../../pure.ts"
+
+const d: Dict = {
+  "errors.http.notFound": "Not available on your provider (404). The title or channel may have been removed.",
+  "errors.http.denied": "Access denied ({status}). Check your subscription, expiry date and number of simultaneous connections.",
+  "errors.http.tooMany": "Too many requests (429). Wait a moment and retry.",
+  "errors.http.server": "The provider's server had an error ({status}). Try again later.",
+  "errors.http.other": "Request failed ({status}).",
+  "errors.cors": "Couldn't reach the server. Check the address and your connection. If the browser is blocking it (CORS), set a proxy in Settings > Network.",
+  "errors.timeout": "The server took too long to answer. Try again.",
+  "errors.stream.decode": "This device can't decode the stream.",
+  "errors.stream.unavailable": "Stream unavailable.",
+  "errors.stream.offline": "Stream unavailable. The channel may be offline, or the browser blocked it (CORS).",
+  "errors.video.format": "This format isn't supported on this device.",
+  "errors.video.corrupt": "The stream is corrupted or can't be decoded.",
+  "errors.video.cannotPlay": "Cannot play this stream. It may be offline, or the browser blocked it (CORS).",
+  "errors.source.noChannels": "No channels found in this source",
+  "errors.source.loginFailed": "Login failed: check server, username and password",
+  "errors.source.loading": "Loading",
+  "errors.source.downloading": "Downloading playlist",
+  "errors.source.loadingChannels": "Loading channels",
+  "errors.source.loadingMovies": "Loading movies",
+  "errors.source.loadingSeries": "Loading series",
+  "errors.source.loadingItem": "Loading {name}",
+  "errors.source.loadingProgress": "Loading {name} ({done}/{total})",
+  "errors.plex.codeExpired": "The code expired. Start again.",
+  "errors.plex.noRouteLocal": "\"{name}\" isn't reachable on your local network. Connect to the same network, or switch the connection mode in Settings > Sources.",
+  "errors.plex.noRouteNoRelay": "Couldn't reach \"{name}\" without Plex's relay. Check that the server is online and remote access is on.",
+  "errors.plex.noRouteAny": "Couldn't reach \"{name}\" on any of its addresses. Check that the server is online and remote access is on.",
+  "errors.jellyfin.notServer": "That address doesn't look like a Jellyfin server.",
+  "errors.jellyfin.wrongLogin": "Wrong username or password.",
+}
+export default d

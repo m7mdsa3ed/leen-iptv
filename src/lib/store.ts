@@ -3,11 +3,13 @@ import { persist } from "zustand/middleware"
 import { LAYOUT_IDS } from "./layouts"
 import type { ProviderCfg } from "./meta/types"
 import { isTv } from "./device"
+import { resolveLang, translate } from "./i18n/pure"
+import { ar, en } from "./i18n/locales"
 import type { LayoutId } from "./layouts"
 import type { Profile, Source } from "./types"
 
 type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }> }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; meta?: ProviderCfg[] }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; meta?: ProviderCfg[] }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
 const empty = (): PData => ({ favs: [], recents: [], progress: {} })
@@ -46,13 +48,13 @@ const upd = (s: S, f: (d: PData) => PData) => {
 export const useApp = create<S>()(
   persist(
     (set) => ({
-      profiles: [{ id: "p1", name: "Me", color: COLORS[0], locked: [] }],
+      profiles: [{ id: "p1", name: translate({ en, ar }, resolveLang("auto", typeof navigator === "undefined" ? "en" : navigator.language), "common.me"), color: COLORS[0], locked: [] }],
       profileId: null,
       sources: [],
       sourceId: null,
       sourceFilter: null,
       data: {},
-      settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, trackHistory: true, accountChoice: "unset", theme: "system", layout: "googletv", motion: isTv ? "reduced" : "full", sourceBadges: true },
+      settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, trackHistory: true, accountChoice: "unset", theme: "system", layout: "googletv", motion: isTv ? "reduced" : "full", sourceBadges: true, language: "auto" },
       addProfile: (name, pin) =>
         set((s) => ({ profiles: [...s.profiles, { id: uid(), name, pin, color: COLORS[s.profiles.length % COLORS.length], locked: [] }] })),
       updateProfile: (id, p) => set((s) => ({ profiles: s.profiles.map((x) => (x.id === id ? { ...x, ...p } : x)) })),

@@ -6,12 +6,14 @@ import { SourceFilter } from "../source-ui"
 import { useBrowse } from "@/layouts/hooks/use-browse"
 import { useMode } from "@/lib/device"
 import { KEY } from "@/lib/nav"
+import { useT } from "@/lib/i18n"
 import type { Item, Kind } from "@/lib/types"
 
 /** Google TV Movies / Shows: category pill row over one big poster grid (All = every rail merged). */
 export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
   const { groups, status, g, setG, items, rails, genres, pct, isLocked, canLock, toggleLock: toggle, open, openCategory, openGenre, kindLabel, page } = useBrowse(kind)
   const mode = useMode()
+  const t = useT()
   const list = useMemo(() => (g === ALL ? [...new Set(rails.flatMap(([, a]) => a))] : items), [g, rails, items])
   return (
     <Shell page={page} title={kindLabel}>
@@ -24,7 +26,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
             onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
             onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
           <div className="min-h-0 flex-1">
-            {list.length ? <VGrid items={list} minW={mode === "tv" ? 270 : mode === "mobile" ? 105 : 190} label={56} render={(i: Item) => <Card key={i.id} fluid item={i} pct={pct(i)} onOpen={() => open(i)} />} /> : <Empty>Nothing here</Empty>}
+            {list.length ? <VGrid items={list} minW={mode === "tv" ? 270 : mode === "mobile" ? 105 : 190} label={56} render={(i: Item) => <Card key={i.id} fluid item={i} pct={pct(i)} onOpen={() => open(i)} />} /> : <Empty>{t("gtv.browse.empty")}</Empty>}
           </div>
         </div>
       )}

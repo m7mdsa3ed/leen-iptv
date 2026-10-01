@@ -100,7 +100,3 @@ export function computeStats(sessions: Session[], days: Record<string, Day>, now
   }
 }
 
-export const fmtDur = (sec: number) => {
-  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60)
-  return h ? `${h}h ${m}m` : m ? `${m} min` : sec > 0 ? "<1 min" : "0 min"
-}

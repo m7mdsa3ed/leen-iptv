@@ -27,7 +27,7 @@ assert.equal(show.logo, undefined)
 assert.deepEqual(show.genres, [])
 
 const ep = mapEpisode({ Id: "e1", Name: "Pilot", ParentIndexNumber: 2, IndexNumber: 3, RunTimeTicks: 30000000000, UserData: { PlaybackPositionTicks: 100000000 } }, { ...show, logo: "L" }, "s1", img)
-assert.deepEqual(ep, { id: "e1", season: 2, num: 3, title: "Pilot", dur: "50m", item: { id: "s1|ep|e1", kind: "movie", sid: "e1", name: "X S2E3", group: "X", logo: "L", plot: undefined, resume: 10, dur: 3000 } })
+assert.deepEqual(ep, { id: "e1", season: 2, num: 3, title: "Pilot", dur: 3000, item: { id: "s1|ep|e1", kind: "movie", sid: "e1", name: "X S2E3", group: "X", logo: "L", plot: undefined, resume: 10, dur: 3000 } })
 assert.equal(mapEpisode({ Id: "e0", ParentIndexNumber: 0, IndexNumber: 1 }, show, "s1", img).season, 0) // specials stay in season 0
 
 const ch = mapChannel({ Id: "c1", Name: "BBC", ChannelNumber: "5", ImageTags: { Primary: "i" } }, "s1", img)
@@ -55,6 +55,6 @@ assert.deepEqual(d.meta.cast, [{ name: "Al", role: "Hanna", photo: "IMG/a/Primar
 assert.deepEqual(d.meta.directors, ["M"])
 assert.deepEqual(d.meta.ids, { tmdb: "949", imdb: "tt0113277" })
 assert.equal(d.meta.poster, "IMG/42/Primary/600/p")
-assert.equal(d.info.duration, "2h 0m")
+assert.equal(d.meta.runtime, 7200)
 assert.equal(d.info.releasedate, "1995-12-15")
 console.log("jellyfin ok")

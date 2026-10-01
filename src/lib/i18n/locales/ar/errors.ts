@@ -1,0 +1,33 @@
+import type { Dict } from "../../pure.ts"
+
+const d: Dict = {
+  "errors.http.notFound": "ده مش موجود عند المزوّد (404). ممكن يكون الفيلم أو القناة اتشالت.",
+  "errors.http.denied": "ممنوع الدخول ({status}). اتأكد من الاشتراك وتاريخ الانتهاء وعدد الاتصالات في نفس الوقت.",
+  "errors.http.tooMany": "طلبات كتير أوي (429). استنى شوية وحاول تاني.",
+  "errors.http.server": "السيرفر بتاع المزوّد فيه مشكلة ({status}). حاول تاني بعدين.",
+  "errors.http.other": "الطلب فشل ({status}).",
+  "errors.cors": "مقدرناش نوصل للسيرفر. اتأكد من العنوان والإنترنت. لو المتصفح بيمنعه (CORS)، حدد بروكسي من الإعدادات > الشبكة.",
+  "errors.timeout": "السيرفر اتأخر في الرد. حاول تاني.",
+  "errors.stream.decode": "الجهاز ده مش قادر يشغّل البث ده.",
+  "errors.stream.unavailable": "البث مش متاح.",
+  "errors.stream.offline": "البث مش متاح. ممكن القناة تكون واقفة، أو المتصفح منعها (CORS).",
+  "errors.video.format": "الصيغة دي مش مدعومة على الجهاز ده.",
+  "errors.video.corrupt": "البث بايظ أو مش ممكن تشغيله.",
+  "errors.video.cannotPlay": "مش قادر أشغّل البث ده. ممكن يكون واقف، أو المتصفح منعه (CORS).",
+  "errors.source.noChannels": "مفيش قنوات في المصدر ده",
+  "errors.source.loginFailed": "فشل تسجيل الدخول: اتأكد من السيرفر واسم المستخدم وكلمة السر",
+  "errors.source.loading": "جاري التحميل",
+  "errors.source.downloading": "جاري تنزيل قايمة التشغيل",
+  "errors.source.loadingChannels": "جاري تحميل القنوات",
+  "errors.source.loadingMovies": "جاري تحميل الأفلام",
+  "errors.source.loadingSeries": "جاري تحميل المسلسلات",
+  "errors.source.loadingItem": "جاري تحميل {name}",
+  "errors.source.loadingProgress": "جاري تحميل {name} ({done}/{total})",
+  "errors.plex.codeExpired": "الكود انتهت صلاحيته. ابدأ من الأول.",
+  "errors.plex.noRouteLocal": "\"{name}\" مش متاح على الشبكة المحلية بتاعتك. اتصل بنفس الشبكة، أو غيّر وضع الاتصال من الإعدادات > المصادر.",
+  "errors.plex.noRouteNoRelay": "مقدرناش نوصل لـ \"{name}\" من غير ريلاي Plex. اتأكد إن السيرفر شغال وإن الوصول من بعيد مفعّل.",
+  "errors.plex.noRouteAny": "مقدرناش نوصل لـ \"{name}\" على أي عنوان من عناوينه. اتأكد إن السيرفر شغال وإن الوصول من بعيد مفعّل.",
+  "errors.jellyfin.notServer": "العنوان ده مش شبه سيرفر Jellyfin.",
+  "errors.jellyfin.wrongLogin": "اسم المستخدم أو كلمة السر غلط.",
+}
+export default d

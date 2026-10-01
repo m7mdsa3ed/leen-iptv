@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { askPin, useOpen } from "@/components/tv/ui"
 import { findLock } from "@/lib/merge-pure"
+import { LOCALE, fold, useLang, useT } from "@/lib/i18n"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
 import { usePData, useProfile } from "@/lib/store"
@@ -8,7 +9,7 @@ import type { Item } from "@/lib/types"
 import { useCatalogView } from "./use-source-filter"
 
 export type Sort = "default" | "az" | "rating"
-export const SORTS: [Sort, string][] = [["default", "Default"], ["az", "A-Z"], ["rating", "Top rated"]]
+const SORTS: Sort[] = ["default", "az", "rating"]
 
 /**
  * One category page (route id `${kind}|${category}`), incl. the PIN gate (Back if refused).
@@ -21,6 +22,8 @@ export function useCategory(id: string) {
   const group = id.slice(cut + 1)
   const status = useCatalog((s) => s.status)
   const { byKind } = useCatalogView()
+  const t = useT()
+  const { lang } = useLang()
   const d = usePData()
   const p = useProfile()
   const back = useRoute((s) => s.back)
@@ -36,14 +39,14 @@ export function useCategory(id: string) {
   const all = useMemo(() => byKind[kind].filter((i) => i.group === group), [byKind, kind, group])
   const hasRating = useMemo(() => all.some((i) => parseFloat(i.rating ?? "") > 0), [all])
   const items = useMemo(() => {
-    const f = q.trim().toLowerCase()
-    const l = f ? all.filter((i) => i.name.toLowerCase().includes(f)) : all
-    if (sort === "az") return [...l].sort((a, b) => a.name.localeCompare(b.name))
+    const f = fold(q.trim())
+    const l = f ? all.filter((i) => fold(i.name).includes(f)) : all
+    if (sort === "az") return [...l].sort((a, b) => a.name.localeCompare(b.name, LOCALE[lang], { numeric: true, sensitivity: "base" }))
     if (sort === "rating") return [...l].sort((a, b) => (parseFloat(b.rating ?? "") || 0) - (parseFloat(a.rating ?? "") || 0))
     return l
-  }, [all, q, sort])
+  }, [all, q, sort, lang])
   return {
-    kind, group, status, ok, all, items, sort, setSort, sorts: SORTS.filter(([s]) => s !== "rating" || hasRating), q, setQ, back,
+    kind, group, status, ok, all, items, sort, setSort, sorts: SORTS.filter((s) => s !== "rating" || hasRating).map((s): [Sort, string] => [s, t(`hooks.sort.${s}`)]), q, setQ, back,
     pct: (i: Item) => d.progress[i.id] && (d.progress[i.id].pos / d.progress[i.id].dur) * 100,
     open: (i: Item) => open(i),
   }

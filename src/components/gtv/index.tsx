@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode, SyntheticEvent, WheelEvent } from
 import { ChevronRight, Info, Lock, Play, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/lib/store"
+import { fmt, useT } from "@/lib/i18n"
 import { Logo, useLocked } from "@/components/tv/ui"
 import { SourceBadge } from "@/components/source/SourceBadge"
 import type { Item } from "@/lib/types"
@@ -17,24 +18,29 @@ export const SectionTitle = ({ children, className }: { children: ReactNode; cla
 const wheel = (e: WheelEvent<HTMLDivElement>) => {
   const el = e.currentTarget
   if (document.documentElement.dataset.mode !== "desktop" || e.deltaX || el.scrollWidth <= el.clientWidth) return
-  el.scrollLeft += e.deltaY
+  el.scrollLeft += document.documentElement.dir === "rtl" ? -e.deltaY : e.deltaY // scrollLeft is negative in RTL
 }
 
 /** Title over a horizontally scrolling row. Children are Cards (or anything shrink-0). Bleeds to the screen edges. */
-export const Rail = ({ title, children, className, onSeeAll }: { title?: ReactNode; children: ReactNode; className?: string; onSeeAll?: () => void }) => (
+export const Rail = ({ title, children, className, onSeeAll }: { title?: ReactNode; children: ReactNode; className?: string; onSeeAll?: () => void }) => <RailBody title={title} className={className} onSeeAll={onSeeAll}>{children}</RailBody>
+
+function RailBody({ title, children, className, onSeeAll }: { title?: ReactNode; children: ReactNode; className?: string; onSeeAll?: () => void }) {
+  const t = useT()
+  return (
   // No content-visibility here: off-screen rails would have no layout boxes, so D-pad navigation could not find the rail above/below
   // and focus jumped to the top bar. Cards are capped per rail and images are lazy, so rendering them all is cheap enough.
   <section className={cn("-mx-[var(--gx)] mb-2", className)}>
     {title && onSeeAll ? (
       <div className="px-[var(--gx)]">
-        <button data-nav data-pill onClick={onSeeAll} aria-label={`See all: ${typeof title === "string" ? title : ""}`} className="-ml-3 mb-1 inline-flex items-center gap-1 rounded-full px-3 py-1 text-2xl font-medium tracking-tight text-foreground">
-          {title}<ChevronRight className="size-6 text-muted-foreground" />
+        <button data-nav data-pill onClick={onSeeAll} aria-label={t("common.seeAll", { title: typeof title === "string" ? title : "" })} className="-ms-3 mb-1 inline-flex items-center gap-1 rounded-full px-3 py-1 text-2xl font-medium tracking-tight text-foreground">
+          {title}<ChevronRight className="rtl-flip size-6 text-muted-foreground" />
         </button>
       </div>
     ) : title ? <SectionTitle className="mb-1 px-[var(--gx)]">{title}</SectionTitle> : null}
     <div className="rail rail-in !mx-0" onWheel={wheel}>{children}</div>
   </section>
-)
+  )
+}
 
 /** White pill = primary action. tonal = surface pill. ghost = text only. On TV every pill turns white when focused. */
 export function Pill({ variant = "tonal", className, type = "button", ...p }: Btn & { variant?: "primary" | "tonal" | "ghost" }) {
@@ -97,20 +103,20 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
       data-id={item.id}
       onClick={onOpen}
       onFocus={onFocus}
-      className={cn("block shrink-0 text-left", fluid ? "w-full" : variant === "wide" ? "w-64" : "w-[9.5rem]", className)}
+      className={cn("block shrink-0 text-start", fluid ? "w-full" : variant === "wide" ? "w-64" : "w-[9.5rem]", className)}
     >
       <div data-tilewrap className="relative rounded-2xl">
       <div data-tile data-loaded={loaded ? "" : undefined} onLoadCapture={(e: SyntheticEvent) => { if ((e.target as HTMLImageElement).loading === "lazy") setLoaded(true) }} className={cn("relative overflow-hidden rounded-[inherit] bg-surface", variant === "wide" ? "aspect-video" : "aspect-[2/3]", live && "bg-gradient-to-br from-surface-3 to-surface")}>
         <Logo item={item} className={cn("relative size-full", live ? "p-6" : variant === "wide" ? "object-contain" : "object-cover")} />
-        {fav && <span className={cn(chip, "right-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
-        {locked && <span className={cn(chip, "left-2")}><Lock className="size-4 text-white" /></span>}
-        <SourceBadge item={item} className={cn("absolute left-2", pct ? "bottom-3" : "bottom-2")} />
-        {pct ? <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} /></div> : null}
+        {fav && <span className={cn(chip, "end-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
+        {locked && <span className={cn(chip, "start-2")}><Lock className="size-4 text-white" /></span>}
+        <SourceBadge item={item} className={cn("absolute start-2", pct ? "bottom-3" : "bottom-2")} />
+        {pct ? <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} /></div> : null}
       </div>
       <span data-ring aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit]" />
       </div>
       <div className="mt-2 px-1">
-        <div className="truncate text-base text-foreground">{item.name}</div>
+        <div dir="auto" className="truncate text-base text-foreground">{item.name}</div>
         {sub ? <div className="truncate text-sm text-muted-foreground">{sub}</div> : null}
       </div>
     </button>
@@ -121,7 +127,8 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
 export function Hero({ item, onPlay, onInfo, onFav, isFav, kicker, children }: {
   item?: Item; onPlay: () => void; onInfo?: () => void; onFav: () => void; isFav?: boolean; kicker?: ReactNode; children?: ReactNode
 }) {
-  const meta = item ? [item.group, item.rating ? `★ ${item.rating}` : ""].filter(Boolean).join("  ·  ") : ""
+  const t = useT()
+  const meta = item ? [item.group, item.rating ? `★ ${fmt.digits(item.rating)}` : ""].filter(Boolean).join("  ·  ") : ""
   // two stacked layers: the new image fades in (opacity) over the previous one, which is dropped once covered
   const [layers, setLayers] = useState(() => (item?.logo ? [{ k: item.id, src: item.logo }] : []))
   useEffect(() => {
@@ -139,19 +146,19 @@ export function Hero({ item, onPlay, onInfo, onFav, isFav, kicker, children }: {
         </div>
       ))}
       <div className="absolute inset-0 bg-background/40" />
-      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r rtl:bg-gradient-to-l from-background via-background/70 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
       <div className="relative flex min-h-[min(20rem,55vh)] flex-col justify-end gap-3 px-[var(--gx)] pb-6 pt-[calc(var(--hdr)+2.5rem)] md:min-h-[min(24rem,50vh)]">
         {kicker ? <div className="text-sm font-medium uppercase tracking-widest text-accent-blue">{kicker}</div> : null}
         {item && (
           <>
-            <h1 className="line-clamp-2 max-w-3xl text-4xl font-medium tracking-tight text-foreground">{item.name}</h1>
-            {meta ? <div className="text-base text-foreground/80">{meta}</div> : null}
-            {item.plot ? <p className="line-clamp-3 max-w-2xl text-base text-muted-foreground">{item.plot}</p> : null}
+            <h1 dir="auto" className="line-clamp-2 max-w-3xl text-4xl font-medium tracking-tight text-foreground">{item.name}</h1>
+            {meta ? <div dir="auto" className="text-base text-foreground/80">{meta}</div> : null}
+            {item.plot ? <p dir="auto" className="line-clamp-3 max-w-2xl text-base text-muted-foreground">{item.plot}</p> : null}
             <div className="mt-2 flex items-center gap-3">
-              <Pill variant="primary" onClick={onPlay}><Play className="fill-current" />Play</Pill>
-              {onInfo && <RoundButton label="More info" onClick={onInfo}><Info /></RoundButton>}
-              <RoundButton label={isFav ? "Remove from favorites" : "Add to favorites"} active={isFav} onClick={onFav}>
+              <Pill variant="primary" onClick={onPlay}><Play className="fill-current" />{t("common.play")}</Pill>
+              {onInfo && <RoundButton label={t("common.moreInfo")} onClick={onInfo}><Info /></RoundButton>}
+              <RoundButton label={t(isFav ? "common.removeFav" : "common.addFav")} active={isFav} onClick={onFav}>
                 <Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />
               </RoundButton>
             </div>

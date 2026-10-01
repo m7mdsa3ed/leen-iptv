@@ -3,6 +3,7 @@
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Prog, Source } from "./types"
 import { mixed, plexFetch, px } from "./net"
+import { t } from "./i18n"
 import { useApp } from "./store"
 import { clientId } from "./plex"
 import { authHeader, imageUrl, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapPrograms, normServer, toTicks, type Img } from "./jellyfin-pure"
@@ -23,7 +24,7 @@ const hdr = (token?: string, json = false): Record<string, string> => ({
 const base = (s: Source) => normServer(s.server ?? "")
 async function call<T>(server: string, path: string, init?: RequestInit, params?: Record<string, string | number | undefined>, token?: string, px_ = proxy()): Promise<T> {
   const r = await plexFetch(jfUrl(normServer(server), path, params, token), px_, init, 20000)
-  return r.status === 204 ? (undefined as T) : r.json().catch(() => { throw new Error("That address doesn't look like a Jellyfin server.") }) // HTML from a router/login page
+  return r.status === 204 ? (undefined as T) : r.json().catch(() => { throw new Error(t("errors.jellyfin.notServer")) }) // HTML from a router/login page
 }
 const get = <T,>(s: Source, px_: string, path: string, params?: Record<string, string | number | undefined>) =>
   call<T>(base(s), path, { headers: { Accept: "application/json" } }, params, s.token, px_)
@@ -32,7 +33,7 @@ const get = <T,>(s: Source, px_: string, path: string, params?: Record<string, s
 /** Public server info (no auth): name, id, version. Also a cheap "is this a Jellyfin server" check. */
 export async function jellyfinServerInfo(server: string): Promise<{ name: string; id: string; version: string }> {
   const j = await call<J>(server, "/System/Info/Public", { headers: { Accept: "application/json" } }, {}, undefined)
-  if (!j?.Id) throw new Error("That address doesn't look like a Jellyfin server.")
+  if (!j?.Id) throw new Error(t("errors.jellyfin.notServer"))
   return { name: String(j.ServerName || "Jellyfin"), id: String(j.Id), version: String(j.Version ?? "") }
 }
 
@@ -42,7 +43,7 @@ export async function jellyfinSignIn(server: string, user: string, pw: string): 
   try {
     return auth(await call<J>(server, "/Users/AuthenticateByName", { method: "POST", headers: hdr(undefined, true), body: JSON.stringify({ Username: user, Pw: pw }) }))
   } catch (e) {
-    if (e instanceof Error && /HTTP 401/.test(e.message)) throw new Error("Wrong username or password.")
+    if (e instanceof Error && /HTTP 401/.test(e.message)) throw new Error(t("errors.jellyfin.wrongLogin"))
     throw e
   }
 }
@@ -84,7 +85,7 @@ export async function loadJellyfin(s: Source, px_: string, step: (m: string) => 
   const out: Item[] = []
   const seen = new Set<string>()
   for (const v of views) {
-    step(`Loading ${v.Name}`)
+    step(t("errors.source.loadingItem", { name: v.Name }))
     for (let start = 0, total = 1; start < total; ) {
       const c = await get<{ Items?: J[]; TotalRecordCount?: number }>(s, px_, `/Users/${uid}/Items`, {
         ParentId: v.Id, Recursive: "true", IncludeItemTypes: "Movie,Series", Fields: FIELDS, EnableUserData: "true",
@@ -95,11 +96,11 @@ export async function loadJellyfin(s: Source, px_: string, step: (m: string) => 
       total = c.TotalRecordCount ?? list.length
       start += 500
       if (!list.length) break
-      step(`Loading ${v.Name} (${Math.min(start, total)}/${total})`)
+      step(t("errors.source.loadingProgress", { name: v.Name, done: Math.min(start, total), total }))
     }
   }
   try {
-    step("Loading channels")
+    step(t("errors.source.loadingChannels"))
     const ch = await get<{ Items?: J[] }>(s, px_, "/LiveTv/Channels", { userId: uid, EnableImages: "true", SortBy: "SortName" })
     for (const c of ch.Items ?? []) out.push(mapChannel(c, s.id, img))
   } catch { /* no live TV on this server (or no access): movies and series only */ }

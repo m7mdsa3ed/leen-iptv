@@ -8,7 +8,7 @@ html[data-layout=netflix][data-mode=tv] { --nf-s: 1.22; --nf-bb: 62vh; }
 html[data-layout=netflix][data-mode=mobile] { --nf-bb: 64vh; }
 
 /* ---------- header ---------- */
-html[data-layout=netflix] .nf-logo { font-weight: 900; letter-spacing: .14em; color: #e50914; font-size: 1.6rem; line-height: 1; margin-right: 1rem; text-shadow: 0 1px 0 rgba(0, 0, 0, .25); }
+html[data-layout=netflix] .nf-logo { font-weight: 900; letter-spacing: .14em; color: #e50914; font-size: 1.6rem; line-height: 1; margin-inline-end: 1rem; text-shadow: 0 1px 0 rgba(0, 0, 0, .25); }
 html[data-layout=netflix] .nf-bg { position: absolute; inset: 0; opacity: 0; transition: opacity var(--dur) var(--ease); pointer-events: none; }
 html[data-layout=netflix] .nf-bg[data-on] { opacity: 1; }
 html[data-layout=netflix] .nf-tab { position: relative; min-height: 2.75rem; padding: .25rem .5rem; font-size: .95rem; color: var(--muted-foreground); white-space: nowrap; }
@@ -25,7 +25,7 @@ html[data-layout=netflix][data-mode=tv] :is(.nf-tab, .nf-hbtn, .nf-pick)[data-na
 
 /* ---------- menus ---------- */
 html[data-layout=netflix] .nf-menu { position: absolute; top: 100%; margin-top: .5rem; z-index: 50; min-width: 12rem; max-height: 60vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--fg-10); border-radius: .25rem; padding: .25rem; }
-html[data-layout=netflix] .nf-pick { display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 2.75rem; padding: .25rem .75rem; text-align: left; font-size: .95rem; color: var(--foreground); border-radius: .25rem; }
+html[data-layout=netflix] .nf-pick { display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 2.75rem; padding: .25rem .75rem; text-align: start; font-size: .95rem; color: var(--foreground); border-radius: .25rem; }
 html[data-layout=netflix] .nf-pick:focus-visible, html[data-layout=netflix] .nf-pick:hover { background: var(--surface-3); }
 html[data-layout=netflix] .nf-drop { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.5rem; padding: .25rem 1rem; border: 1px solid var(--fg-40); background: rgba(0, 0, 0, .35); color: var(--foreground); font-size: .95rem; font-weight: 600; border-radius: .125rem; }
 html[data-layout=netflix] .nf-drop:focus-visible { background: var(--foreground); color: var(--background); }
@@ -44,11 +44,11 @@ html[data-layout=netflix] .nf-bb { position: relative; height: var(--nf-bb); min
 html[data-layout=netflix] .nf-bb-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; }
 html[data-layout=netflix] .nf-vig-l { position: absolute; inset: 0; background-image: linear-gradient(to right, var(--background) 0%, var(--fade-mid) 30%, var(--fade-to) 70%); }
 html[data-layout=netflix] .nf-vig-b { position: absolute; inset: 0; background-image: linear-gradient(to top, var(--background) 0%, var(--fade-to) 40%); }
-html[data-layout=netflix] .nf-bb-body { position: absolute; left: var(--gx); bottom: calc(9vw + 4rem); width: min(36rem, 44%); display: flex; flex-direction: column; gap: .9rem; }
-html[data-layout=netflix][data-mode=mobile] .nf-bb-body { width: auto; right: var(--gx); bottom: 12%; align-items: center; text-align: center; }
+html[data-layout=netflix] .nf-bb-body { position: absolute; inset-inline-start: var(--gx); bottom: calc(9vw + 4rem); width: min(36rem, 44%); display: flex; flex-direction: column; gap: .9rem; }
+html[data-layout=netflix][data-mode=mobile] .nf-bb-body { width: auto; inset-inline-end: var(--gx); bottom: 12%; align-items: center; text-align: center; }
 html[data-layout=netflix] .nf-bb-title { font-size: clamp(2rem, 4.2vw, 4rem); line-height: 1.05; font-weight: 900; letter-spacing: -.02em; text-shadow: 0 2px 4px rgba(0, 0, 0, .35); }
 html[data-layout=netflix][data-mode=mobile] .nf-bb-title { font-size: 2.2rem; }
-html[data-layout=netflix] .nf-badge { position: absolute; right: 0; bottom: calc(9vw + 4rem); display: flex; align-items: center; padding: .35rem 2.5rem .35rem 1rem; background: rgba(51, 51, 51, .6); border-left: 3px solid #dcdcdc; color: #fff; font-size: 1.05rem; }
+html[data-layout=netflix] .nf-badge { position: absolute; inset-inline-end: 0; bottom: calc(9vw + 4rem); display: flex; align-items: center; padding: .35rem 0; padding-inline: 1rem 2.5rem; background: rgba(51, 51, 51, .6); border-inline-start: 3px solid #dcdcdc; color: #fff; font-size: 1.05rem; }
 html[data-layout=netflix][data-mode=mobile] .nf-badge { display: none; }
 html[data-layout=netflix] .nf-under { position: relative; z-index: 2; margin-top: -9vw; }
 html[data-layout=netflix][data-mode=mobile] .nf-under { margin-top: -2rem; }
@@ -59,7 +59,7 @@ html[data-layout=netflix] .nf-page::-webkit-scrollbar { display: none; }
 html[data-layout=netflix] .nf-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; padding: 1.25rem 0 .5rem; }
 html[data-layout=netflix] .nf-strip { position: relative; }
 html[data-layout=netflix][data-mode=mobile] .nf-strip > .relative { position: static; }
-html[data-layout=netflix][data-mode=mobile] .nf-strip .nf-menu { left: 0 !important; right: 0 !important; width: auto !important; }
+html[data-layout=netflix][data-mode=mobile] .nf-strip .nf-menu { inset-inline: 0 !important; width: auto !important; }
 html[data-layout=netflix] .nf-h1 { font-size: 2rem; font-weight: 900; letter-spacing: -.01em; }
 html[data-layout=netflix] .nf-rowsec { position: relative; margin-inline: calc(var(--gx) * -1); margin-top: .5rem; }
 html[data-layout=netflix] .nf-rowtitle { position: relative; z-index: 2; padding-inline: var(--gx); font-size: 1.3rem; font-weight: 700; line-height: 1.6; }
@@ -92,7 +92,7 @@ html[data-layout=netflix] .nf-tile.nf-fluid { width: 100%; }
 html[data-layout=netflix] .nf-pop { position: relative; transform-origin: center; transition: transform var(--dur) var(--ease); }
 html[data-layout=netflix] .nf-row > :first-child .nf-pop { transform-origin: left center; }
 html[data-layout=netflix] .nf-row > :last-child .nf-pop { transform-origin: right center; }
-html[data-layout=netflix] .nf-img { display: block; position: relative; width: 100%; text-align: left; border-radius: .25rem; }
+html[data-layout=netflix] .nf-img { display: block; position: relative; width: 100%; text-align: start; border-radius: .25rem; }
 html[data-layout=netflix] .nf-media { position: relative; overflow: hidden; border-radius: .25rem; background: var(--surface-2); }
 html[data-layout=netflix] .nf-live { background-image: linear-gradient(135deg, var(--surface-3), var(--surface)); }
 html[data-layout=netflix] .nf-cap { position: absolute; inset: auto 0 0 0; padding: 1.5rem .5rem .4rem; color: #fff; font-size: .8rem; background-image: linear-gradient(to top, rgba(0, 0, 0, .85), rgba(0, 0, 0, 0)); }
@@ -102,7 +102,7 @@ html[data-layout=netflix][data-mode=tv] .nf-img:focus-visible .nf-ring { opacity
 html[data-layout=netflix] .nf-img:focus-visible, html[data-layout=netflix] .nf-round:focus-visible { box-shadow: none !important; transform: none !important; outline: none; }
 html[data-layout=netflix] .nf-round:focus-visible { outline: 2px solid var(--foreground) !important; outline-offset: 2px; }
 html[data-layout=netflix] .nf-img:active .nf-pop { transform: none; }
-html[data-layout=netflix] .nf-info { position: absolute; top: 100%; left: 0; right: 0; padding: .6rem .7rem .7rem; background: var(--surface); border-radius: 0 0 .25rem .25rem; box-shadow: 0 8px 12px rgba(0, 0, 0, .35); opacity: 0; visibility: hidden; transition: opacity var(--dur) var(--ease), visibility 0s linear var(--dur); pointer-events: none; }
+html[data-layout=netflix] .nf-info { position: absolute; top: 100%; inset-inline: 0; padding: .6rem .7rem .7rem; background: var(--surface); border-radius: 0 0 .25rem .25rem; box-shadow: 0 8px 12px rgba(0, 0, 0, .35); opacity: 0; visibility: hidden; transition: opacity var(--dur) var(--ease), visibility 0s linear var(--dur); pointer-events: none; }
 html[data-layout=netflix][data-mode=tv] .nf-info { padding: .5rem .6rem .6rem; box-shadow: none; }
 
 /* grow: TV on focus; desktop on hover (short delay) or focus; touch never */
@@ -120,17 +120,17 @@ html[data-layout=netflix][data-mode=mobile] .nf-grid[data-v=poster] { grid-templ
 
 /* Top 10 numerals */
 html[data-layout=netflix] .nf-top { display: flex; align-items: flex-end; }
-html[data-layout=netflix] .nf-num { font-size: 9.5rem; line-height: .74; font-weight: 900; letter-spacing: -.08em; margin-right: -1.4rem; margin-bottom: .4rem; color: var(--background); -webkit-text-stroke: 4px #595959; user-select: none; }
-html[data-layout=netflix][data-mode=mobile] .nf-num { font-size: 6.5rem; margin-right: -1rem; }
+html[data-layout=netflix] .nf-num { font-size: 9.5rem; line-height: .74; font-weight: 900; letter-spacing: -.08em; margin-inline-end: -1.4rem; margin-bottom: .4rem; color: var(--background); -webkit-text-stroke: 4px #595959; user-select: none; }
+html[data-layout=netflix][data-mode=mobile] .nf-num { font-size: 6.5rem; margin-inline-end: -1rem; }
 html[data-layout=netflix] .nf-top .nf-tile { position: relative; z-index: 1; }
 
 /* ---------- detail (more-info modal style) ---------- */
 html[data-layout=netflix] .nf-modal { position: relative; width: min(60rem, 100%); margin: 0 auto; background: var(--surface); border-radius: .5rem; overflow: hidden; }
 html[data-layout=netflix][data-mode=mobile] .nf-modal { border-radius: 0; }
-html[data-layout=netflix] .nf-ep { display: flex; align-items: center; gap: 1rem; width: 100%; min-height: 4.5rem; padding: .75rem 1rem; text-align: left; border-bottom: 1px solid var(--fg-10); border-radius: .25rem; }
+html[data-layout=netflix] .nf-ep { display: flex; align-items: center; gap: 1rem; width: 100%; min-height: 4.5rem; padding: .75rem 1rem; text-align: start; border-bottom: 1px solid var(--fg-10); border-radius: .25rem; }
 html[data-layout=netflix] .nf-ep:focus-visible, html[data-layout=netflix] .nf-ep:hover { background: var(--surface-3); }
 html[data-layout=netflix] .nf-ep[data-nav]:focus-visible, html[data-layout=netflix] .nf-more[data-nav]:focus-visible, html[data-layout=netflix] .nf-link[data-nav]:focus-visible { box-shadow: none !important; transform: none !important; outline: 2px solid var(--foreground); outline-offset: -2px; }
-html[data-layout=netflix] .nf-more { display: block; text-align: left; background: var(--surface-2); border-radius: .25rem; overflow: hidden; }
+html[data-layout=netflix] .nf-more { display: block; text-align: start; background: var(--surface-2); border-radius: .25rem; overflow: hidden; }
 html[data-layout=netflix] .nf-link { color: var(--foreground); border-radius: 2px; }
 html[data-layout=netflix] .nf-link:hover { text-decoration: underline; }
 html[data-layout=netflix] .nf-match { color: #46d369; font-weight: 700; }
@@ -140,7 +140,7 @@ html[data-layout=netflix] .nf-search { display: flex; align-items: center; gap: 
 html[data-layout=netflix] .nf-search:focus-within { border-color: var(--foreground); }
 html[data-layout=netflix] .nf-search input { flex: 1; min-width: 0; background: transparent; outline: none; font-size: 1.15rem; color: var(--foreground); }
 html[data-layout=netflix][data-mode=mobile] .nf-search input { font-size: 16px; }
-html[data-layout=netflix] .nf-top-search { display: flex; align-items: center; gap: 1rem; width: 100%; min-height: 4.5rem; padding: .35rem 1rem; background: var(--surface-2); border-bottom: 2px solid var(--background); text-align: left; }
+html[data-layout=netflix] .nf-top-search { display: flex; align-items: center; gap: 1rem; width: 100%; min-height: 4.5rem; padding: .35rem 1rem; background: var(--surface-2); border-bottom: 2px solid var(--background); text-align: start; }
 html[data-layout=netflix] .nf-top-search:focus-visible, html[data-layout=netflix] .nf-top-search:hover { background: var(--surface-3); }
 html[data-layout=netflix] .nf-top-search[data-nav]:focus-visible { box-shadow: none !important; transform: none !important; outline: 2px solid var(--foreground); outline-offset: -2px; }
 html[data-layout=netflix] .nf-prof { display: flex; flex-direction: column; align-items: center; gap: .75rem; width: 9rem; color: var(--muted-foreground); }
@@ -166,3 +166,10 @@ html[data-layout=netflix] .nf-src-pill[aria-pressed=true] { background: var(--su
 html[data-layout=netflix] .nf-src-pill:focus-visible { background: var(--foreground); color: var(--background); }
 html[data-layout=netflix] .nf-src-pill:focus-visible .text-muted-foreground { color: inherit; }
 html[data-layout=netflix] .nf-src-dot { width: .6rem; height: .6rem; border-radius: 9999px; flex-shrink: 0; }
+
+/* ---------- RTL ---------- */
+html[dir=rtl][data-layout=netflix] .nf-vig-l { background-image: linear-gradient(to left, var(--background) 0%, var(--fade-mid) 30%, var(--fade-to) 70%); }
+html[dir=rtl][data-layout=netflix] .nf-explore { transform: translate3d(.5rem, 0, 0); }
+html[dir=rtl][data-layout=netflix] .nf-seeall:hover .nf-explore, html[dir=rtl][data-layout=netflix] .nf-seeall:focus-visible .nf-explore, html[dir=rtl][data-layout=netflix][data-mode=mobile] .nf-explore { transform: none; }
+html[dir=rtl][data-layout=netflix] .nf-row > :first-child .nf-pop { transform-origin: right center; }
+html[dir=rtl][data-layout=netflix] .nf-row > :last-child .nf-pop { transform-origin: left center; }

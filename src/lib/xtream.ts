@@ -1,5 +1,6 @@
 import type { Episode, Item, Source } from "./types"
 import { fetchT, px } from "./net"
+import { t } from "./i18n"
 
 const base = (s: Source) => s.server!.replace(/\/+$/, "")
 const api = (s: Source, action = "", extra = "") =>
@@ -20,14 +21,14 @@ export function xtreamUrl(s: Source, kind: "live" | "movie" | "series", sid: str
 
 export async function loadXtream(s: Source, proxy: string, step: (m: string) => void): Promise<Item[]> {
   const auth = await call<{ user_info?: { auth?: number; status?: string } }>(s, proxy)
-  if (!auth.user_info || auth.user_info.auth === 0) throw new Error("Login failed: check server, username and password")
+  if (!auth.user_info || auth.user_info.auth === 0) throw new Error(t("errors.source.loginFailed"))
   const out: Item[] = []
   for (const [kind, cats, list] of [
     ["live", "get_live_categories", "get_live_streams"],
     ["movie", "get_vod_categories", "get_vod_streams"],
     ["series", "get_series_categories", "get_series"],
   ] as const) {
-    step(kind === "live" ? "Loading channels" : kind === "movie" ? "Loading movies" : "Loading series")
+    step(t(kind === "live" ? "errors.source.loadingChannels" : kind === "movie" ? "errors.source.loadingMovies" : "errors.source.loadingSeries"))
     const [c, l] = await Promise.all([call<R[]>(s, proxy, cats), call<R[]>(s, proxy, list)])
     const names = new Map(arr<R>(c).map((x) => [String(x.category_id), String(x.category_name)]))
     for (const x of arr<R>(l)) {

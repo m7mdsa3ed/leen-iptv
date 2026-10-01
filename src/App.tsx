@@ -6,6 +6,7 @@ import { isTv, useMode } from "@/lib/device"
 import { useLayoutAttr, useLayoutDef } from "@/layouts"
 import { useMotion } from "@/lib/motion"
 import { useTheme } from "@/lib/theme"
+import { useLanguageAttr, useT } from "@/lib/i18n"
 import { ExitConfirm, askExit, closeExit, useExitAsk } from "@/components/tv/exit-confirm"
 import { installNav, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
@@ -31,9 +32,10 @@ import Sources from "@/pages/sources"
 function RestorePlayer({ id }: { id: string }) {
   const { status, byId, byKind } = useCatalog()
   const back = useRoute((s) => s.back)
+  const t = useT()
   const item = byId.get(id)
-  if (status === "ready" && !item) return <Empty>Not found. <button data-nav className="ml-3 underline" onClick={back}>Back</button></Empty>
-  if (!item) return <Empty>Loading...</Empty>
+  if (status === "ready" && !item) return <Empty>{t("common.notFound")} <button data-nav className="ms-3 underline" onClick={back}>{t("common.back")}</button></Empty>
+  if (!item) return <Empty>{t("common.loading")}</Empty>
   const queue = item.kind === "live" ? byKind.live.filter((i) => i.group === item.group) : [item]
   return <Player queue={queue} index={queue.indexOf(item)} />
 }
@@ -69,6 +71,7 @@ export default function App() {
   useMode() // keeps html[data-mode] in sync on resize
   useTheme()
   useMotion()
+  useLanguageAttr()
   useLayoutAttr()
   const tvScale = useApp((s) => s.settings.tvScale)
   useEffect(() => { document.documentElement.style.setProperty("--tv-scale", String(tvScale)) }, [tvScale])

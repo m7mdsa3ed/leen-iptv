@@ -1,3 +1,4 @@
+import { t } from "./i18n"
 // ponytail: optional CORS proxy (server/proxy.mjs); packaged webOS apps usually don't need it, hosted/web ones do.
 // Proxy formats: "https://host/path?url={url}" (template, URL-encoded), "https://proxy.corsfix.com/?" (ends in ? or =, raw URL appended),
 // or a bare base like "http://lan:8787" (our server/proxy.mjs, /p?url=).
@@ -31,19 +32,19 @@ export class HttpError extends Error {
 }
 
 export const statusMsg = (s: number) =>
-  s === 404 ? "Not available on your provider (404). The title or channel may have been removed."
-  : s === 401 || s === 403 ? `Access denied (${s}). Check your subscription, expiry date and number of simultaneous connections.`
-  : s === 429 ? "Too many requests (429). Wait a moment and retry."
-  : s >= 500 ? `The provider's server had an error (${s}). Try again later.`
-  : `Request failed (${s}).`
+  s === 404 ? t("errors.http.notFound")
+  : s === 401 || s === 403 ? t("errors.http.denied", { status: s })
+  : s === 429 ? t("errors.http.tooMany")
+  : s >= 500 ? t("errors.http.server", { status: s })
+  : t("errors.http.other", { status: s })
 
-export const CORS_HINT = "Couldn't reach the server. Check the address and your connection. If the browser is blocking it (CORS), set a proxy in Settings > Network."
+export const corsHint = () => t("errors.cors")
 
 /** Turn any thrown value into a sentence a viewer can act on. */
 export function explain(e: unknown): string {
   if (e instanceof HttpError) return statusMsg(e.status)
-  if (e instanceof DOMException && e.name === "AbortError") return "The server took too long to answer. Try again."
-  if (e instanceof TypeError) return CORS_HINT
+  if (e instanceof DOMException && e.name === "AbortError") return t("errors.timeout")
+  if (e instanceof TypeError) return corsHint()
   return e instanceof Error ? e.message : String(e)
 }
 

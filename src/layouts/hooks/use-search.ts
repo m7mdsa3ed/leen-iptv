@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo, useState } from "react"
 import { useOpen } from "@/components/tv/ui"
+import { fold } from "@/lib/i18n"
 import type { Item } from "@/lib/types"
 import { useCatalogView } from "./use-source-filter"
 
@@ -13,8 +14,8 @@ export function useSearch() {
   const { items } = useCatalogView()
   const open = useOpen()
   const [q, setQ] = useState("")
-  const query = useDeferredValue(q).trim().toLowerCase()
-  const results = useMemo(() => (query.length < 2 ? [] : items.filter((i) => i.name.toLowerCase().includes(query)).slice(0, 300)), [query, items])
+  const query = fold(useDeferredValue(q).trim())
+  const results = useMemo(() => (query.length < 2 ? [] : items.filter((i) => fold(i.name).includes(query)).slice(0, 300)), [query, items])
   const live = useMemo(() => results.filter((i) => i.kind === "live"), [results])
   const movies = useMemo(() => results.filter((i) => i.kind === "movie"), [results])
   const series = useMemo(() => results.filter((i) => i.kind === "series"), [results])

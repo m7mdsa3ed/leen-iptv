@@ -1,6 +1,6 @@
 // node scripts/stats.check.ts
 import assert from "node:assert/strict"
-import { computeStats, dayKey, fmtDur, level, type Day, type Session } from "../src/lib/stats.ts"
+import { computeStats, dayKey, level, type Day, type Session } from "../src/lib/stats.ts"
 
 const now = new Date(2026, 9, 10, 20, 0).getTime()
 const day = (n: number) => dayKey(now - n * 864e5)
@@ -29,6 +29,4 @@ assert.equal(level(0, 10), 0)
 assert.equal(level(10, 10), 4)
 assert.equal(level(1, 10), 1)
 assert.equal(computeStats([], {}, now).hasData, false)
-assert.equal(fmtDur(3725), "1h 2m")
-assert.equal(fmtDur(30), "<1 min")
 console.log("stats ok")

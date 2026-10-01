@@ -4,6 +4,7 @@ import { useBrowse } from "../../hooks/use-browse"
 import { useMode } from "@/lib/device"
 import { KEY } from "@/lib/nav"
 import { useApp } from "@/lib/store"
+import { useT } from "@/lib/i18n"
 import type { Item, Kind } from "@/lib/types"
 import { Hero, Shelf, SourceFilter, Tile } from "../ui"
 
@@ -11,6 +12,7 @@ const hue = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 
 
 /** Movies / Shows: one featured banner, category capsules, then Top, Genres and category shelves. */
 export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
+  const t = useT()
   const B = useBrowse(kind)
   const mode = useMode()
   const toggleFav = useApp((s) => s.toggleFav)
@@ -18,7 +20,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
     const all = B.rails.flatMap(([, a]) => a)
     return all.filter((i, n) => all.findIndex((x) => x.id === i.id) === n).sort((a, b) => (parseFloat(b.rating ?? "") || 0) - (parseFloat(a.rating ?? "") || 0)).slice(0, 20)
   }, [B.rails])
-  const picks = top.slice(0, 5).map((item) => ({ item, kicker: `Top ${B.kindLabel}` }))
+  const picks = top.slice(0, 5).map((item) => ({ item, kicker: t("atv.browse.top", { kind: B.kindLabel }) }))
   const tile = (i: Item) => <Tile key={i.id} item={i} shape="poster" size="poster" pct={B.pct(i)} onOpen={() => B.open(i)} />
   return (
     <Shell page={B.page} title={B.kindLabel}>
@@ -31,9 +33,9 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
             <SourceFilter className="-mt-2 mb-2" />
             {B.rails.length ? (
               <>
-                {top.length > 0 && <Shelf title={`Top ${B.kindLabel}`}>{top.map(tile)}</Shelf>}
+                {top.length > 0 && <Shelf title={t("atv.browse.top", { kind: B.kindLabel })}>{top.map(tile)}</Shelf>}
                 {B.genres.length > 0 && (
-                  <Shelf title="Genres">
+                  <Shelf title={t("atv.browse.genres")}>
                     {B.genres.map((n) => (
                       <button key={n} data-nav data-atv-card onClick={() => B.openGenre(n)} className="atv-card atv-w-up">
                         <div className="atv-lift"><div className="atv-art grid aspect-video place-items-center px-4 text-center text-2xl font-bold text-white" style={{ background: `linear-gradient(135deg, hsl(${hue(n)} 55% 38%), hsl(${(hue(n) + 50) % 360} 60% 22%))` }}>{n}</div><span aria-hidden className="atv-glow" /></div>
@@ -49,7 +51,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
                   </Shelf>
                 ))}
               </>
-            ) : <div className="h-48"><Empty>Nothing here</Empty></div>}
+            ) : <div className="h-48"><Empty>{t("atv.browse.empty")}</Empty></div>}
           </div>
         </div>
       )}

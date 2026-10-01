@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -40,6 +40,12 @@
       var t
       try { t = JSON.parse(localStorage.getItem("iptv-app")).state.settings.theme } catch (e) {}
       var tv = /Web0S|webOS|SmartTV/i.test(navigator.userAgent)
+      // language / direction before first paint; mirrors src/lib/i18n
+      var lg; try { lg = JSON.parse(localStorage.getItem("iptv-app")).state.settings.language } catch (e) {}
+      var ar = lg === "ar" || (lg !== "en" && /^ar/i.test(navigator.language))
+      document.documentElement.lang = ar ? "ar-EG" : "en"
+      document.documentElement.dir = ar ? "rtl" : "ltr"
+      document.documentElement.dataset.lang = ar ? "ar" : "en"
       document.documentElement.classList.toggle("dark", t === "dark" || (t !== "light" && (tv || matchMedia("(prefers-color-scheme: dark)").matches)))
     </script>
   </head>

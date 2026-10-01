@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { fmt, useT } from "@/lib/i18n"
 import { useMeta, useSimilar } from "@/lib/meta"
 import { explain } from "@/lib/net"
 import { useCatalog } from "@/lib/catalog"
@@ -27,11 +28,12 @@ export type DetailRating = { source: string; value: string; votes?: string }
  *  cast (meta.cast), directors, castText (raw Xtream cast string),
  *  episodes, seasons (numbers), season (selected, null = none), setSeason, shown (episodes of the season),
  *  progress(x) -> {pos,dur,t}|undefined, pct(x) -> 0..100, watched(x), epLabel(e) -> "E3  ·  45m  ·  Watched",
- *  resumeIdx, resumeLabel ("Resume"|"Play"), canPlay, play(queue|null, index) -> opens the player, playMain() (resume/play button),
+ *  resumeIdx, resumeLabel (localised "Resume"|"Play"), resuming (true = Resume; compare this, not the label), ratingName(source) (localises the generic "Rating" source name), canPlay, play(queue|null, index) -> opens the player, playMain() (resume/play button),
  *  fav, toggleFav(), similar: Item[], open(item) (PIN-aware, live -> player), openCategory(), openGenre(g), openPerson(castMember), back()
  * }
  */
 export function useDetail(id: string) {
+  const t = useT()
   const item = useCatalog((s) => s.byId.get(id))
   const primary = useCatalog((s) => s.primaryOf.get(id)) ?? item // the deduped card (carries alts)
   const sources = useApp((s) => s.sources)
@@ -89,9 +91,10 @@ export function useDetail(id: string) {
     return last && last[1] ? Math.min(episodes.length - 1, last[0] + (watched(episodes[last[0]].item) ? 1 : 0)) : 0
   })()
   const play = (queue: Episode[] | null, i: number) => selected && go("player", { queue: queue ? queue.map((e) => e.item) : [selected], index: i })
+  const dur = (d?: string | number) => (typeof d === "number" ? fmt.duration(d) : d)
   const text = (k: string) => (info[k] ? String(info[k]) : "")
   const plot = meta?.plot || text("plot") || text("description") || item?.plot
-  const chips = [meta?.year || text("releasedate").slice(0, 4) || text("releaseDate").slice(0, 4) || text("year"), meta?.runtime || text("duration")].filter(Boolean) as string[]
+  const chips = [meta?.year || text("releasedate").slice(0, 4) || text("releaseDate").slice(0, 4) || text("year"), dur(meta?.runtime) || text("duration")].filter(Boolean) as string[]
   const genres = (meta?.genres.length ? meta.genres : text("genre").split(/\s*[,/]\s*/)).filter(Boolean).slice(0, 4)
   const ratings: DetailRating[] = meta?.ratings.length ? meta.ratings : [text("rating") || item?.rating].filter(Boolean).map((v) => ({ source: "Rating", value: String(v), votes: undefined }))
   const poster = item && (item.logo ? item : ({ ...item, logo: meta?.poster } as Item))
@@ -103,8 +106,9 @@ export function useDetail(id: string) {
     cast: meta?.cast ?? [], directors: meta?.directors ?? [], castText: text("cast"),
     episodes, seasons, season, setSeason, shown: episodes.filter((e) => e.season === season),
     progress, pct, watched,
-    epLabel: (e: Episode) => [`E${e.num}`, e.dur, watched(e.item) ? "Watched" : ""].filter(Boolean).join("  ·  "),
-    resumeIdx, resumeLabel: hasProgress ? "Resume" : "Play", canPlay: !isSeries || episodes.length > 0, play,
+    epDur: dur,
+    epLabel: (e: Episode) => [t("hooks.detail.ep", { n: e.num }), dur(e.dur), watched(e.item) ? t("hooks.detail.watched") : ""].filter(Boolean).join("  ·  "),
+    resumeIdx, resumeLabel: t(hasProgress ? "hooks.detail.resume" : "hooks.detail.play"), resuming: hasProgress, ratingName: (s: string) => (s === "Rating" ? t("hooks.detail.rating") : s), canPlay: !isSeries || episodes.length > 0, play,
     playMain: () => (isSeries ? episodes.length && play(episodes, resumeIdx) : play(null, 0)),
     fav: !!item && d.favs.includes(item.id), toggleFav: () => item && toggleFavStore(item.id),
     similar, open: (i: Item) => open(i),

@@ -10,6 +10,7 @@ import { useApp, useProfile } from "@/lib/store"
 import { Card, SkelGrid, SkelRail } from "@/components/gtv"
 import { useLayoutDef } from "@/layouts"
 import { useCatalog } from "@/lib/catalog"
+import { fmt, useT, type TFn } from "@/lib/i18n"
 import type { Item } from "@/lib/types"
 
 /* ---------- PIN gate ---------- */
@@ -17,6 +18,7 @@ export const usePinAsk = create<{ ask: null | { pin: string; resolve: (ok: boole
 export const askPin = (pin: string) => new Promise<boolean>((resolve) => usePinAsk.setState({ ask: { pin, resolve } }))
 
 export function PinModal() {
+  const t = useT()
   const ask = usePinAsk((s) => s.ask)
   const [v, setV] = useState("")
   const [bad, setBad] = useState(false)
@@ -41,15 +43,15 @@ export function PinModal() {
     <div data-modal className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
       <div className="my-auto w-full max-w-[26rem] rounded-[28px] bg-surface-2 p-6 text-center shadow-2xl sm:p-8">
         <Lock className="mx-auto mb-3 size-8" />
-        <div className="text-2xl font-semibold">Enter PIN</div>
-        <div className={cn("my-5 h-8 text-3xl tracking-[0.6em]", bad && "text-destructive")}>{bad ? "Wrong PIN" : "•".repeat(v.length) || " "}</div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="text-2xl font-semibold">{t("nav.pin.title")}</div>
+        <div className={cn("my-5 h-8 text-3xl tracking-[0.6em]", bad && "text-destructive")}>{bad ? t("nav.pin.wrong") : "•".repeat(v.length) || " "}</div>
+        <div dir="ltr" className="grid grid-cols-3 gap-3">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
             <TvButton key={d} variant="secondary" className="h-14 rounded-2xl bg-surface-3 text-2xl" onClick={() => press(d)}>{d}</TvButton>
           ))}
-          <TvButton variant="ghost" className="h-14 text-base" onClick={() => done(false)}>Cancel</TvButton>
+          <TvButton variant="ghost" className="h-14 text-base" onClick={() => done(false)}>{t("common.cancel")}</TvButton>
           <TvButton variant="secondary" className="h-14 rounded-2xl bg-surface-3 text-2xl" onClick={() => press("0")}>0</TvButton>
-          <TvButton variant="ghost" className="h-14 text-base" onClick={() => setV(v.slice(0, -1))}>Del</TvButton>
+          <TvButton variant="ghost" className="h-14 text-base" onClick={() => setV(v.slice(0, -1))}>{t("common.del")}</TvButton>
         </div>
       </div>
     </div>
@@ -61,7 +63,11 @@ export function TvButton({ className, ...p }: React.ComponentProps<typeof Button
   return <Button data-nav data-pill {...p} className={cn("h-12 min-h-11 rounded-full px-6 text-base font-medium", className)} />
 }
 
+/** Display name of a group chip: the FAV / ALL pseudo groups are localised, real categories are shown as-is. (FAV/ALL live in groups.tsx; literals here avoid an import cycle.) */
+export const groupLabel = (g: string, t: TFn) => (g === "Favorites" ? t("common.favorites") : g === "All" ? t("common.all") : g === "Other" ? t("common.other") : g)
+
 export function Chips({ items, active, onPick, locked, onKey, onCtx }: { items: string[]; active: string; onPick: (g: string) => void; locked?: (g: string) => boolean; onKey?: (e: React.KeyboardEvent, g: string) => void; onCtx?: (e: React.MouseEvent, g: string) => void }) {
+  const t = useT()
   return (
     <div className="rail !mb-0 !gap-3 !pb-2">
       {items.map((g) => (
@@ -77,7 +83,7 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx }: { items: 
         >
           {g === "Favorites" && <Star className="size-4" />}
           {locked?.(g) && <Lock className="size-4" />}
-          {g}
+          <bdi>{groupLabel(g, t)}</bdi>
         </button>
       ))}
     </div>
@@ -178,9 +184,10 @@ export function VList<T>({ items, rowH: baseH, render, className }: { items: T[]
 
 /* ---------- shell ---------- */
 export function Clock() {
-  const [t, setT] = useState(new Date())
-  useEffect(() => { const i = setInterval(() => setT(new Date()), 15000); return () => clearInterval(i) }, [])
-  return <>{t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</>
+  const [now, setNow] = useState(new Date())
+  useT() // re-render on language switch
+  useEffect(() => { const i = setInterval(() => setNow(new Date()), 15000); return () => clearInterval(i) }, [])
+  return <>{fmt.time(now)}</>
 }
 
 /** Delegates to the active layout (src/layouts). */
@@ -199,10 +206,11 @@ export const focusFirstSoon = () => { requestAnimationFrame(() => requestAnimati
 /** Catalog not ready: show progress, or the reason it failed with a retry. */
 export function Pending({ shape = "rails" }: { shape?: "rails" | "grid" }) {
   const { status, msg } = useCatalog()
+  const t = useT()
   if (status !== "error")
     return (
       <div role="status" className="h-full overflow-hidden pt-2">
-        <div className="mb-3 text-base text-muted-foreground">{msg || "Loading"}...</div>
+        <div className="mb-3 text-base text-muted-foreground">{msg ? `${msg}...` : t("common.loading")}</div>
         {shape === "grid" ? <SkelGrid variant="wide" /> : <><SkelRail variant="wide" /><SkelRail /><SkelRail /></>}
       </div>
     )
@@ -210,7 +218,7 @@ export function Pending({ shape = "rails" }: { shape?: "rails" | "grid" }) {
     <Empty>
       <div className="flex max-w-xl flex-col items-center gap-4 px-6 text-center">
         <div className="text-destructive">{msg}</div>
-        <TvButton onClick={() => { const c = useCatalog.getState(); for (const id in c.sources) if (c.sources[id].status === "error") void c.retry(id) }}>Retry</TvButton>
+        <TvButton onClick={() => { const c = useCatalog.getState(); for (const id in c.sources) if (c.sources[id].status === "error") void c.retry(id) }}>{t("common.retry")}</TvButton>
       </div>
     </Empty>
   )

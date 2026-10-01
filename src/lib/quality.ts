@@ -9,9 +9,9 @@ export function rate(s: { bufAhead: number; stalls: number; bw?: number; bitrate
 }
 
 /** Media-server (Plex/Jellyfin) stream quality picked in the player. Original = no caps; the server copies the source when it can. */
-export type StreamQ = { id: "original" | "1080" | "720" | "480"; label: string; height?: number; kbps?: number }
+export type StreamQ = { id: "original" | "1080" | "720" | "480"; label?: string; height?: number; kbps?: number }
 export const STREAM_QS: StreamQ[] = [
-  { id: "original", label: "Original" },
+  { id: "original" },
   { id: "1080", label: "1080p - 20 Mbps", height: 1080, kbps: 20000 },
   { id: "720", label: "720p - 8 Mbps", height: 720, kbps: 8000 },
   { id: "480", label: "480p - 3 Mbps", height: 480, kbps: 3000 },

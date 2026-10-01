@@ -3,6 +3,7 @@ import { Shell, TvButton, Empty } from "@/components/tv/ui"
 import { SkelRail } from "@/components/gtv"
 import type { Item } from "@/lib/types"
 import { usePData } from "@/lib/store"
+import { fmt, useT } from "@/lib/i18n"
 import { useHomeData } from "../home-data"
 import { Hero, Shelf, SkelHeroBlock, Tile } from "./ui"
 
@@ -11,10 +12,11 @@ const uniq = (l: Item[]) => l.filter((i, n) => l.findIndex((x) => x.id === i.id)
 
 /** Watch Now: full-bleed carousel, then Up Next, What to Watch, Live, Top Movies, Top Shows and category shelves. */
 export default function Home() {
+  const t = useT()
   const h = useHomeData()
   const prog = usePData().progress
-  const left = (i: Item) => { const p = prog[i.id]; const m = p && p.dur > p.pos ? Math.ceil((p.dur - p.pos) / 60) : 0; return m ? `${m} min left` : i.group }
-  const what = (i: Item) => [i.year, i.genres?.[0] ?? i.group].filter(Boolean).join("  ·  ")
+  const left = (i: Item) => { const p = prog[i.id]; const m = p && p.dur > p.pos ? Math.ceil((p.dur - p.pos) / 60) : 0; return m ? fmt.plural("atv.home.minLeft", m) : i.group }
+  const what = (i: Item) => [i.year && fmt.digits(i.year), i.genres?.[0] ?? i.group].filter(Boolean).join("  ·  ")
   const scroller = useRef<HTMLDivElement>(null)
   const s = useMemo(() => {
     const by = (k: string) => h.rails.find((r) => r.key === k)
@@ -30,7 +32,7 @@ export default function Home() {
     }
   }, [h.rails])
   return (
-    <Shell page="home" title={h.sourceName ?? "Watch Now"}>
+    <Shell page="home" title={h.sourceName ?? t("atv.home.watchNow")}>
       {h.status === "loading" && (
         <div role="status" className="atv-scroll overflow-hidden">
           <SkelHeroBlock />
@@ -41,7 +43,7 @@ export default function Home() {
       )}
       {h.status === "error" && (
         <Empty><div className="flex flex-col items-center gap-4"><div className="text-destructive">{h.msg}</div>
-          <div className="flex gap-3"><TvButton onClick={h.retry}>Retry</TvButton><TvButton variant="secondary" onClick={h.changeSource}>Change source</TvButton></div></div></Empty>
+          <div className="flex gap-3"><TvButton onClick={h.retry}>{t("common.retry")}</TvButton><TvButton variant="secondary" onClick={h.changeSource}>{t("atv.home.changeSource")}</TvButton></div></div></Empty>
       )}
       {h.status === "ready" && (
         <div ref={scroller} data-nav-group className="atv-scroll overflow-y-auto">
@@ -49,35 +51,35 @@ export default function Home() {
             <div className="contents" onFocus={() => scroller.current?.scrollTo({ top: 0 })}>
               <Hero picks={h.featured} onPlay={h.play} onInfo={h.info} isFav={h.isFav} onFav={h.toggleFav} />
             </div>
-          ) : <div className="h-[calc(var(--hdr)+1rem)]"><Empty>Pick Live TV, Movies or Series to start. Favorites and history show up here.</Empty></div>}
+          ) : <div className="h-[calc(var(--hdr)+1rem)]"><Empty>{t("atv.home.pick")}</Empty></div>}
           <div className="atv-after-hero">
             {s.upNext.length > 0 && (
-              <Shelf title="Up Next">
+              <Shelf title={t("atv.home.upNext")}>
                 {s.upNext.map((i) => <Tile key={i.id} item={i} pct={s.cont?.pct?.(i)} sub={left(i)} onOpen={() => h.open(i)} />)}
               </Shelf>
             )}
             {s.what.length > 0 && (
-              <Shelf title="What to Watch">
+              <Shelf title={t("atv.home.whatToWatch")}>
                 {s.what.map((i) => <Tile key={i.id} item={i} size="big" sub={what(i)} onOpen={() => h.open(i)} />)}
               </Shelf>
             )}
             {s.live && (
-              <Shelf title="Live now">
+              <Shelf title={t("atv.home.liveNow")}>
                 {s.live.items.map((i) => <Tile key={i.id} item={i} sub={s.live!.sub?.(i)} always onOpen={() => h.open(i, s.live!.items)} />)}
               </Shelf>
             )}
             {s.movies.length > 0 && (
-              <Shelf title="Top Movies">
+              <Shelf title={t("atv.home.topMovies")}>
                 {s.movies.map((i) => <Tile key={i.id} item={i} shape="poster" size="poster" onOpen={() => h.open(i)} />)}
               </Shelf>
             )}
             {s.shows.length > 0 && (
-              <Shelf title="Top Shows">
+              <Shelf title={t("atv.home.topShows")}>
                 {s.shows.map((i) => <Tile key={i.id} item={i} shape="poster" size="poster" onOpen={() => h.open(i)} />)}
               </Shelf>
             )}
             {s.recents && (
-              <Shelf title="Recently Watched">
+              <Shelf title={t("atv.home.recentlyWatched")}>
                 {s.recents.items.map((i) => <Tile key={i.id} item={i} sub={i.group} onOpen={() => h.open(i)} />)}
               </Shelf>
             )}

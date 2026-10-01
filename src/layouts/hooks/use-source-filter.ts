@@ -7,7 +7,7 @@ import type { Item, Kind } from "@/lib/types"
 
 /**
  * Source filter state for the pill bar. Returns {
- *  sources: { id, name, label, color, count }[] (enabled sources, priority order; count = titles/channels loaded),
+ *  sources: { id, name, title (name, plus the type label when two sources share a name), label, color, count }[] (enabled sources, priority order; count = titles/channels loaded),
  *  filter: string | null (null = All), setFilter(id | null), multi (more than one enabled source: show badges/filter)
  * }
  */
@@ -16,7 +16,12 @@ export function useSourceFilter() {
   const stats = useCatalog((s) => s.sources)
   const filter = useApp((s) => s.sourceFilter)
   const setFilter = useApp((s) => s.setSourceFilter)
-  const sources = useMemo(() => list.map((s) => ({ id: s.id, name: s.name, label: s.label, color: s.color, count: stats[s.id]?.count ?? 0 })), [list, stats])
+  const sources = useMemo(() => {
+    // two sources with the same name (ignoring case) would be indistinguishable: append their type label ("Mohamed - Plex")
+    const dup = new Map<string, number>()
+    for (const s of list) dup.set(s.name.trim().toLowerCase(), (dup.get(s.name.trim().toLowerCase()) ?? 0) + 1)
+    return list.map((s) => ({ id: s.id, name: s.name, title: (dup.get(s.name.trim().toLowerCase()) ?? 0) > 1 ? `${s.name} · ${s.label}` : s.name, label: s.label, color: s.color, count: stats[s.id]?.count ?? 0 }))
+  }, [list, stats])
   return { sources, filter: filter && list.some((s) => s.id === filter) ? filter : null, setFilter, multi: list.length > 1 }
 }
 

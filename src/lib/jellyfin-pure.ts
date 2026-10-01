@@ -65,7 +65,7 @@ export function mapEpisode(e: J, series: Item, sourceId: string, img: Img): Epis
     season,
     num,
     title: String(e.Name ?? `Episode ${num}`),
-    dur: sec ? `${Math.round(sec / 60)}m` : undefined,
+    dur: sec || undefined,
     item: {
       id: `${sourceId}|ep|${e.Id}`,
       kind: "movie",
@@ -106,8 +106,6 @@ export function mapPrograms(list: J[]): Map<string, Prog[]> {
   return out
 }
 
-const hm = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m` : `${Math.round(s / 60)}m`)
-
 /** GET /Users/{uid}/Items/{id} -> Xtream-like `info` + normalized meta fields (same shape as plex mapDetail). */
 export function mapDetail(m: J, img: Img) {
   const genres: string[] = Array.isArray(m.Genres) ? m.Genres.map(String) : []
@@ -129,9 +127,9 @@ export function mapDetail(m: J, img: Img) {
       genre: genres.join(", "),
       cast: cast.map((c) => c.name).join(", "),
       releasedate: (m.PremiereDate ? String(m.PremiereDate).slice(0, 10) : "") || year || "",
-      duration: sec ? hm(sec) : "",
+      duration: "",
       rating: m.CommunityRating ?? "",
     } as Record<string, unknown>,
-    meta: { plot: m.Overview || undefined, genres, runtime: sec ? hm(sec) : undefined, year, ratings, poster: poster(m, img, 600), backdrop: backdrop(m, img), cast, directors, ids },
+    meta: { plot: m.Overview || undefined, genres, runtime: sec || undefined, year, ratings, poster: poster(m, img, 600), backdrop: backdrop(m, img), cast, directors, ids },
   }
 }

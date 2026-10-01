@@ -290,3 +290,8 @@ html[data-motion=reduced] .rail-in > :nth-child(n+9) { animation: none; }
 
 /* off: nothing moves */
 html[data-motion=off] *, html[data-motion=off] *::before, html[data-motion=off] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+
+/* ================= RTL / i18n baseline (html[dir] + html[lang] set by useLanguageAttr in lib/i18n) ================= */
+html[lang^=ar] { --font-sans: "Noto Sans Arabic", "Segoe UI", Tahoma, "Arial", sans-serif; } /* system fonts only; font-size / --tv-scale rules above are untouched */
+html[dir=rtl] .rtl-flip { transform: scaleX(-1); } /* directional icons (chevrons, back arrows); do not combine with another transform on the same element */
+[data-ltr] { direction: ltr; unicode-bidi: isolate; } /* media transport, seek bars, timelines, EPG grid stay left-to-right (also use dir="ltr") */

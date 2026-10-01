@@ -9,6 +9,7 @@ import { useSourceFilter } from "../hooks/use-source-filter"
 import { useSourceOf, type SourceMeta } from "@/lib/sources"
 import { cn } from "@/lib/utils"
 import type { Item } from "@/lib/types"
+import { fmt, useT } from "@/lib/i18n"
 
 /** Netflix-style building blocks (tiles that grow on focus/hover, rows, dropdowns). Styles: layout.css (.nf-*). */
 
@@ -25,29 +26,32 @@ const onColor = (hex: string) => { const n = parseInt(hex.slice(1, 7), 16) || 0;
 export function SourceBadge({ item }: { item: Item }) {
   const on = useApp((s) => s.settings.sourceBadges !== false && s.sources.filter((x) => x.enabled !== false).length > 1)
   const src = useSourceOf(item)
+  useT() // re-render on language switch (fmt.number)
   if (!on || !src) return null
   const n = item.alts?.length ?? 0
-  return <span className="nf-src-chip" style={{ background: src.color, color: onColor(src.color) }}>{src.label}{n > 0 ? ` +${n}` : ""}</span>
+  return <span dir="ltr" className="nf-src-chip" style={{ background: src.color, color: onColor(src.color) }}>{src.label}{n > 0 ? ` +${fmt.number(n)}` : ""}</span>
 }
 
 /** "All | source..." pill bar with colored dots and counts; the active pill gets an underline in its source color. Hidden with one source. */
 export function SourceBar() {
   const { sources, filter, setFilter, multi } = useSourceFilter()
+  const t = useT()
   if (!multi) return null
   const pill = (id: string | null, name: string, color?: string, count?: number) => (
     <button key={id ?? "all"} data-nav aria-pressed={filter === id} onClick={() => setFilter(id)} className="nf-src-pill" style={filter === id ? { boxShadow: `inset 0 -3px 0 ${color ?? "var(--foreground)"}` } : undefined}>
-      {color && <span aria-hidden className="nf-src-dot" style={{ background: color }} />}{name}{count != null && <span className="text-muted-foreground">{count}</span>}
+      {color && <span aria-hidden className="nf-src-dot" style={{ background: color }} />}{name}{count != null && <span dir="ltr" className="text-muted-foreground">{fmt.compact(count)}</span>}
     </button>
   )
-  return <div data-nav-group role="group" aria-label="Source" className="nf-src-bar">{pill(null, "All")}{sources.map((s) => pill(s.id, s.name, s.color, s.count))}</div>
+  return <div data-nav-group role="group" aria-label={t("nf.ui.source")} className="nf-src-bar">{pill(null, t("nf.all"))}{sources.map((s) => pill(s.id, s.title, s.color, s.count))}</div>
 }
 
 /** "Available on" pills in Detail: pick which source plays. Hidden with one source. */
 export function SourceChooser({ list, selected, onSelect }: { list: { item: Item; source: SourceMeta }[]; selected?: Item; onSelect: (i: Item) => void }) {
+  const t = useT()
   if (list.length < 2) return null
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm text-muted-foreground">Available on</span>
+      <span className="text-sm text-muted-foreground">{t("nf.ui.availableOn")}</span>
       <div data-nav-group className="nf-src-bar !p-0">
         {list.map(({ item, source }) => (
           <button key={item.id} data-nav aria-pressed={item.id === selected?.id} onClick={() => onSelect(item)} className="nf-src-pill" style={item.id === selected?.id ? { boxShadow: `inset 0 -3px 0 ${source.color}` } : undefined}>
@@ -86,6 +90,7 @@ export function Tile({ item, variant = "wide", pct, sub, fluid, onOpen, onPlay }
   item: Item; variant?: "wide" | "poster"; pct?: number; sub?: string; fluid?: boolean; onOpen: () => void; onPlay?: () => void
 }) {
   const mode = useMode()
+  const t = useT()
   const fav = useApp((s) => !!s.profileId && s.data[s.profileId]?.favs.includes(item.id))
   const toggleFav = useApp((s) => s.toggleFav)
   const locked = useLocked(item)
@@ -95,7 +100,7 @@ export function Tile({ item, variant = "wide", pct, sub, fluid, onOpen, onPlay }
   const [liked, setLiked] = useState(false)
   const art = variant === "wide" && item.backdrop ? { ...item, logo: item.backdrop } : item
   const noArt = !art.logo
-  const meta = [item.year, ...(item.genres?.slice(0, 2) ?? [item.group])].filter(Boolean).join("  ·  ")
+  const meta = [item.year && fmt.digits(item.year), ...(item.genres?.slice(0, 2) ?? [item.group])].filter(Boolean).join("  ·  ")
   const round = "nf-round grid size-9 place-items-center rounded-full border-2"
   return (
     <div className={cn("nf-tile", fluid && "nf-fluid")} data-v={variant} onMouseEnter={() => setHot(true)} onMouseLeave={(e) => { if (!e.currentTarget.contains(document.activeElement)) setHot(false) }} onFocus={() => setHot(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHot(false) }}>
@@ -103,10 +108,10 @@ export function Tile({ item, variant = "wide", pct, sub, fluid, onOpen, onPlay }
         <button data-nav data-card data-id={item.id} aria-label={item.name} onClick={onOpen} onKeyDown={(e) => e.keyCode === KEY.red && toggleFav(item.id)} onContextMenu={(e) => { if (mode === "mobile") { e.preventDefault(); toggleFav(item.id) } }} className="nf-img">
           <div className={cn("nf-media", variant === "wide" ? "aspect-video" : "aspect-[2/3]", live && "nf-live")}>
             <Logo item={art} className={cn("size-full", live ? "p-5" : "object-cover")} />
-            {(live || noArt) && <div className="nf-cap"><div className="truncate font-semibold">{item.name}</div>{sub ? <div className="truncate text-xs opacity-80">{sub}</div> : null}</div>}
-            <span className="absolute right-1.5 top-1.5"><SourceBadge item={item} /></span>
-            {locked && <span className="absolute left-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-black/70"><Lock className="size-3.5 text-white" /></span>}
-            {pct ? <div className="absolute inset-x-0 bottom-0 h-1 bg-white/30"><div className="h-full bg-accent-blue" style={{ width: `${Math.min(100, pct)}%` }} /></div> : null}
+            {(live || noArt) && <div className="nf-cap"><div dir="auto" className="truncate font-semibold">{item.name}</div>{sub ? <div dir="auto" className="truncate text-xs opacity-80">{sub}</div> : null}</div>}
+            <span className="absolute end-1.5 top-1.5"><SourceBadge item={item} /></span>
+            {locked && <span className="absolute start-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-black/70"><Lock className="size-3.5 text-white" /></span>}
+            {pct ? <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-white/30"><div className="h-full bg-accent-blue" style={{ width: `${Math.min(100, pct)}%` }} /></div> : null}
           </div>
           <span aria-hidden className="nf-ring" />
         </button>
@@ -114,16 +119,16 @@ export function Tile({ item, variant = "wide", pct, sub, fluid, onOpen, onPlay }
           <div className="nf-info">
             {mode === "desktop" && (
               <div className="mb-2 flex items-center gap-1.5">
-                <button data-nav aria-label="Play" onClick={onPlay ?? onOpen} className="nf-round grid size-9 place-items-center rounded-full border-2 border-transparent bg-foreground text-background"><Play className="size-4 fill-current" /></button>
-                <button data-nav aria-label={fav ? "Remove from My List" : "Add to My List"} onClick={() => toggleFav(item.id)} className={cn(round, "border-[var(--fg-40)]")}>{fav ? <Check className="size-4" /> : <Plus className="size-4" />}</button>
-                {!live && <button data-nav aria-label="Like" aria-pressed={liked} onClick={() => setLiked(!liked)} className={cn(round, "border-[var(--fg-40)]", liked && "bg-foreground text-background")}><ThumbsUp className="size-4" /></button>}
-                {!live && <button data-nav aria-label="More info" onClick={onOpen} className={cn(round, "ml-auto border-[var(--fg-40)]")}><ChevronDown className="size-4" /></button>}
+                <button data-nav aria-label={t("nf.ui.play")} onClick={onPlay ?? onOpen} className="nf-round grid size-9 place-items-center rounded-full border-2 border-transparent bg-foreground text-background"><Play className="size-4 fill-current" /></button>
+                <button data-nav aria-label={fav ? t("nf.ui.removeList") : t("nf.ui.addList")} onClick={() => toggleFav(item.id)} className={cn(round, "border-[var(--fg-40)]")}>{fav ? <Check className="size-4" /> : <Plus className="size-4" />}</button>
+                {!live && <button data-nav aria-label={t("nf.ui.like")} aria-pressed={liked} onClick={() => setLiked(!liked)} className={cn(round, "border-[var(--fg-40)]", liked && "bg-foreground text-background")}><ThumbsUp className="size-4" /></button>}
+                {!live && <button data-nav aria-label={t("nf.ui.moreInfo")} onClick={onOpen} className={cn(round, "ms-auto border-[var(--fg-40)]")}><ChevronDown className="size-4" /></button>}
               </div>
             )}
-            <div className="truncate text-sm font-semibold">{item.name}</div>
+            <div dir="auto" className="truncate text-sm font-semibold">{item.name}</div>
             <div className="mt-0.5 flex items-center gap-2 text-xs">
-              {r > 0 && <span className="font-bold text-[#46d369]">{r.toFixed(1)} rating</span>}
-              <span className="truncate text-muted-foreground">{live ? sub ?? "Live" : meta}</span>
+              {r > 0 && <span className="font-bold text-[#46d369]">{t("nf.ui.rating", { r: fmt.decimal(r) })}</span>}
+              <span dir="auto" className="truncate text-muted-foreground">{live ? sub ?? t("nf.live") : meta}</span>
             </div>
           </div>
         )}
@@ -135,13 +140,14 @@ export function Tile({ item, variant = "wide", pct, sub, fluid, onOpen, onPlay }
 /** Titled horizontal row. The title becomes "Explore All >" when onSeeAll is given; chevron arrows show on desktop hover. */
 export function Row({ title, onSeeAll, children }: { title?: ReactNode; onSeeAll?: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
+  const t = useT()
   const motion = useApp((s) => s.settings.motion)
   const by = (d: number) => ref.current?.scrollBy({ left: d * ref.current.clientWidth * 0.85, behavior: motion === "off" ? "auto" : "smooth" })
   return (
     <section className="nf-rowsec">
       {title ? (
         <h2 className="nf-rowtitle">
-          {onSeeAll ? <button data-nav onClick={onSeeAll} className="nf-seeall">{title}<span className="nf-explore">Explore All<ChevronRight className="size-4" /></span></button> : title}
+          {onSeeAll ? <button data-nav onClick={onSeeAll} className="nf-seeall">{title}<span className="nf-explore">{t("nf.ui.exploreAll")}<ChevronRight className="rtl-flip size-4" /></span></button> : title}
         </h2>
       ) : null}
       <div className="nf-rowwrap">
@@ -192,7 +198,7 @@ export function Dropdown({ trigger, className, align = "left", panelClass, child
       onBlur={(e) => { if (open && e.relatedTarget && !box.current?.contains(e.relatedTarget as Node)) setOpen(false) }}
     >
       <button data-nav data-trig aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} className={className}>{trigger}</button>
-      {open && <div role="menu" data-nav-wrap={align === "right" ? "" : undefined} className={cn("nf-menu", align === "right" ? "right-0" : "left-0", panelClass)}>{children(close)}</div>}
+      {open && <div role="menu" data-nav-wrap={align === "right" ? "" : undefined} className={cn("nf-menu", align === "right" ? "end-0" : "start-0", panelClass)}>{children(close)}</div>}
     </div>
   )
 }
@@ -207,8 +213,9 @@ export const Pick = ({ active, className, ...p }: React.ButtonHTMLAttributes<HTM
 
 /** Loading placeholder: billboard (optional) + skeleton rows, same footprint as the real ones. */
 export function SkelRows({ n = 3, hero }: { n?: number; hero?: boolean }) {
+  const t = useT()
   return (
-    <div role="status" aria-label="Loading" className="overflow-hidden">
+    <div role="status" aria-label={t("nf.ui.loading")} className="overflow-hidden">
       {hero && <div className="nf-bb -mx-[var(--gx)] skel" />}
       {Array.from({ length: n }, (_, r) => (
         <section key={r} aria-hidden className="nf-rowsec">
@@ -223,11 +230,12 @@ export function SkelRows({ n = 3, hero }: { n?: number; hero?: boolean }) {
 /** Grid that renders 120 tiles at a time (big categories), with a Show more button. */
 export function PagedGrid<T>({ items, variant, render }: { items: T[]; variant?: "wide" | "poster"; render: (t: T) => ReactNode }) {
   const [n, setN] = useState(120)
+  const t = useT()
   useEffect(() => setN(120), [items])
   return (
     <>
       <Grid variant={variant}>{items.slice(0, n).map(render)}</Grid>
-      {items.length > n && <div className="-mt-6 pb-24 text-center"><button data-nav onClick={() => setN(n + 120)} className="nf-btn nf-info-btn">Show more</button></div>}
+      {items.length > n && <div className="-mt-6 pb-24 text-center"><button data-nav onClick={() => setN(n + 120)} className="nf-btn nf-info-btn">{t("nf.ui.showMore")}</button></div>}
     </>
   )
 }

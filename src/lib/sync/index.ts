@@ -4,8 +4,9 @@ import { get as idbGet, set as idbSet } from "idb-keyval"
 import { useApp } from "../store"
 import { useHistory, flushHistory } from "../history"
 import { explain } from "../net"
+import { t } from "../i18n"
 import { api, ApiError, badKey, envConfigured, loadConfig, type Config, type Session } from "./client"
-import { canEncrypt, deriveKey, exportKey, importKey, newSalt, NEEDS_HTTPS, open, parseBlob, seal, WrongPassphrase, type Key } from "./crypto"
+import { canEncrypt, deriveKey, exportKey, importKey, newSalt, needsHttps, open, parseBlob, seal, WrongPassphrase, type Key } from "./crypto"
 import { applySnapshot, buildSnapshot, flatten, merge, stable, stamp, type AppSlice, type Day, type Snapshot } from "./merge"
 import { useSyncMeta } from "./meta"
 
@@ -80,7 +81,7 @@ async function writeDays(days: Record<string, Day>) {
 
 async function fresh(): Promise<Session> {
   const { cfg, session } = useS.getState()
-  if (!session) throw new Error("Not signed in.")
+  if (!session) throw new Error(t("sync.err.notSignedIn"))
   if (session.exp - Date.now() / 1000 > 90) return session
   try {
     const n = await api.refresh(cfg, session)
@@ -88,7 +89,7 @@ async function fresh(): Promise<Session> {
     setSession(n)
     return n
   } catch (e) {
-    if (e instanceof ApiError && [400, 401, 403].includes(e.status)) { setSession(null); throw new Error("Your session expired. Sign in again.") }
+    if (e instanceof ApiError && [400, 401, 403].includes(e.status)) { setSession(null); throw new Error(t("sync.err.expired")) }
     throw e
   }
 }
@@ -107,7 +108,7 @@ async function cycle() {
       const blob = parseBlob(row.data)
       plain = !blob.enc
       remote = JSON.parse(await open(blob, key)) as Snapshot
-      if (remote.v !== 1) throw new Error("The cloud data was written by a newer version of the app. Update the app first.")
+      if (remote.v !== 1) throw new Error(t("sync.err.newerVersion"))
       merged = merge(local, remote)
       const now = slice()
       if (now.profiles !== base.profiles || now.sources !== base.sources || now.data !== base.data || now.settings !== base.settings) continue // edited during the network wait: rebuild and re-pull
@@ -132,13 +133,13 @@ async function cycle() {
     const needPush = !remote || stable(merged) !== stable(remote) || plain === !!key // plain cloud + passphrase set = upgrade to encrypted
     if (!needPush || (await api.push(cfg, s, await seal(JSON.stringify(merged), key), row?.updated_at ?? null, new Date().toISOString()))) return
   }
-  throw new Error("Another device kept changing the data. Try again in a moment.")
+  throw new Error(t("sync.err.conflict"))
 }
 
 function fail(e: unknown) {
   fails++
   blockedUntil = Date.now() + Math.min(300000, 15000 * 2 ** fails)
-  setStatus({ state: "error", error: e instanceof TypeError ? "Couldn't reach Supabase. Check the project URL and your connection." : explain(e), needPass: e instanceof WrongPassphrase })
+  setStatus({ state: "error", error: e instanceof TypeError ? t("sync.err.unreachable") : explain(e), needPass: e instanceof WrongPassphrase })
 }
 
 /** Manual or automatic; never two at once (a request during a run triggers one more pass). */
@@ -198,8 +199,8 @@ export function initSync() {
 }
 
 // ---- actions ----
-const needCfg = () => { const c = useS.getState().cfg; if (!cfgOk(c)) throw new Error("Enter the Supabase URL and anon key first."); return c }
-const signedIn = async (s: Session | null) => { if (!s) throw new Error("No session was returned."); setSession(s); void syncNow() }
+const needCfg = () => { const c = useS.getState().cfg; if (!cfgOk(c)) throw new Error(t("sync.err.noConfig")); return c }
+const signedIn = async (s: Session | null) => { if (!s) throw new Error(t("sync.err.noSession")); setSession(s); void syncNow() }
 
 const actions = {
   async signInOtpSend(email: string) { await api.otpSend(needCfg(), email.trim()) },
@@ -221,8 +222,8 @@ const actions = {
   },
   syncNow,
   async setPassphrase(p: string, remember: boolean) {
-    if (!canEncrypt()) throw new Error(NEEDS_HTTPS)
-    if (p.length < 8) throw new Error("Use at least 8 characters.")
+    if (!canEncrypt()) throw new Error(needsHttps())
+    if (p.length < 8) throw new Error(t("sync.err.shortPass"))
     const { cfg, session } = useS.getState()
     let salt = newSalt()
     const row = session ? await api.pull(cfg, await fresh()) : null

@@ -1,26 +1,30 @@
+import { fmt, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { useSourceFilter } from "@/layouts/hooks/use-source-filter"
 
 /**
- * Pill bar: "All" + one pill per enabled source (color dot + name + count). Props: className.
- * Selected pill = accent container + underline in the source color. Renders nothing with a single source.
- * Only the pills are interactive (data-nav); the hooks already apply the filter, so just place it above the list.
+ * Source filter, styled like the main top bar tabs: plain text chips, the picked one is a filled surface pill, focus (TV) = white pill.
+ * "All" + one chip per enabled source: its color dot, name and a short count (29.3K). Same-name sources are told apart by the type label.
+ * Renders nothing with a single source. Props: className. Only the chips are interactive (data-nav); the hooks already apply the filter,
+ * so just place it above the list.
  */
 export function SourceFilter({ className }: { className?: string }) {
   const { sources, filter, setFilter, multi } = useSourceFilter()
+  const t = useT()
   if (!multi) return null
   const total = sources.reduce((a, s) => a + s.count, 0)
-  const pill = (on: boolean) => cn("flex min-h-[44px] shrink-0 items-center gap-2 rounded-full px-4 py-2 text-base", on ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground/80")
+  const tab = (on: boolean) => cn("inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 text-base font-medium whitespace-nowrap", on ? "bg-surface-2 text-foreground" : "text-muted-foreground hover:bg-surface-2 hover:text-foreground")
+  const count = (n: number) => <span dir="ltr" title={fmt.number(n)} className="text-sm font-normal tabular-nums opacity-70">{fmt.compact(n)}</span>
   return (
-    <div role="group" aria-label="Source" data-nav-group className={cn("rail !mb-0 !gap-3 !pb-2", className)}>
-      <button data-nav data-pill aria-pressed={!filter} onClick={() => setFilter(null)} className={pill(!filter)} style={!filter ? { boxShadow: "inset 0 -3px 0 #94a3b8" } : undefined}>
-        All <span className="text-sm text-muted-foreground">{total}</span>
+    <div role="radiogroup" aria-label={t("source.label")} data-nav-group className={cn("rail !mb-0 !items-center !gap-1 !pb-2 !pt-1", className)}>
+      <button data-nav data-pill role="radio" aria-checked={!filter} onClick={() => setFilter(null)} className={tab(!filter)}>
+        {t("source.all")} {count(total)}
       </button>
       {sources.map((s) => (
-        <button key={s.id} data-nav data-pill aria-pressed={filter === s.id} onClick={() => setFilter(s.id)} className={pill(filter === s.id)} style={filter === s.id ? { boxShadow: `inset 0 -3px 0 ${s.color}` } : undefined}>
-          <span style={{ background: s.color }} className="size-2.5 shrink-0 rounded-full" />
-          <span className="max-w-[10rem] truncate">{s.name}</span>
-          <span className="text-sm text-muted-foreground">{s.count}</span>
+        <button key={s.id} data-nav data-pill role="radio" aria-checked={filter === s.id} onClick={() => setFilter(s.id)} className={tab(filter === s.id)}>
+          <span aria-hidden style={{ background: s.color }} className="size-2.5 shrink-0 rounded-full" />
+          <span dir="auto" className="max-w-[10rem] truncate">{s.title}</span>
+          {count(s.count)}
         </button>
       ))}
     </div>

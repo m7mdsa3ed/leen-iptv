@@ -118,7 +118,7 @@ html[data-layout=appletv] .atv-chips button:not([class*="bg-accent-blue-containe
 html[data-layout=appletv] .atv-chips button[class*="bg-accent-blue-container"] { background: var(--foreground); color: var(--background); }
 
 /* cards: art lifts, shadow + gloss fade in (opacity), caption fades in BELOW on focus; no ring */
-html[data-layout=appletv] .atv-card { position: relative; display: block; flex-shrink: 0; text-align: left; }
+html[data-layout=appletv] .atv-card { position: relative; display: block; flex-shrink: 0; text-align: start; }
 html[data-layout=appletv] .atv-lift { position: relative; border-radius: 18px; transition: transform var(--dur) var(--ease); }
 html[data-layout=appletv] .atv-art { position: relative; overflow: hidden; border-radius: inherit; background: var(--surface); }
 html[data-layout=appletv] .atv-glow { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity var(--dur) var(--ease); box-shadow: 0 14px 24px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(255, 255, 255, .22); background: linear-gradient(135deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, 0) 45%); }

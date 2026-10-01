@@ -63,5 +63,5 @@ export interface Episode {
   num: number
   title: string
   item: Item
-  dur?: string
+  dur?: string | number // number = seconds (formatted at render); string = raw provider text
 }

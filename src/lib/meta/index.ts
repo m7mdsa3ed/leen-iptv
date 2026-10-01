@@ -28,7 +28,8 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[]): Promise<Meta> {
     let r
     try { r = await p.fetch({ ...q, ids }, c) } catch { continue } // one broken provider must not hide the others
     if (!r) continue
-    for (const k of ["title", "year", "plot", "runtime", "poster", "backdrop"] as const) m[k] ||= r[k]
+    for (const k of ["title", "year", "plot", "poster", "backdrop"] as const) m[k] ||= r[k]
+    m.runtime ||= r.runtime
     for (const k of ["genres", "directors", "similar"] as const) if (!m[k].length && r[k]?.length) (m[k] as unknown[]) = r[k]!
     // cast: names-only lists (Xtream, OMDb) give way to a list that has photos
     if (r.cast?.length && (!m.cast.length || (!m.cast.some((c) => c.photo) && r.cast.some((c) => c.photo)))) m.cast = r.cast
@@ -44,7 +45,8 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[]): Promise<Meta> {
 function withBase(m: Meta, b?: Partial<Meta>): Meta {
   if (!b) return m
   const r = { ...m }
-  for (const k of ["title", "year", "plot", "runtime", "poster", "backdrop"] as const) r[k] = b[k] || m[k]
+  for (const k of ["title", "year", "plot", "poster", "backdrop"] as const) r[k] = b[k] || m[k]
+  r.runtime = b.runtime || m.runtime
   for (const k of ["genres", "directors", "similar"] as const) (r[k] as unknown[]) = b[k]?.length ? b[k]! : m[k]
   r.cast = b.cast?.length && (b.cast.some((c) => c.photo) || !m.cast.some((c) => c.photo)) ? b.cast : m.cast
   r.ratings = [...(b.ratings ?? []), ...m.ratings.filter((x) => !b.ratings?.some((y) => y.source === x.source))]

@@ -5,7 +5,8 @@ import { useApp, useProfile } from "@/lib/store"
 import { findLock } from "@/lib/merge-pure"
 import type { Kind } from "@/lib/types"
 import { useMode } from "@/lib/device"
-import { askPin } from "./ui"
+import { useT } from "@/lib/i18n"
+import { askPin, groupLabel } from "./ui"
 
 export const FAV = "Favorites"
 export const ALL = "All"
@@ -13,6 +14,7 @@ export const ALL = "All"
 /** Category pill row (all modes). Yellow key toggles the parental lock on the focused category. */
 export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups: string[]; active: string; onPick: (g: string) => void }) {
   const p = useProfile()
+  const t = useT()
   const toggleLock = useApp((s) => s.toggleLock)
   const list = [FAV, ALL, ...groups]
   const lockKey = (g: string) => findLock(p?.locked ?? [], kind, g)
@@ -34,11 +36,11 @@ export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups
             className={cn("flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-5 text-base", g === active ? "bg-accent-blue-container text-[#d3e3fd]" : "bg-surface-2 text-foreground/80")}>
             {g === FAV && <Star className="size-4" />}
             {lockKey(g) && <Lock className="size-3.5" />}
-            {g}
+            <bdi>{groupLabel(g, t)}</bdi>
           </button>
         ))}
       </div>
-      {p?.pin && mode !== "mobile" && <div className="text-sm text-muted-foreground">{mode === "tv" ? "Yellow: lock / unlock category" : "Right-click / long-press: lock"}</div>}
+      {p?.pin && mode !== "mobile" && <div className="text-sm text-muted-foreground">{t(mode === "tv" ? "nav.groups.hintTv" : "nav.groups.hintPtr")}</div>}
     </div>
   )
 }

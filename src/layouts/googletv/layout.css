@@ -11,4 +11,5 @@ html[data-layout=googletv] .gtv-tab:focus-visible::before, html[data-layout=goog
 /* top bar goes solid on scroll */
 html[data-layout=googletv] .gtv-hdr-solid { transition: opacity var(--dur) var(--ease); }
 html[data-layout=googletv] .gtv-hero-fade { background-image: linear-gradient(to right, var(--background) 35%, var(--fade-mid) 65%, var(--fade-to)); }
+html[dir=rtl][data-layout=googletv] .gtv-hero-fade { background-image: linear-gradient(to left, var(--background) 35%, var(--fade-mid) 65%, var(--fade-to)); }
 html[data-layout=googletv] .gtv-hero-fade-b { background-image: linear-gradient(to top, var(--background), var(--fade-to)); }

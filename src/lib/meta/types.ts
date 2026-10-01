@@ -9,7 +9,7 @@ export interface Meta {
   year?: string
   plot?: string
   genres: string[]
-  runtime?: string
+  runtime?: string | number // number = seconds
   ratings: Rating[]
   poster?: string
   backdrop?: string
@@ -54,7 +54,6 @@ export interface Provider {
   name: string
   needsKey: boolean
   hasLang?: boolean
-  hint?: string
   fetch(q: Query, cfg: ProviderCfg): Promise<Partial<Meta> | null>
   /** Optional: genre names for "movie" / "series" (powers the genre pills). */
   genres?(kind: "movie" | "series", cfg: ProviderCfg): Promise<string[] | null>

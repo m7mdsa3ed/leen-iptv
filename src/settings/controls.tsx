@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Pill, RoundButton } from "@/components/gtv"
 import { Toggle } from "@/components/gtv/toggle"
 import { cn } from "@/lib/utils"
+import { useT } from "@/lib/i18n"
 
 /** The ONLY building blocks sections may use, so every layout renders every section consistently. */
 export { Pill, RoundButton, Toggle }
@@ -50,7 +51,7 @@ export function Field({ label, value, onChange, error, hint, className, ...p }: 
   return (
     <label className={cn("flex w-full max-w-[32rem] flex-col gap-1.5", className)}>
       <span className="text-sm text-muted-foreground">{label}</span>
-      <Input data-nav autoComplete="off" spellCheck={false} aria-invalid={error ? true : undefined} {...p} value={value} onChange={(e) => onChange(e.target.value)} className="h-12 w-full rounded-2xl text-base focus-visible:ring-0 md:text-lg [html[data-mode=mobile]_&]:text-[16px]" />
+      <Input data-nav dir="auto" autoComplete="off" spellCheck={false} aria-invalid={error ? true : undefined} {...p} value={value} onChange={(e) => onChange(e.target.value)} className="h-12 w-full rounded-2xl text-base focus-visible:ring-0 md:text-lg [html[data-mode=mobile]_&]:text-[16px]" />
       {error ? <span role="alert" className="text-sm text-destructive">{error}</span> : hint ? <span className="text-sm text-muted-foreground">{hint}</span> : null}
     </label>
   )
@@ -81,11 +82,12 @@ export function Swatches({ value, colors, onChange, label }: { value: string; co
 }
 
 /** Destructive action that needs a second press (resets on blur). */
-export function ConfirmButton({ children, confirmLabel = "Press again to confirm", onConfirm, disabled, className }: { children: ReactNode; confirmLabel?: string; onConfirm: () => void; disabled?: boolean; className?: string }) {
+export function ConfirmButton({ children, confirmLabel, onConfirm, disabled, className }: { children: ReactNode; confirmLabel?: string; onConfirm: () => void; disabled?: boolean; className?: string }) {
+  const t = useT()
   const [armed, setArmed] = useState(false)
   return (
     <Pill variant={armed ? "primary" : "ghost"} disabled={disabled} className={className} onBlur={() => setArmed(false)} onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}>
-      {armed ? confirmLabel : children}
+      {armed ? (confirmLabel ?? t("settings.confirm")) : children}
     </Pill>
   )
 }

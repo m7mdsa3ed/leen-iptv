@@ -1,4 +1,5 @@
 import { Search } from "lucide-react"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { LeenMark } from "@/components/gtv"
 import { ProfileButton, useShellNav } from "../shared"
@@ -7,9 +8,10 @@ import type { ShellProps } from "../types"
 /** tvOS: no header bar. A floating glass capsule (tabs + search) is centred at the top, the profile circle sits at the far right.
  *  Mobile: slim wordmark row (search + profile) and a bottom tab bar. The header never animates; only <main data-page-content> does. */
 export default function Shell({ page, title, children }: ShellProps) {
+  const t = useT()
   const { tabs, go, mobile, tv } = useShellNav(page)
   const searchBtn = (cls: string) => (
-    <button data-nav data-pill aria-label="Search" aria-current={page === "search" ? "page" : undefined} data-autofocus={page === "search" ? "" : undefined} data-nav-home={page === "search" ? "" : undefined} onClick={() => go("search")} className={cn("atv-tab grid place-items-center rounded-full", cls)}>
+    <button data-nav data-pill aria-label={t("common.search")} aria-current={page === "search" ? "page" : undefined} data-autofocus={page === "search" ? "" : undefined} data-nav-home={page === "search" ? "" : undefined} onClick={() => go("search")} className={cn("atv-tab grid place-items-center rounded-full", cls)}>
       <Search className="size-5" />
     </button>
   )
@@ -20,7 +22,7 @@ export default function Shell({ page, title, children }: ShellProps) {
         {mobile ? (
           <div className="pointer-events-auto flex w-full items-center gap-1">
             <LeenMark className="size-7" />
-            <span className="atv-wordmark ml-1 min-w-0 flex-1 truncate">Leen</span>
+            <span className="atv-wordmark ms-1 min-w-0 flex-1 truncate">Leen</span>
             <h1 className="sr-only">{title}</h1>
             {searchBtn("atv-glass size-11")}
             <span className="w-1" />
@@ -38,7 +40,7 @@ export default function Shell({ page, title, children }: ShellProps) {
               ))}
               {searchBtn("size-11")}
             </nav>
-            <div className="absolute right-[var(--gx)]">{avatar}</div>
+            <div className="absolute end-[var(--gx)]">{avatar}</div>
           </div>
         )}
       </header>

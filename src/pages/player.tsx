@@ -5,7 +5,7 @@ import { ArrowLeft, Captions, Gauge, RotateCcw, RotateCw, Expand, Maximize, Mini
 import { Pill, RoundButton } from "@/components/gtv"
 import { hm, nowNext, useCatalog } from "@/lib/catalog"
 import { isTv } from "@/lib/device"
-import { CORS_HINT, mixed, px, pxStream, statusMsg } from "@/lib/net"
+import { corsHint, mixed, px, pxStream, statusMsg } from "@/lib/net"
 import { KEY, navState, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
 import { useSourceOf } from "@/lib/sources"
@@ -15,17 +15,18 @@ import { plexScrobble, plexStopTranscode, plexStreamUrl, plexTimeline } from "@/
 import { jellyfinMarkPlayed, jellyfinReport, jellyfinStopTranscode, jellyfinStreamUrl } from "@/lib/jellyfin"
 import { xtreamUrl } from "@/lib/xtream"
 import { useHistory } from "@/lib/history"
+import { fmt, t as tn, useT } from "@/lib/i18n"
 
 const NONE: string[] = []
 const FITS = ["contain", "cover", "fill"] as const
-const FIT_LABEL = { contain: "Fit", cover: "Zoom", fill: "Stretch" }
 type Track = { id: number; label: string }
-const mmss = (s: number) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600); return `${h ? h + ":" : ""}${String(Math.floor((s % 3600) / 60)).padStart(h ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")}` }
+const mmss = (s: number) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600); return `${h ? h + ":" : ""}${String(Math.floor((s % 3600) / 60)).padStart(h ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")}`.replace(/\d/g, (d) => fmt.number(+d)) }
 
 // ponytail: module-level so the picked quality carries to the next episode; resets to Original on reload
 let lastQ: StreamQ = STREAM_QS[0]
 
 export default function Player({ queue, index }: { queue: Item[]; index: number }) {
+  const t = useT()
   const back = useRoute((s) => s.back)
   const { settings, toggleFav, pushRecent, setProgress } = useApp()
   const epg = useCatalog((s) => s.epg)
@@ -114,8 +115,8 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
         h.loadSource(url); h.attachMedia(v)
         h.on(Hls.Events.BUFFER_CODECS, (_e, d) => { const a = d.audio ?? d.audiovideo; if (a?.codec) aud.current = { codec: a.codec, ch: a.metadata?.channelCount } })
         h.on(Hls.Events.MANIFEST_PARSED, () => void v.play().catch(() => {}))
-        h.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => setAudio(h.audioTracks.map((t, i) => ({ id: i, label: t.name || t.lang || `Audio ${i + 1}` }))))
-        h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => setSubs(h.subtitleTracks.map((t, i) => ({ id: i, label: t.name || t.lang || `Subtitle ${i + 1}` }))))
+        h.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => setAudio(h.audioTracks.map((x, i) => ({ id: i, label: x.name || x.lang || tn("player.audioTrack", { n: i + 1 }) }))))
+        h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => setSubs(h.subtitleTracks.map((x, i) => ({ id: i, label: x.name || x.lang || tn("player.subtitleTrack", { n: i + 1 }) }))))
         h.on(Hls.Events.ERROR, (_e, d) => {
           if (!d.fatal) return
           const code = d.response?.code
@@ -123,7 +124,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
           if (direct && d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && !h.levels?.length) setProxied(raw) // direct manifest failed (CORS / unreachable): retry through the proxy once (startLoad would not refetch it)
           else if (d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && net++ < 3) h.startLoad()
           else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && net++ < 3) h.recoverMediaError()
-          else setErr(http ? statusMsg(code) : d.type === Hls.ErrorTypes.NETWORK_ERROR ? CORS_HINT : d.type === Hls.ErrorTypes.MEDIA_ERROR ? "This device can't decode the stream." : "Stream unavailable.")
+          else setErr(http ? statusMsg(code) : d.type === Hls.ErrorTypes.NETWORK_ERROR ? corsHint() : d.type === Hls.ErrorTypes.MEDIA_ERROR ? tn("errors.stream.decode") : tn("errors.stream.unavailable"))
         })
         stop = () => { h.stopLoad(); h.detachMedia(); h.destroy(); hls.current = null }
       } else if (live && mpegts.isSupported()) {
@@ -132,7 +133,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
         p.attachMediaElement(v); p.load()
         p.on(mpegts.Events.MEDIA_INFO, (mi: { audioCodec?: string; audioChannelCount?: number }) => { if (mi.audioCodec) aud.current = { codec: mi.audioCodec, ch: mi.audioChannelCount } })
         void Promise.resolve(p.play()).catch(() => {})
-        p.on(mpegts.Events.ERROR, (_t, _d, info: { code?: number }) => setErr(info?.code && info.code >= 400 ? statusMsg(info.code) : "Stream unavailable. The channel may be offline, or the browser blocked it (CORS)."))
+        p.on(mpegts.Events.ERROR, (_t, _d, info: { code?: number }) => setErr(info?.code && info.code >= 400 ? statusMsg(info.code) : tn("errors.stream.offline")))
         stop = () => { p.pause(); p.unload(); p.detachMediaElement(); p.destroy(); mp.current = null } // unload() aborts the open live connection
       } else {
         v.src = url
@@ -277,7 +278,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   }
   const pickAudio = (i: number) => { if (hls.current) hls.current.audioTrack = i; setMenu(null) }
   const openSubs = () => {
-    if (!hls.current) setSubs(Array.from(vref.current!.textTracks).map((t, i) => ({ id: i, label: t.label || t.language || `Subtitle ${i + 1}` })))
+    if (!hls.current) setSubs(Array.from(vref.current!.textTracks).map((x, i) => ({ id: i, label: x.label || x.language || tn("player.subtitleTrack", { n: i + 1 }) })))
     setMenu("subs")
   }
 
@@ -412,7 +413,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   }, [])
 
   const lbl = "hidden lg:inline"
-  const ic = "lg:mr-1"
+  const ic = "lg:me-1"
   return (
     <div ref={root} className={`dark fixed inset-0 bg-black text-white${!show && !isTv ? " cursor-none" : ""}`} onMouseMove={poke}>
       <video
@@ -431,28 +432,28 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
         onPlaying={() => { setBuf(false); setPaused(false); played.current = true; startupMs.current ??= Date.now() - attachAt.current }}
         onPause={() => setPaused(true)}
         onEnded={() => (idx < queue.length - 1 ? setIdx(idx + 1) : back())}
-        onError={() => (!live && !hls.current && viaHls !== url && Hls.isSupported() ? setViaHls(url) : setErr(vref.current?.error?.code === 4 ? "This format isn't supported on this device." : vref.current?.error?.code === 3 ? "The stream is corrupted or can't be decoded." : "Cannot play this stream. It may be offline, or the browser blocked it (CORS)."))}
+        onError={() => (!live && !hls.current && viaHls !== url && Hls.isSupported() ? setViaHls(url) : setErr(vref.current?.error?.code === 4 ? tn("errors.video.format") : vref.current?.error?.code === 3 ? tn("errors.video.corrupt") : tn("errors.video.cannotPlay")))}
       />
       {buf && !err && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><div className="size-16 animate-spin rounded-full border-4 border-white/30 border-t-white" /></div>}
-      {num && <div className="absolute right-4 top-4 rounded-[28px] bg-black/70 px-6 py-3 text-3xl sm:right-12 sm:top-10 sm:text-5xl">{num}</div>}
+      {num && <div className="absolute end-4 top-4 rounded-[28px] bg-black/70 px-6 py-3 text-3xl sm:end-12 sm:top-10 sm:text-5xl">{num}</div>}
       {err && (
         <div data-modal className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/85 p-4 text-center">
-          <div className="max-w-2xl px-6 text-center"><div className="mb-2 text-base text-white/60">{item.name}</div><div className="text-xl font-medium sm:text-3xl">{err}</div></div>
-          <div className="flex flex-wrap justify-center gap-3"><Pill variant="primary" data-autofocus="" onClick={() => setRetry((r) => r + 1)}>Retry</Pill>{queue.length > 1 && <Pill onClick={() => zap(1)}>Next</Pill>}<Pill onClick={back}>Back</Pill></div>
+          <div className="max-w-2xl px-6 text-center"><div dir="auto" className="mb-2 text-base text-white/60">{item.name}</div><div className="text-xl font-medium sm:text-3xl">{err}</div></div>
+          <div className="flex flex-wrap justify-center gap-3"><Pill variant="primary" data-autofocus="" onClick={() => setRetry((r) => r + 1)}>{t("player.retry")}</Pill>{queue.length > 1 && <Pill onClick={() => zap(1)}>{t("player.next")}</Pill>}<Pill onClick={back}>{t("player.back")}</Pill></div>
         </div>
       )}
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between px-safe pt-safe pb-safe">
         {(show || banner) ? (
           <div className="bg-gradient-to-b from-black/90 to-transparent p-4 pb-12 sm:p-10 sm:pb-24">
             <div className="flex items-start gap-3">
-              {show && !isTv && <button aria-label="Back" onClick={back} className="pointer-events-auto flex size-11 shrink-0 items-center justify-center rounded-full bg-black/50"><ArrowLeft className="size-6" /></button>}
-              <div className="min-w-0 flex-1 text-xl font-medium sm:text-4xl">{live && item.num ? `${item.num}  ` : ""}{item.name}</div>
+              {show && !isTv && <button aria-label={t("player.back")} onClick={back} className="pointer-events-auto flex size-11 shrink-0 items-center justify-center rounded-full bg-black/50"><ArrowLeft className="size-6 rtl-flip" /></button>}
+              <div dir="auto" className="min-w-0 flex-1 text-xl font-medium sm:text-4xl">{live && item.num ? `${item.num}  ` : ""}{item.name}</div>
             </div>
             {live && now && (
               <div className="mt-3 max-w-3xl text-base sm:text-xl">
-                <div>{now.t} <span className="text-white/60">{hm(now.s)} - {hm(now.e)}</span></div>
-                <div className="mt-2 h-1 rounded-full bg-white/25"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, ((Date.now() - now.s) / (now.e - now.s)) * 100)}%` }} /></div>
-                {next && <div className="mt-2 text-white/60">Next: {next.t} ({hm(next.s)})</div>}
+                <div><bdi dir="auto">{now.t}</bdi> <bdi dir="ltr" className="text-white/60">{hm(now.s)} - {hm(now.e)}</bdi></div>
+                <div dir="ltr" data-ltr className="mt-2 h-1 rounded-full bg-white/25"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, ((Date.now() - now.s) / (now.e - now.s)) * 100)}%` }} /></div>
+                {next && <div className="mt-2 text-white/60">{t("player.nextProgram", { title: next.t, time: hm(next.s) })}</div>}
               </div>
             )}
           </div>
@@ -460,10 +461,10 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
         {show && (
           <div className="bg-gradient-to-t from-black/90 to-transparent p-4 pt-12 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-10 sm:pt-24 sm:pb-[max(2.5rem,env(safe-area-inset-bottom))]">
             {!live && (
-              <div className="pointer-events-auto mb-3 flex items-center gap-3 text-sm sm:mb-5 sm:gap-4 sm:text-lg">
+              <div dir="ltr" data-ltr className="pointer-events-auto mb-3 flex items-center gap-3 text-sm sm:mb-5 sm:gap-4 sm:text-lg">
                 <span className="w-14 text-right sm:w-20">{mmss(cur)}</span>
                 <button
-                  data-nav data-seek aria-label="Seek"
+                  data-nav data-seek aria-label={t("player.seek")}
                   className="flex h-8 flex-1 touch-none items-center rounded-full focus-visible:bg-white/15"
                   onClick={(e) => e.detail === 0 && toggle()}
                   onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); seekTo(e) }}
@@ -474,49 +475,49 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
                 <span className="w-14 sm:w-20">{mmss(dur)}</span>
               </div>
             )}
-            {stats && <div className="mb-2 text-right text-xs text-white/60 sm:text-sm">{qualityDetail(stats)}</div>}
+            {stats && <div className="mb-2 text-end text-xs text-white/60 sm:text-sm">{qualityDetail(stats)}</div>}
             {/* three zones, always in this order: transport (left) | volume | tools (right). Stacks into two centered rows on narrow screens. */}
             <div className="pointer-events-auto flex flex-col items-center gap-3 md:flex-row md:justify-between md:gap-6">
-              <div className="flex items-center justify-center gap-2 sm:gap-3">
-                {queue.length > 1 && <RoundButton label="Previous" onClick={prev_}><SkipBack /></RoundButton>}
-                <RoundButton data-play data-primary label={paused ? "Play" : "Pause"} className="size-14 bg-white text-[#1f1f1f] [&_svg]:size-7" onClick={toggle}>{paused ? <Play className="fill-current" /> : <Pause className="fill-current" />}</RoundButton>
-                {!live && <RoundButton label="Back 10 seconds" className="hidden [html[data-layout=netflix]_&]:flex" onClick={() => seek(-10)}><RotateCcw /></RoundButton>}
-                {!live && <RoundButton label="Forward 10 seconds" className="hidden [html[data-layout=netflix]_&]:flex" onClick={() => seek(10)}><RotateCw /></RoundButton>}
-                {queue.length > 1 && <RoundButton label="Next" onClick={next_}><SkipForward /></RoundButton>}
+              <div dir="ltr" data-ltr className="flex items-center justify-center gap-2 sm:gap-3">
+                {queue.length > 1 && <RoundButton label={t("player.previous")} onClick={prev_}><SkipBack /></RoundButton>}
+                <RoundButton data-play data-primary label={paused ? t("player.play") : t("player.pause")} className="size-14 bg-white text-[#1f1f1f] [&_svg]:size-7" onClick={toggle}>{paused ? <Play className="fill-current" /> : <Pause className="fill-current" />}</RoundButton>
+                {!live && <RoundButton label={t("player.back10")} className="hidden [html[data-layout=netflix]_&]:flex" onClick={() => seek(-10)}><RotateCcw /></RoundButton>}
+                {!live && <RoundButton label={t("player.forward10")} className="hidden [html[data-layout=netflix]_&]:flex" onClick={() => seek(10)}><RotateCw /></RoundButton>}
+                {queue.length > 1 && <RoundButton label={t("player.next")} onClick={next_}><SkipForward /></RoundButton>}
                 {!isTv && (
-                  <div className="ml-1 flex items-center gap-2 sm:ml-3">
-                    <RoundButton label="Mute" onClick={() => (vref.current!.muted = !muted)}>{muted || !vol ? <VolumeX /> : <Volume2 />}</RoundButton>
-                    <input type="range" aria-label="Volume" min={0} max={1} step={0.05} value={muted ? 0 : vol} onChange={(e) => setVolume(+e.target.value)} className="hidden w-24 accent-primary lg:block" />
+                  <div className="ms-1 flex items-center gap-2 sm:ms-3">
+                    <RoundButton label={t("player.mute")} onClick={() => (vref.current!.muted = !muted)}>{muted || !vol ? <VolumeX /> : <Volume2 />}</RoundButton>
+                    <input type="range" aria-label={t("player.volume")} min={0} max={1} step={0.05} value={muted ? 0 : vol} onChange={(e) => setVolume(+e.target.value)} className="hidden w-24 accent-primary lg:block" />
                   </div>
                 )}
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:justify-end">
                 {stats && <QualityBadge s={stats} />}
-                <RoundButton label="Favorite" active={isFav} onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} /></RoundButton>
-                <Pill aria-label="Audio" className="h-12 px-3 lg:px-6" onClick={() => setMenu("audio")}><Volume1 className={ic} /><span className={lbl}>Audio</span></Pill>
-                {mediaServer && !live && <Pill aria-label="Quality" className="h-12 px-3 lg:px-6" onClick={() => setMenu("quality")}><Gauge className={ic} /><span className={lbl}>{sq.id === "original" ? "Original" : `${sq.height}p`}</span></Pill>}
-                <Pill aria-label="Subtitles" className="h-12 px-3 lg:px-6" onClick={openSubs}><Captions className={ic} /><span className={lbl}>Subtitles</span></Pill>
-                <Pill aria-label="Aspect" className="h-12 px-3 lg:px-6" onClick={() => setFit((f) => (f + 1) % FITS.length)}><Maximize className={ic} /><span className={lbl}>{FIT_LABEL[FITS[fit]]}</span></Pill>
-                {canPip && <RoundButton label="Picture in picture" active={pip} onClick={togglePip}><PictureInPicture2 className={pip ? "text-primary" : ""} /></RoundButton>}
-                {!isTv && <RoundButton label="Fullscreen" onClick={toggleFs}>{fs ? <Minimize /> : <Expand />}</RoundButton>}
+                <RoundButton label={t("player.favorite")} active={isFav} onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} /></RoundButton>
+                <Pill aria-label={t("player.audio")} className="h-12 px-3 lg:px-6" onClick={() => setMenu("audio")}><Volume1 className={ic} /><span className={lbl}>{t("player.audio")}</span></Pill>
+                {mediaServer && !live && <Pill aria-label={t("player.quality")} className="h-12 px-3 lg:px-6" onClick={() => setMenu("quality")}><Gauge className={ic} /><span className={lbl}>{sq.id === "original" ? t("player.original") : `${sq.height}p`}</span></Pill>}
+                <Pill aria-label={t("player.subtitles")} className="h-12 px-3 lg:px-6" onClick={openSubs}><Captions className={ic} /><span className={lbl}>{t("player.subtitles")}</span></Pill>
+                <Pill aria-label={t("player.aspect")} className="h-12 px-3 lg:px-6" onClick={() => setFit((f) => (f + 1) % FITS.length)}><Maximize className={ic} /><span className={lbl}>{t(`player.fit.${FITS[fit]}`)}</span></Pill>
+                {canPip && <RoundButton label={t("player.pip")} active={pip} onClick={togglePip}><PictureInPicture2 className={pip ? "text-primary" : ""} /></RoundButton>}
+                {!isTv && <RoundButton label={t("player.fullscreen")} onClick={toggleFs}>{fs ? <Minimize /> : <Expand />}</RoundButton>}
               </div>
             </div>
-            {isTv && <div className="mt-3 text-center text-sm text-white/60">Red favorite - Green audio - Yellow aspect - Blue subtitles</div>}
+            {isTv && <div className="mt-3 text-center text-sm text-white/60">{t("player.remoteHint")}</div>}
           </div>
         )}
       </div>
       {menu && (
         <div data-modal className="absolute inset-0 z-10 flex items-center justify-center bg-black/60" onAnimationStart={() => {}}>
           <div className="flex max-h-[90vh] w-[28rem] max-w-[92vw] flex-col gap-2 overflow-y-auto rounded-[28px] bg-surface p-6 shadow-2xl">
-            <div className="mb-2 text-2xl font-semibold">{menu === "audio" ? "Audio" : menu === "quality" ? "Quality" : "Subtitles"}</div>
-            {menu === "quality" && STREAM_QS.map((q) => <Pill key={q.id} data-autofocus={q.id === sq.id ? "" : undefined} variant={q.id === sq.id ? "primary" : "tonal"} className="justify-start" onClick={() => pickQ(q)}>{q.label}</Pill>)}
-            {menu === "subs" && <Pill data-autofocus="" className="justify-start" onClick={() => setSub(-1)}>Off</Pill>}
-            {menu !== "quality" && (menu === "audio" ? audio : subs).map((t) => (
-              <Pill key={t.id} className="justify-start" onClick={() => (menu === "audio" ? pickAudio(t.id) : setSub(t.id))}>{t.label}</Pill>
+            <div className="mb-2 text-2xl font-semibold">{menu === "audio" ? t("player.audio") : menu === "quality" ? t("player.quality") : t("player.subtitles")}</div>
+            {menu === "quality" && STREAM_QS.map((q) => <Pill key={q.id} data-autofocus={q.id === sq.id ? "" : undefined} variant={q.id === sq.id ? "primary" : "tonal"} className="justify-start" onClick={() => pickQ(q)}><bdi dir="ltr">{q.id === "original" ? t("player.original") : q.label}</bdi></Pill>)}
+            {menu === "subs" && <Pill data-autofocus="" className="justify-start" onClick={() => setSub(-1)}>{t("player.off")}</Pill>}
+            {menu !== "quality" && (menu === "audio" ? audio : subs).map((x) => (
+              <Pill key={x.id} className="justify-start" onClick={() => (menu === "audio" ? pickAudio(x.id) : setSub(x.id))}><bdi>{x.label}</bdi></Pill>
             ))}
-            {menu === "audio" && !audio.length && <div className="text-muted-foreground">Only the default audio track is available.</div>}
-            {menu === "subs" && !subs.length && <div className="text-muted-foreground">No subtitle tracks in this stream.</div>}
-            <Pill variant="ghost" className="justify-start" onClick={() => setMenu(null)}>Close</Pill>
+            {menu === "audio" && !audio.length && <div className="text-muted-foreground">{t("player.noAudioTracks")}</div>}
+            {menu === "subs" && !subs.length && <div className="text-muted-foreground">{t("player.noSubtitleTracks")}</div>}
+            <Pill variant="ghost" className="justify-start" onClick={() => setMenu(null)}>{t("player.close")}</Pill>
           </div>
         </div>
       )}
@@ -525,7 +526,6 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
 }
 
 const QC = { good: "bg-emerald-400", fair: "bg-amber-400", poor: "bg-red-500" } as const
-const QL = { good: "Good", fair: "Fair", poor: "Poor" } as const
 
 type Stats = { q: Quality; bw?: number; bitrate?: number; height?: number; buf: number; dropped: number; stalls: number; audio?: string }
 
@@ -534,23 +534,25 @@ function audioLabel({ codec, ch }: { codec?: string; ch?: number }) {
   if (!codec) return undefined
   const c = codec.toLowerCase()
   const name = c === "ac-3" ? "AC3" : c === "ec-3" ? "EAC3" : c === "opus" ? "Opus" : c === "mp3" || c === "mp4a.40.34" || c === "mp4a.6b" ? "MP3" : c.startsWith("mp4a") ? "AAC" : c.split(".")[0].toUpperCase()
-  return name + (ch === 1 ? " mono" : ch === 2 ? " stereo" : ch ? ` ${ch - 1}.1` : "")
+  return name + (ch === 1 ? ` ${tn("player.mono")}` : ch === 2 ? ` ${tn("player.stereo")}` : ch ? ` ${ch - 1}.1` : "")
 }
-const mbps = (n?: number) => (n ? `${(n / 1e6).toFixed(1)} Mbps` : "")
+const mbps = (n: number | undefined, key: string) => (n ? tn(key, { n: +(n / 1e6).toFixed(1) }) : "")
 
 /** The numbers behind the rating, shown above the controls while they are open. */
 const qualityDetail = (s: Stats) =>
-  [mbps(s.bw) && `${mbps(s.bw)} link`, mbps(s.bitrate) && `${mbps(s.bitrate)} stream`, `${s.buf.toFixed(0)}s buffered`, s.stalls ? `${s.stalls} stall${s.stalls > 1 ? "s" : ""}/min` : "", s.dropped >= 1 ? `${s.dropped.toFixed(0)}% dropped` : ""].filter(Boolean).join(" · ")
+  [mbps(s.bw, "player.stat.link"), mbps(s.bitrate, "player.stat.stream"), tn("player.stat.buffered", { n: Math.round(s.buf) }), s.stalls ? fmt.plural("player.stat.stalls", s.stalls) : "", s.dropped >= 1 ? tn("player.stat.dropped", { n: Math.round(s.dropped) }) : ""].filter(Boolean).join(" · ")
 
 /** Three signal bars + label, sits at the end of the control row. */
 function QualityBadge({ s }: { s: Stats }) {
+  const t = useT()
+  const ql = t(`player.q.${s.q}`)
   const on = s.q === "good" ? 3 : s.q === "fair" ? 2 : 1
   return (
-    <div className="flex h-12 shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 text-sm sm:text-base" title={qualityDetail(s)} aria-label={`Connection quality: ${QL[s.q]}`}>
+    <div className="flex h-12 shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 text-sm sm:text-base" title={qualityDetail(s)} aria-label={t("player.q.label", { q: ql })}>
       <span className="flex items-end gap-0.5" aria-hidden>
         {[1, 2, 3].map((n) => <span key={n} className={`w-1.5 rounded-sm ${n <= on ? QC[s.q] : "bg-white/25"}`} style={{ height: 6 + n * 4 }} />)}
       </span>
-      <span>{QL[s.q]}</span>
+      <span>{ql}</span>
       {s.height ? <span className="text-white/60">{s.height}p</span> : null}
       {s.audio ? <span className="text-white/60">{s.audio}</span> : null}
     </div>

@@ -1,11 +1,13 @@
 import { useEffect } from "react"
 import { ConfirmButton, Pill, Row, SectionCard } from "../controls"
 import { useHistory } from "@/lib/history"
+import { fmt, useT } from "@/lib/i18n"
 import { useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
 
 /** Watch history + stats (data stays on this device, per profile). */
 export default function HistorySection() {
+  const t = useT()
   const profileId = useApp((s) => s.profileId)
   const go = useRoute((s) => s.go)
   const n = useHistory((s) => s.sessions.length)
@@ -19,11 +21,11 @@ export default function HistorySection() {
     URL.revokeObjectURL(a.href)
   }
   return (
-    <SectionCard description={`${n} sessions saved for this profile.`}>
-      <Row label="History" description="What you watched, and when."><Pill variant="primary" onClick={() => go("history")}>View history</Pill></Row>
-      <Row label="Stats" description="Watch time and stream quality."><Pill onClick={() => go("stats")}>View stats</Pill></Row>
-      <Row label="Export" description="Download as a JSON file."><Pill disabled={!n} onClick={exportJson}>Export JSON</Pill></Row>
-      <Row label="Clear" description="Deletes history and stats for this profile."><ConfirmButton disabled={!n} confirmLabel="Press again to clear all" onConfirm={() => useHistory.getState().clear()}>Clear history and stats</ConfirmButton></Row>
+    <SectionCard description={fmt.plural("settings.history.saved", n)}>
+      <Row label={t("settings.history.history")} description={t("settings.history.history.desc")}><Pill variant="primary" onClick={() => go("history")}>{t("settings.history.view")}</Pill></Row>
+      <Row label={t("settings.history.stats")} description={t("settings.history.stats.desc")}><Pill onClick={() => go("stats")}>{t("settings.history.viewStats")}</Pill></Row>
+      <Row label={t("settings.history.export")} description={t("settings.history.export.desc")}><Pill disabled={!n} onClick={exportJson}>{t("settings.history.exportBtn")}</Pill></Row>
+      <Row label={t("settings.history.clear")} description={t("settings.history.clear.desc")}><ConfirmButton disabled={!n} confirmLabel={t("settings.history.clearConfirm")} onConfirm={() => useHistory.getState().clear()}>{t("settings.history.clearBtn")}</ConfirmButton></Row>
     </SectionCard>
   )
 }

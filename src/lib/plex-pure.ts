@@ -69,8 +69,6 @@ export function mapMeta(m: J, o: { sourceId: string; group: string; img: (path: 
 export const ratingSource = (image: string) =>
   image.startsWith("imdb:") ? "IMDb" : image.startsWith("rottentomatoes:") ? "Rotten Tomatoes" : image.startsWith("themoviedb:") ? "TMDB" : ""
 
-const hm = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m` : `${Math.round(s / 60)}m`)
-
 /** GET /library/metadata/{key} entry -> Xtream-like `info` + normalized meta fields. */
 export function mapDetail(m: J, img: (path: string, w: number, h: number) => string) {
   const genres = tagList(m.Genre)
@@ -82,14 +80,14 @@ export function mapDetail(m: J, img: (path: string, w: number, h: number) => str
   })
   const sec = m.duration ? Math.round(m.duration / 1000) : 0
   const year = m.year ? String(m.year) : undefined
-  const runtime = sec ? hm(sec) : undefined
+  const runtime = sec || undefined
   return {
     info: {
       plot: m.summary ?? "",
       genre: genres.join(", "),
       cast: cast.map((c) => c.name).join(", "),
       releasedate: m.originallyAvailableAt || year || "",
-      duration: sec ? hm(sec) : "",
+      duration: "",
       rating: m.rating ?? m.audienceRating ?? "",
     } as Record<string, unknown>,
     meta: { plot: m.summary || undefined, genres, runtime, year, ratings, poster: m.thumb ? img(m.thumb, 600, 900) : undefined, backdrop: m.art ? img(m.art, 1280, 720) : undefined, cast, directors },

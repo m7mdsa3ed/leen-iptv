@@ -5,11 +5,13 @@ import { Shell } from "@/components/tv/ui"
 import { useMode } from "@/lib/device"
 import { useProfile } from "@/lib/store"
 import { useSync } from "@/lib/sync"
+import { useT } from "@/lib/i18n"
 import { useSettingsNav } from "@/settings/sections"
 import "../settings.css"
 
 /** Google TV settings: large section list (left) + section cards (right); mobile = list that opens the section. */
 export default function Settings() {
+  const t = useT()
   const { sections, open, key, section, select, close } = useSettingsNav()
   const mobile = useMode() === "mobile"
   const p = useProfile()
@@ -28,13 +30,13 @@ export default function Settings() {
   }, [mobile, open, close])
 
   const list = (
-    <nav data-nav-group="memory" aria-label="Settings" className="gtv-set-list">
+    <nav data-nav-group="memory" aria-label={t("gtv.settings.title")} className="gtv-set-list">
       {p && (
-        <button data-nav className="gtv-set-account text-left" onClick={() => select("account")}>
+        <button data-nav className="gtv-set-account text-start" onClick={() => select("account")}>
           <Avatar name={p.name} color={p.color} className="size-14 text-2xl" />
           <div className="min-w-0">
             <div className="truncate text-xl font-medium">{p.name}</div>
-            <div className="truncate text-sm text-muted-foreground">{email || "Sign in to sync"}</div>
+            <div className="truncate text-sm text-muted-foreground">{email || t("gtv.settings.signIn")}</div>
           </div>
         </button>
       )}
@@ -43,8 +45,8 @@ export default function Settings() {
         return (
           <button key={s.key} data-nav data-nav-home={on ? "" : undefined} aria-current={on ? "true" : undefined} className="gtv-set-item" onClick={() => select(s.key)}>
             <s.icon className="size-6 shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-left">{s.title}</span>
-            {mobile && <ChevronRight className="size-5 shrink-0 opacity-60" />}
+            <span className="min-w-0 flex-1 truncate text-start">{s.title}</span>
+            {mobile && <ChevronRight className="rtl-flip size-5 shrink-0 opacity-60" />}
           </button>
         )
       })}
@@ -52,13 +54,13 @@ export default function Settings() {
   )
 
   return (
-    <Shell page="settings" title="Settings">
+    <Shell page="settings" title={t("gtv.settings.title")}>
       <div className="gtv-set">
         {(!mobile || !open) && list}
         {showBody && (
           <div className="gtv-set-body">
             <h2 className="mb-5 flex items-center gap-3 text-3xl font-medium tracking-tight">
-              {mobile && <RoundButton label="Back" onClick={close}><ChevronLeft /></RoundButton>}
+              {mobile && <RoundButton label={t("gtv.back")} onClick={close}><ChevronLeft className="rtl-flip" /></RoundButton>}
               {section.title}
             </h2>
             <C />

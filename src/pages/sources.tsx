@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Pill } from "@/components/gtv"
+import { fmt, t, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { explain } from "@/lib/net"
@@ -11,6 +12,7 @@ import { jellyfinServerInfo, jellyfinSignIn, normServer, quickConnectCheck, quic
 type Type = "M3U" | "Xtream" | "Plex" | "Jellyfin"
 
 export default function Sources() {
+  const tr = useT() // re-render on language change; handlers use the non-reactive t()
   const addSource = useApp((s) => s.addSource)
   const reset = useRoute((s) => s.reset)
   const [type, setType] = useState<Type>("Xtream")
@@ -29,48 +31,48 @@ export default function Sources() {
   useEffect(() => {
     if (!pin) return
     let live = true
-    const t = setInterval(async () => {
+    const iv = setInterval(async () => {
       try {
         const token = await checkPin(pin.id)
         if (!token || !live) return
-        clearInterval(t)
-        setBusy("Finding your servers...")
+        clearInterval(iv)
+        setBusy(t("pages.sources.finding"))
         const list = await plexServers(token)
         if (!live) return
         setServers(list); setPin(null); setBusy("")
-        if (!list.length) setErr("No Plex Media Server found on this account.")
+        if (!list.length) setErr(t("pages.sources.noPlex"))
       } catch (e) {
         if (!live) return
-        clearInterval(t)
+        clearInterval(iv)
         setErr(explain(e)); setPin(null); setBusy("")
       }
     }, 2000)
-    return () => { live = false; clearInterval(t) }
+    return () => { live = false; clearInterval(iv) }
   }, [pin])
 
   useEffect(() => {
     if (!qc) return
     let live = true
     let busyTick = false // a check can outlast the 3s interval: never run two at once (two would add the source twice)
-    const t = setInterval(async () => {
+    const iv = setInterval(async () => {
       if (busyTick) return
       busyTick = true
       try {
         if (!(await quickConnectCheck(qc.server, qc.secret)) || !live) return
-        clearInterval(t)
+        clearInterval(iv)
         await jfAdd(qc.server, () => quickConnectFinish(qc.server, qc.secret), () => live)
       } catch (e) {
         if (!live) return
-        clearInterval(t)
+        clearInterval(iv)
         setErr(explain(e)); setQc(null); setBusy("")
       } finally { busyTick = false }
     }, 3000)
-    return () => { live = false; clearInterval(t) }
+    return () => { live = false; clearInterval(iv) }
   }, [qc]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Check the address is a Jellyfin server, sign in, save. */
   const jfAdd = async (server: string, auth: () => Promise<JfAuth>, live = () => true) => {
-    setErr(""); setBusy("Signing in...")
+    setErr(""); setBusy(t("pages.sources.signingIn"))
     try {
       const info = await jellyfinServerInfo(server)
       const a = await auth()
@@ -81,22 +83,22 @@ export default function Sources() {
   }
   const jfQuick = async () => {
     const server = normServer(f.server)
-    setErr(""); setBusy("Contacting server...")
+    setErr(""); setBusy(t("pages.sources.contacting"))
     try {
       await jellyfinServerInfo(server)
-      if (!(await quickConnectEnabled(server))) throw new Error("Quick Connect is turned off on this server. Sign in with your username and password.")
+      if (!(await quickConnectEnabled(server))) throw new Error(t("pages.sources.qcOff"))
       setQc({ server, ...(await quickConnectStart(server)) }); setBusy("")
     } catch (e) { setErr(explain(e)); setBusy("") }
   }
 
   const signIn = async () => {
-    setErr(""); setBusy("Contacting plex.tv...")
+    setErr(""); setBusy(t("pages.sources.contactingPlex"))
     try { setPin(await createPin()) } catch (e) { setErr(explain(e)) }
     setBusy("")
   }
   const [connMode, setConnMode] = useState<ConnMode>("auto")
   const choose = async (s: PlexServer) => {
-    setErr(""); setBusy(`Connecting to ${s.name}...`)
+    setErr(""); setBusy(t("pages.sources.connecting", { name: s.name }))
     try {
       const server = await pickConnection(s, connMode)
       addSource({ name: s.name, type: "plex", server, token: s.token, serverId: s.id, conns: s.connections, connMode })
@@ -115,77 +117,77 @@ export default function Sources() {
     reset("home") // App loads the new active source
   }
   const field = (k: keyof typeof f, ph: string, type = "text", inputMode?: "url", ac = "off") => (
-    <Input data-nav className="h-12 rounded-2xl text-base md:h-14 md:text-xl" type={type} inputMode={inputMode} autoComplete={ac} spellCheck={false} placeholder={ph} value={f[k]} onChange={set(k)} autoCapitalize="off" autoCorrect="off" />
+    <Input data-nav dir={k === "name" ? "auto" : "ltr"} className="h-12 rounded-2xl text-base md:h-14 md:text-xl" type={type} inputMode={inputMode} autoComplete={ac} spellCheck={false} placeholder={ph} value={f[k]} onChange={set(k)} autoCapitalize="off" autoCorrect="off" />
   )
-  const cancel = () => useApp.getState().sources.length > 0 && <Pill variant="ghost" onClick={() => useRoute.getState().back()}>Cancel</Pill>
-  const conn = (s: PlexServer) => `${s.owned ? "Yours" : "Shared"} - ${s.connections.length} address${s.connections.length === 1 ? "" : "es"}`
+  const cancel = () => useApp.getState().sources.length > 0 && <Pill variant="ghost" onClick={() => useRoute.getState().back()}>{tr("common.cancel")}</Pill>
+  const conn = (s: PlexServer) => fmt.plural(s.owned ? "pages.sources.connOwned" : "pages.sources.connShared", s.connections.length)
 
   return (
     <div className="flex h-full flex-col items-center gap-6 overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] md:justify-center">
       <div className="flex w-full max-w-[40rem] flex-col gap-3 rounded-[28px] bg-surface p-6">
-        <h1 className="text-3xl font-medium tracking-tight md:text-4xl">Add a source</h1>
+        <h1 className="text-3xl font-medium tracking-tight md:text-4xl">{tr("pages.sources.title")}</h1>
         <div className="flex flex-wrap gap-2 py-2">
           {(["Xtream", "M3U", "Plex", "Jellyfin"] as const).map((t) => (
             <Pill key={t} variant="tonal" className={type === t ? "bg-accent-blue-container text-foreground" : ""} onClick={() => { setType(t); setErr(""); setQc(null); setBusy("") }}>{t}</Pill>
           ))}
         </div>
-        {type !== "Plex" && type !== "Jellyfin" && field("name", "Name")}
-        {type === "M3U" && field("url", "Playlist URL (http://...m3u)", "url", "url")}
-        {type === "Xtream" && (<>{field("server", "Server (http://host:port)", "url", "url")}{field("user", "Username", "text", undefined, "username")}{field("pass", "Password", "password", undefined, "current-password")}</>)}
-        {type !== "Plex" && type !== "Jellyfin" && field("epgUrl", "EPG / XMLTV URL (optional)", "url", "url")}
+        {type !== "Plex" && type !== "Jellyfin" && field("name", tr("pages.sources.name"))}
+        {type === "M3U" && field("url", tr("pages.sources.playlistUrl"), "url", "url")}
+        {type === "Xtream" && (<>{field("server", tr("pages.sources.server"), "url", "url")}{field("user", tr("pages.sources.user"), "text", undefined, "username")}{field("pass", tr("pages.sources.pass"), "password", undefined, "current-password")}</>)}
+        {type !== "Plex" && type !== "Jellyfin" && field("epgUrl", tr("pages.sources.epg"), "url", "url")}
 
         {type === "Plex" && !manual && !pin && !servers && (
           <div className="flex flex-col gap-3">
-            <p className="text-muted-foreground">Movies and shows from your Plex Media Server. No live TV or guide for Plex.</p>
-            <div className="flex flex-wrap gap-3"><Pill variant="primary" disabled={!!busy} onClick={signIn}>{busy || "Sign in with Plex"}</Pill><Pill onClick={() => { setManual(true); setErr("") }}>Use a token instead</Pill></div>
+            <p className="text-muted-foreground">{tr("pages.sources.plexInfo")}</p>
+            <div className="flex flex-wrap gap-3"><Pill variant="primary" disabled={!!busy} onClick={signIn}>{busy || tr("pages.sources.plexSignIn")}</Pill><Pill onClick={() => { setManual(true); setErr("") }}>{tr("pages.sources.useToken")}</Pill></div>
           </div>
         )}
         {type === "Plex" && pin && (
           <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <div className="text-muted-foreground">Enter this code at <b className="text-foreground">plex.tv/link</b></div>
-            <div className="text-6xl font-semibold tracking-[0.3em] md:text-7xl">{pin.code}</div>
-            <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy || "Waiting for you to sign in..."}</div>
-            <Pill variant="ghost" onClick={() => { setPin(null); setBusy("") }}>Cancel</Pill>
+            <div className="text-muted-foreground">{tr("pages.sources.plexEnter")} <b dir="ltr" className="text-foreground">plex.tv/link</b></div>
+            <div dir="ltr" className="text-6xl font-semibold tracking-[0.3em] md:text-7xl">{pin.code}</div>
+            <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy || tr("pages.sources.waitSignIn")}</div>
+            <Pill variant="ghost" onClick={() => { setPin(null); setBusy("") }}>{tr("common.cancel")}</Pill>
           </div>
         )}
         {type === "Plex" && servers && servers.length > 0 && (
           <div className="flex flex-col gap-2">
-            <div className="text-lg">Connection</div>
-            <div role="radiogroup" aria-label="Connection mode" data-nav-group className="flex flex-wrap gap-2">
-              {([["auto", "Automatic"], ["norelay", "Never use relay"], ["local", "Local network only"]] as const).map(([v, label]) => (
+            <div className="text-lg">{tr("pages.sources.connection")}</div>
+            <div role="radiogroup" aria-label={tr("pages.sources.connMode")} data-nav-group className="flex flex-wrap gap-2">
+              {([["auto", tr("pages.sources.modeAuto")], ["norelay", tr("pages.sources.modeNoRelay")], ["local", tr("pages.sources.modeLocal")]] as const).map(([v, label]) => (
                 <Pill key={v} role="radio" aria-checked={connMode === v} variant={connMode === v ? "primary" : "tonal"} onClick={() => setConnMode(v)}>{label}</Pill>
               ))}
             </div>
-            <div className="text-sm text-muted-foreground">{connMode === "local" ? "Only your home network is used. Nothing goes through the internet or Plex's relay." : connMode === "norelay" ? "Local or direct remote access. Plex's slow relay is never used." : "Local first, then remote, then Plex's relay as a last resort."}</div>
-            <div className="mt-2 text-lg">Choose a server</div>
+            <div className="text-sm text-muted-foreground">{tr(connMode === "local" ? "pages.sources.descLocal" : connMode === "norelay" ? "pages.sources.descNoRelay" : "pages.sources.descAuto")}</div>
+            <div className="mt-2 text-lg">{tr("pages.sources.chooseServer")}</div>
             {servers.map((s) => (
               <Pill key={s.id} className="h-auto min-h-14 justify-between gap-4 py-2" disabled={!!busy} onClick={() => choose(s)}>
-                <span className="truncate">{s.name}</span><span className="text-sm text-muted-foreground">{conn(s)}</span>
+                <span dir="auto" className="truncate">{s.name}</span><span className="text-sm text-muted-foreground">{conn(s)}</span>
               </Pill>
             ))}
             {busy && <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy}</div>}
           </div>
         )}
-        {type === "Plex" && manual && (<>{field("server", "Server (http://host:32400)", "url", "url")}{field("token", "Plex token", "password")}{field("name", "Name (optional)")}</>)}
+        {type === "Plex" && manual && (<>{field("server", tr("pages.sources.serverPlex"), "url", "url")}{field("token", tr("pages.sources.plexToken"), "password")}{field("name", tr("pages.sources.nameOpt"))}</>)}
         {type === "Jellyfin" && !qc && (<>
-          <p className="text-muted-foreground">Movies, shows and live TV (when the server has it) from your Jellyfin server.</p>
-          {field("server", "Server (http://host:8096)", "url", "url")}{field("user", "Username", "text", undefined, "username")}{field("pass", "Password", "password", undefined, "current-password")}
+          <p className="text-muted-foreground">{tr("pages.sources.jfInfo")}</p>
+          {field("server", tr("pages.sources.serverJf"), "url", "url")}{field("user", tr("pages.sources.user"), "text", undefined, "username")}{field("pass", tr("pages.sources.pass"), "password", undefined, "current-password")}
         </>)}
         {type === "Jellyfin" && qc && (
           <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <div className="text-muted-foreground">In a signed-in Jellyfin app open <b className="text-foreground">Settings &gt; Quick Connect</b> and enter</div>
-            <div className="text-6xl font-semibold tracking-[0.3em] md:text-7xl">{qc.code}</div>
-            <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy || "Waiting for approval..."}</div>
-            <Pill variant="ghost" onClick={() => { setQc(null); setBusy("") }}>Cancel</Pill>
+            <div className="text-muted-foreground">{tr("pages.sources.qcPre")} <b dir="ltr" className="text-foreground">Settings &gt; Quick Connect</b> {tr("pages.sources.qcPost")}</div>
+            <div dir="ltr" className="text-6xl font-semibold tracking-[0.3em] md:text-7xl">{qc.code}</div>
+            <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy || tr("pages.sources.waitApproval")}</div>
+            <Pill variant="ghost" onClick={() => { setQc(null); setBusy("") }}>{tr("common.cancel")}</Pill>
           </div>
         )}
         {err && <p role="alert" className="text-destructive">{err}</p>}
 
         <div className="flex flex-wrap gap-3 pt-2">
-          {type !== "Plex" && type !== "Jellyfin" && <Pill variant="primary" disabled={!ok} onClick={save}>Save and load</Pill>}
-          {type === "Jellyfin" && !qc && <><Pill variant="primary" disabled={!ok || !!busy} onClick={() => { const sv = normServer(f.server); void jfAdd(sv, () => jellyfinSignIn(sv, f.user, f.pass)) }}>{busy || "Sign in"}</Pill><Pill disabled={!f.server || !!busy} onClick={jfQuick}>Use Quick Connect</Pill></>}
-          {type === "Plex" && manual && <><Pill variant="primary" disabled={!ok} onClick={save}>Save and load</Pill><Pill onClick={() => { setManual(false); setErr("") }}>Sign in with Plex</Pill></>}
-          {type === "Plex" && servers && <Pill onClick={() => { setServers(null); setErr("") }}>Back</Pill>}
+          {type !== "Plex" && type !== "Jellyfin" && <Pill variant="primary" disabled={!ok} onClick={save}>{tr("pages.sources.saveLoad")}</Pill>}
+          {type === "Jellyfin" && !qc && <><Pill variant="primary" disabled={!ok || !!busy} onClick={() => { const sv = normServer(f.server); void jfAdd(sv, () => jellyfinSignIn(sv, f.user, f.pass)) }}>{busy || tr("pages.sources.signIn")}</Pill><Pill disabled={!f.server || !!busy} onClick={jfQuick}>{tr("pages.sources.quickConnect")}</Pill></>}
+          {type === "Plex" && manual && <><Pill variant="primary" disabled={!ok} onClick={save}>{tr("pages.sources.saveLoad")}</Pill><Pill onClick={() => { setManual(false); setErr("") }}>{tr("pages.sources.plexSignIn")}</Pill></>}
+          {type === "Plex" && servers && <Pill onClick={() => { setServers(null); setErr("") }}>{tr("common.back")}</Pill>}
           {cancel()}
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { t } from "../i18n"
 // Plain-fetch GoTrue + PostgREST client (no SDK). Only the public anon key is ever used.
 export type Config = { url: string; anonKey: string }
 export type Session = { access: string; refresh: string; exp: number; id: string; email: string } // exp = unix seconds
@@ -7,10 +8,10 @@ const ENV: Config = { url: import.meta.env.VITE_SUPABASE_URL ?? "", anonKey: imp
 
 /** null when the key is fine; otherwise why it was refused. Never accept a service-role / secret key in a client. */
 export function badKey(k: string): string | null {
-  if (/^sb_secret_/.test(k)) return "That is a secret key. Never put it in an app. Use the anon (public) key."
+  if (/^sb_secret_/.test(k)) return t("sync.err.secretKey")
   try {
     const p = JSON.parse(atob(k.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")))
-    if (p.role === "service_role") return "That is a service_role key (full database access). Never put it in an app. Use the anon (public) key."
+    if (p.role === "service_role") return t("sync.err.serviceRole")
   } catch { /* not a JWT: let the server decide */ }
   return null
 }
@@ -51,16 +52,16 @@ async function req(cfg: Config, path: string, o: { method?: string; body?: unkno
 function readable(status: number, j: J | null): string {
   const m = String(j?.msg ?? j?.error_description ?? j?.message ?? j?.hint ?? j?.error ?? "")
   const code = String(j?.error_code ?? j?.code ?? "")
-  if (/over_email_send_rate_limit|rate limit|^429$/i.test(code + m) || status === 429) return "Too many attempts. Wait a minute and try again."
-  if (/invalid_credentials|Invalid login/i.test(code + m)) return "Wrong email or password."
-  if (/otp_expired|expired|invalid/i.test(code + m) && /otp|token|code/i.test(code + m)) return "That code is wrong or has expired. Request a new one."
-  if (/user_already_exists|already registered/i.test(code + m)) return "That email already has an account. Sign in instead."
-  if (/email_not_confirmed/i.test(code + m)) return "Confirm your email first (check your inbox), then sign in."
-  if (/weak_password/i.test(code + m)) return m || "Password is too weak."
-  if (/signup_disabled|otp_disabled/i.test(code + m)) return "Sign-ups are disabled in this Supabase project."
-  if (status === 404 || /user_data/.test(m) && /not find|does not exist/i.test(m)) return "The user_data table is missing. Run supabase/schema.sql in the Supabase SQL editor."
-  if (status === 401 || status === 403) return m || "Not allowed. Check the anon key or sign in again."
-  return m || `The sync server answered ${status}.`
+  if (/over_email_send_rate_limit|rate limit|^429$/i.test(code + m) || status === 429) return t("sync.err.rateLimit")
+  if (/invalid_credentials|Invalid login/i.test(code + m)) return t("sync.err.badLogin")
+  if (/otp_expired|expired|invalid/i.test(code + m) && /otp|token|code/i.test(code + m)) return t("sync.err.badCode")
+  if (/user_already_exists|already registered/i.test(code + m)) return t("sync.err.exists")
+  if (/email_not_confirmed/i.test(code + m)) return t("sync.err.unconfirmed")
+  if (/weak_password/i.test(code + m)) return m || t("sync.err.weakPassword")
+  if (/signup_disabled|otp_disabled/i.test(code + m)) return t("sync.err.signupDisabled")
+  if (status === 404 || /user_data/.test(m) && /not find|does not exist/i.test(m)) return t("sync.err.noTable")
+  if (status === 401 || status === 403) return m || t("sync.err.notAllowed")
+  return m || t("sync.err.serverStatus", { status })
 }
 
 type AuthRes = { access_token?: string; refresh_token?: string; expires_at?: number; expires_in?: number; user?: { id: string; email?: string } }

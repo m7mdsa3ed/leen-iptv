@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { ALL, FAV } from "@/components/tv/groups"
 import { askPin, useOpen } from "@/components/tv/ui"
+import { useT } from "@/lib/i18n"
 import { useGenres } from "@/lib/meta"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
@@ -20,10 +21,11 @@ export { ALL, FAV }
  *  g / setG (selected pseudo group: ALL | FAV; real categories open their own page via openCategory), items (FAV list; [] for ALL),
  *  rails: [categoryName, Item[<=20]][] (<=30, only when g === ALL), favorites (this kind's favorite Items),
  *  pct(item) progress %|undefined, isFav(item), isLocked(cat), canLock (profile has a PIN), toggleLock(cat) (PIN-aware, ignores ALL/FAV),
- *  open(item) (PIN-aware), openCategory(cat), openGenre(name), kindLabel ("Movies"|"Series"), page ("movies"|"series")
+ *  open(item) (PIN-aware), openCategory(cat), openGenre(name), kindLabel (localised "Movies"|"Series"), page ("movies"|"series")
  * }
  */
 export function useBrowse(kind: Exclude<Kind, "live">) {
+  const t = useT()
   const status = useCatalog((s) => s.status)
   const byId = useCatalog((s) => s.byId)
   const { byKind, groups } = useCatalogView()
@@ -59,6 +61,6 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
     open: (i: Item) => open(i),
     openCategory: (c: string) => go("category", { id: `${kind}|${c}` }),
     openGenre: (n: string) => go("genre", { id: `${kind}|${n}` }),
-    kindLabel: kind === "movie" ? "Movies" : "Series", page: kind === "movie" ? "movies" : "series",
+    kindLabel: t(kind === "movie" ? "hooks.browse.movies" : "hooks.browse.series"), page: kind === "movie" ? "movies" : "series",
   }
 }

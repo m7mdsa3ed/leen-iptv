@@ -60,7 +60,6 @@ const tmdb: Provider = {
   name: "TMDB",
   needsKey: true,
   hasLang: true,
-  hint: "Free key at themoviedb.org/settings/api (API key or read access token). Also powers cast profiles.",
   person: tmdbPerson,
   async genres(kind, cfg) {
     return cfg.key ? (await tmdbGenres(cfg, kind === "series")).map((g) => g.name) : null
@@ -103,7 +102,7 @@ const tmdb: Provider = {
       year: date.slice(0, 4) || undefined,
       plot: str(d.overview),
       genres: (d.genres ?? []).map((g: J) => g.name),
-      runtime: rt ? `${rt} min` : undefined,
+      runtime: rt ? rt * 60 : undefined,
       ratings: d.vote_count ? [{ source: "TMDB", value: Number(d.vote_average).toFixed(1), votes: String(d.vote_count) }] : [],
       poster: d.poster_path ? `${IMG}/w500${d.poster_path}` : undefined,
       backdrop: d.backdrop_path ? `${IMG}/w1280${d.backdrop_path}` : undefined,
@@ -161,7 +160,6 @@ const omdb: Provider = {
   id: "omdb",
   name: "OMDb",
   needsKey: true,
-  hint: "Free key at omdbapi.com/apikey.aspx (1,000 requests/day).",
   async fetch(q, cfg) {
     if (!cfg.key) return null
     const u = new URL("https://www.omdbapi.com/")

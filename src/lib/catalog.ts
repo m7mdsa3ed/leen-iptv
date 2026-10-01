@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { del, get, set } from "idb-keyval"
 import type { Item, Kind, Prog, Source } from "./types"
 import { explain, fetchText, px } from "./net"
+import { fmt, t } from "./i18n"
 import { parseM3U, parseXmltv } from "./parse"
 import { loadXtream, xmltvUrl } from "./xtream"
 import { loadPlex } from "./plex"
@@ -77,10 +78,10 @@ function mergeEpg() {
 }
 
 async function loadOne(src: Source, proxy: string, force?: boolean) {
-  const t = (tok.get(src.id) ?? 0) + 1
-  tok.set(src.id, t)
-  const live = () => tok.get(src.id) === t
-  patch(src.id, { status: "loading", msg: "Loading" })
+  const tk = (tok.get(src.id) ?? 0) + 1
+  tok.set(src.id, tk)
+  const live = () => tok.get(src.id) === tk
+  patch(src.id, { status: "loading", msg: t("errors.source.loading") })
   try {
     let items: Item[] | undefined
     const cached = force ? undefined : await get<{ at: number; items: Item[] }>("cat:" + src.id)
@@ -91,10 +92,10 @@ async function loadOne(src: Source, proxy: string, force?: boolean) {
       else if (src.type === "plex") items = await loadPlex(src, proxy, step)
       else if (src.type === "jellyfin") items = await loadJellyfin(src, proxy, step)
       else {
-        step("Downloading playlist")
+        step(t("errors.source.downloading"))
         items = parseM3U(await fetchText(px(src.url!, proxy)), src.id)
       }
-      if (!items.length) throw new Error("No channels found in this source")
+      if (!items.length) throw new Error(t("errors.source.noChannels"))
       void set("cat:" + src.id, { at: Date.now(), items })
     }
     if (!live()) return
@@ -181,4 +182,4 @@ export function nowNext(epg: Map<string, Prog[]>, id?: string, at = Date.now()) 
   return i < 0 ? {} : l[i].s <= at ? { now: l[i], next: l[i + 1] } : { next: l[i] }
 }
 
-export const hm = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+export const hm = (t: number) => fmt.time(t)

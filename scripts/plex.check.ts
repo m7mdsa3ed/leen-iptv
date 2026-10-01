@@ -27,7 +27,7 @@ assert.equal(mapMeta({ ratingKey: "7", type: "show", title: "X" }, { sourceId: "
 const d = mapDetail({ summary: "p", year: 1995, duration: 7200000, Genre: [{ tag: "Crime" }], Director: [{ tag: "M" }], Role: [{ tag: "Al", role: "Hanna", thumb: "/p" }], Rating: [{ image: "imdb://image.rating", value: 8.3 }, { image: "rottentomatoes://image.rating.ripe", value: 8 }, { image: "other://", value: 1 }] }, img)
 assert.deepEqual(d.meta.ratings.map((r) => r.source), ["IMDb", "Rotten Tomatoes"])
 assert.equal(d.meta.cast[0].photo, "IMG200x200/p")
-assert.equal(d.info.duration, "2h 0m")
+assert.equal(d.meta.runtime, 7200)
 // connection modes: local = LAN only, norelay = no relay, auto = everything
 const conns = [
   { uri: "https://1-2-3-4.abc.plex.direct:32400", local: false, relay: false, protocol: "https" },

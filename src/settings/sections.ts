@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import { create } from "zustand"
+import { t, useT } from "@/lib/i18n"
 import { Cloud, Database, Globe, Info, Layers, MonitorPlay, Palette, Play, UserRound, type LucideIcon } from "lucide-react"
 import AccountSection from "./sections/account"
 import ProfilesSection from "./sections/profiles"
@@ -15,16 +16,22 @@ export type SectionKey = "account" | "profiles" | "sources" | "display" | "playb
 export type SectionDef = { key: SectionKey; title: string; icon: LucideIcon; description: string; Component: ComponentType }
 
 /** Spec order. Layouts build their navigation from this list. */
+const def = (key: SectionKey, icon: LucideIcon, Component: ComponentType): SectionDef => ({
+  key, icon, Component,
+  get title() { return t(`settings.sec.${key}`) }, // getters: read the language at call time
+  get description() { return t(`settings.sec.${key}.desc`) },
+})
+
 export const SECTIONS: SectionDef[] = [
-  { key: "account", title: "Account & sync", icon: Cloud, description: "Sign in and sync your profiles and sources", Component: AccountSection },
-  { key: "profiles", title: "Profiles & PIN", icon: UserRound, description: "Switch profile, PIN and parental locks", Component: ProfilesSection },
-  { key: "sources", title: "Sources", icon: Layers, description: "Add, order, color and refresh your sources", Component: SourcesSection },
-  { key: "display", title: "Display", icon: Palette, description: "Layout, theme, motion and size", Component: DisplaySection },
-  { key: "playback", title: "Playback", icon: Play, description: "Live format, proxy streams and history tracking", Component: PlaybackSection },
-  { key: "metadata", title: "Metadata", icon: MonitorPlay, description: "TMDB, OMDb and Xtream info providers", Component: MetadataSection },
-  { key: "history", title: "History & stats", icon: Database, description: "View, export or clear what you watched", Component: HistorySection },
-  { key: "network", title: "Network", icon: Globe, description: "CORS proxy", Component: NetworkSection },
-  { key: "about", title: "About", icon: Info, description: "Version, device and source health", Component: AboutSection },
+  def("account", Cloud, AccountSection),
+  def("profiles", UserRound, ProfilesSection),
+  def("sources", Layers, SourcesSection),
+  def("display", Palette, DisplaySection),
+  def("playback", Play, PlaybackSection),
+  def("metadata", MonitorPlay, MetadataSection),
+  def("history", Database, HistorySection),
+  def("network", Globe, NetworkSection),
+  def("about", Info, AboutSection),
 ]
 
 // module state so the open section survives a layout switch; null = list only (mobile / Apple-style root)
@@ -33,6 +40,7 @@ const useOpen = create<{ open: SectionKey | null; set: (k: SectionKey | null) =>
 /** Selected-section helpers. `open` = pushed sub-screen (null shows the list); `key`/`section` fall back to the first section for two-pane layouts. */
 export function useSettingsNav() {
   const { open, set } = useOpen()
+  useT() // re-render on language change (section titles are getters)
   const key = open ?? SECTIONS[0].key
   return { sections: SECTIONS, open, key, section: SECTIONS.find((s) => s.key === key)!, select: (k: SectionKey) => set(k), close: () => set(null) }
 }

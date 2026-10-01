@@ -1,4 +1,5 @@
 import { useMemo } from "react"
+import { t, useLang } from "@/lib/i18n"
 import { progressPct } from "./hooks/use-live"
 import { hm, nowNext, useCatalog } from "@/lib/catalog"
 import { useApp, usePData } from "@/lib/store"
@@ -39,6 +40,7 @@ export function useHomeData() {
   const openItem = useOpen()
   const toggleFav = useApp((s) => s.toggleFav)
   const proxy = useApp((s) => s.settings.proxy)
+  const { lang } = useLang() // t() below is non-reactive: rebuild on language change
 
   const data = useMemo(() => {
     const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter((x) => x && inSource(x, filter)).slice(0, CAP) as Item[]
@@ -54,30 +56,30 @@ export function useHomeData() {
     const vod = [...byKind.movie, ...byKind.series]
     const day = Math.floor(Date.now() / 864e5)
     const hero = cont[0] ?? favs[0] ?? (vod.length ? vod[day % vod.length] : undefined) ?? byKind.live[0]
-    const kicker = (i: Item) => (cont[0] === i ? "Continue watching" : favs[0] === i ? "Favorite" : "Featured")
+    const kicker = (i: Item) => (cont[0] === i ? t("common.continueWatching") : favs[0] === i ? t("common.favorite") : t("common.featured"))
     // carousel candidates (up to 5, distinct, hero first)
     const featured: HeroPick[] = []
-    const add = (i: Item | undefined, k?: string) => { if (i && featured.length < 5 && !featured.some((f) => f.item === i)) featured.push({ item: i, kicker: k ?? "Featured" }) }
+    const add = (i: Item | undefined, k?: string) => { if (i && featured.length < 5 && !featured.some((f) => f.item === i)) featured.push({ item: i, kicker: k ?? t("common.featured") }) }
     add(hero, hero && kicker(hero))
-    add(favs[0], "Favorite")
+    add(favs[0], t("common.favorite"))
     for (let n = 0; n < vod.length && featured.length < 5; n++) add(vod[(day + n * 7) % vod.length])
     if (!featured.length) add(byKind.live[0])
     const pct = (i: Item) => { const p = d.progress[i.id]; return p ? (p.pos / p.dur) * 100 : undefined }
-    const sub = (i: Item) => { const n = nowNext(epg, i.epgId).now; return n ? `${hm(n.s)} ${n.t}` : undefined }
+    const sub = (i: Item) => { const n = nowNext(epg, i.epgId).now; return n ? `${hm(n.s)} \u2068${n.t}\u2069` : undefined }
     const livePct = (i: Item) => { const n = nowNext(epg, i.epgId).now; return n ? progressPct(n.s, n.e) : undefined }
     const seeAll = (k: Kind, g: string) => () => go("category", { id: `${k}|${g}` })
     const rails: HomeRail[] = []
-    if (cont.length) rails.push({ key: "cont", title: "Continue watching", kind: "wide", items: cont, pct })
-    if (favs.length) rails.push({ key: "favs", title: "Favorites", kind: "wide", items: favs })
-    if (recents.length) rails.push({ key: "recents", title: "Recently watched", kind: "wide", items: recents })
-    if (live.length) rails.push({ key: "live", title: "Live now", kind: "wide", items: live, sub, pct: livePct })
+    if (cont.length) rails.push({ key: "cont", title: t("common.continueWatching"), kind: "wide", items: cont, pct })
+    if (favs.length) rails.push({ key: "favs", title: t("common.favorites"), kind: "wide", items: favs })
+    if (recents.length) rails.push({ key: "recents", title: t("common.recents"), kind: "wide", items: recents })
+    if (live.length) rails.push({ key: "live", title: t("common.liveNow"), kind: "wide", items: live, sub, pct: livePct })
     for (const r of [...genre("movie"), ...genre("series")]) {
-      const title = `${r.k === "movie" ? "Movies" : "Shows"} · ${r.g}`
+      const title = t(r.k === "movie" ? "common.moviesIn" : "common.showsIn", { g: r.g })
       rails.push({ key: r.k + r.g, title, kind: "poster", items: r.items, seeAll: seeAll(r.k, r.g) })
     }
     const hp: HeroPick | undefined = hero ? { item: hero, kicker: kicker(hero) } : undefined
     return { hero: hp, featured, rails, live, favIds: d.favs }
-  }, [d, byId, byKind, groups, epg, go, filter])
+  }, [d, byId, byKind, groups, epg, go, filter, lang])
 
   return {
     status, msg, ...data,
