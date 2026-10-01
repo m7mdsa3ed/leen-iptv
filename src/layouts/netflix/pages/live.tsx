@@ -5,7 +5,7 @@ import { hm } from "@/lib/catalog"
 import { ALL, FAV, progressPct, useLive } from "../../hooks/use-live"
 import { useRoute } from "@/lib/nav"
 import type { Item } from "@/lib/types"
-import { Dropdown, DropLabel, PagedGrid, Pick, Row, SkelRows, Tile } from "../ui"
+import { Dropdown, DropLabel, PagedGrid, Pick, Row, SkelRows, SourceBar, Tile } from "../ui"
 
 const MAX_ROWS = 30
 const PER_ROW = 20
@@ -38,6 +38,7 @@ export default function Live() {
             </Dropdown>
             <button data-nav onClick={() => go("guide")} className="nf-drop"><Tv className="size-4" />TV Guide</button>
           </div>
+          <SourceBar />
           {L.g === ALL ? (
             rows.length ? rows.map(([g, a]) => <Row key={g} title={g} onSeeAll={() => L.setG(g)}>{a.map((i) => tile(i, a))}</Row>) : <div className="h-64"><Empty>No channels</Empty></div>
           ) : L.items.length ? (

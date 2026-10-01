@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { isTv, useMode } from "@/lib/device"
 import { focusFirst, useRoute } from "@/lib/nav"
-import { useApp, useProfile, useSource } from "@/lib/store"
+import { useApp, useProfile } from "@/lib/store"
 import { Card, SkelGrid, SkelRail } from "@/components/gtv"
 import { useLayoutDef } from "@/layouts"
 import { useCatalog } from "@/lib/catalog"
@@ -198,7 +198,6 @@ export const focusFirstSoon = () => { requestAnimationFrame(() => requestAnimati
 /** Catalog not ready: show progress, or the reason it failed with a retry. */
 export function Pending({ shape = "rails" }: { shape?: "rails" | "grid" }) {
   const { status, msg } = useCatalog()
-  const src = useSource()
   if (status !== "error")
     return (
       <div role="status" className="h-full overflow-hidden pt-2">
@@ -210,7 +209,7 @@ export function Pending({ shape = "rails" }: { shape?: "rails" | "grid" }) {
     <Empty>
       <div className="flex max-w-xl flex-col items-center gap-4 px-6 text-center">
         <div className="text-destructive">{msg}</div>
-        <TvButton onClick={() => src && useCatalog.getState().load(src, useApp.getState().settings.proxy, true)}>Retry</TvButton>
+        <TvButton onClick={() => { const c = useCatalog.getState(); for (const id in c.sources) if (c.sources[id].status === "error") void c.retry(id) }}>Retry</TvButton>
       </div>
     </Empty>
   )

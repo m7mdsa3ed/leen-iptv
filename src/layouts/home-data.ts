@@ -1,10 +1,12 @@
 import { useMemo } from "react"
 import { progressPct } from "./hooks/use-live"
 import { hm, nowNext, useCatalog } from "@/lib/catalog"
-import { useApp, usePData, useSource } from "@/lib/store"
+import { useApp, usePData } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { useOpen } from "@/components/tv/ui"
 import type { Item, Kind } from "@/lib/types"
+import { useSources } from "@/lib/sources"
+import { inSource, useActiveFilter, useCatalogView } from "./hooks/use-source-filter"
 
 const CAP = 20
 
@@ -27,19 +29,19 @@ export function useHomeData() {
   const status = useCatalog((s) => s.status) // idle | loading | ready | error
   const msg = useCatalog((s) => s.msg)
   const byId = useCatalog((s) => s.byId)
-  const byKind = useCatalog((s) => s.byKind)
-  const groups = useCatalog((s) => s.groups)
+  const { byKind, groups } = useCatalogView()
+  const filter = useActiveFilter()
+  const enabled = useSources()
   const epg = useCatalog((s) => s.epg)
   useCatalog((s) => s.epgTick)
   const d = usePData()
-  const src = useSource()
   const go = useRoute((s) => s.go)
   const openItem = useOpen()
   const toggleFav = useApp((s) => s.toggleFav)
   const proxy = useApp((s) => s.settings.proxy)
 
   const data = useMemo(() => {
-    const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter(Boolean).slice(0, CAP) as Item[]
+    const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter((x) => x && inSource(x, filter)).slice(0, CAP) as Item[]
     const p = Object.entries(d.progress).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
     const genre = (k: Kind) => {
       const first = groups[k].slice(0, 6)
@@ -75,7 +77,7 @@ export function useHomeData() {
     }
     const hp: HeroPick | undefined = hero ? { item: hero, kicker: kicker(hero) } : undefined
     return { hero: hp, featured, rails, live, favIds: d.favs }
-  }, [d, byId, byKind, groups, epg, go])
+  }, [d, byId, byKind, groups, epg, go, filter])
 
   return {
     status, msg, ...data,
@@ -86,8 +88,8 @@ export function useHomeData() {
     info: (i: Item) => openItem(i),
     toggleFav: (i: Item) => toggleFav(i.id),
     isFav: (i: Item) => data.favIds.includes(i.id),
-    retry: () => src && useCatalog.getState().load(src, proxy, true),
+    retry: () => void useCatalog.getState().loadAll(useApp.getState().sources, proxy, true),
     changeSource: () => go("sources"),
-    sourceName: src?.name,
+    sourceName: enabled.length === 1 ? enabled[0].name : undefined, // several sources: no single name
   }
 }

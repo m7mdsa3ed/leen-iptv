@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { askPin, useOpen } from "@/components/tv/ui"
+import { findLock } from "@/lib/merge-pure"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
 import { usePData, useProfile } from "@/lib/store"
 import type { Item } from "@/lib/types"
+import { useCatalogView } from "./use-source-filter"
 
 export type Sort = "default" | "az" | "rating"
 export const SORTS: [Sort, string][] = [["default", "Default"], ["az", "A-Z"], ["rating", "Top rated"]]
@@ -17,12 +19,13 @@ export function useCategory(id: string) {
   const cut = id.indexOf("|")
   const kind = (id.slice(0, cut) === "series" ? "series" : "movie") as "movie" | "series"
   const group = id.slice(cut + 1)
-  const { byKind, status } = useCatalog()
+  const status = useCatalog((s) => s.status)
+  const { byKind } = useCatalogView()
   const d = usePData()
   const p = useProfile()
   const back = useRoute((s) => s.back)
   const open = useOpen()
-  const locked = !!p?.pin && p.locked.includes(`${kind}|${group}`)
+  const locked = !!p?.pin && !!findLock(p.locked, kind, group)
   const [ok, setOk] = useState(!locked) // locked categories need the PIN even when reached by URL or refresh
   const [sort, setSort] = useState<Sort>("default")
   const [q, setQ] = useState("")

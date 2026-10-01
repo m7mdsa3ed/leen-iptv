@@ -1,7 +1,7 @@
 import { useDeferredValue, useMemo, useState } from "react"
 import { useOpen } from "@/components/tv/ui"
-import { useCatalog } from "@/lib/catalog"
 import type { Item } from "@/lib/types"
+import { useCatalogView } from "./use-source-filter"
 
 /**
  * Search state. Returns {
@@ -10,7 +10,7 @@ import type { Item } from "@/lib/types"
  * }
  */
 export function useSearch() {
-  const items = useCatalog((s) => s.items)
+  const { items } = useCatalogView()
   const open = useOpen()
   const [q, setQ] = useState("")
   const query = useDeferredValue(q).trim().toLowerCase()

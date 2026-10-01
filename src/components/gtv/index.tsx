@@ -4,6 +4,7 @@ import { ChevronRight, Info, Lock, Play, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/lib/store"
 import { Logo, useLocked } from "@/components/tv/ui"
+import { SourceBadge } from "@/components/source/SourceBadge"
 import type { Item } from "@/lib/types"
 
 type Btn = ButtonHTMLAttributes<HTMLButtonElement>
@@ -103,6 +104,7 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
         <Logo item={item} className={cn("relative size-full", live ? "p-6" : variant === "wide" ? "object-contain" : "object-cover")} />
         {fav && <span className={cn(chip, "right-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
         {locked && <span className={cn(chip, "left-2")}><Lock className="size-4 text-white" /></span>}
+        <SourceBadge item={item} className={cn("absolute left-2", pct ? "bottom-3" : "bottom-2")} />
         {pct ? <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} /></div> : null}
       </div>
       <span data-ring aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit]" />

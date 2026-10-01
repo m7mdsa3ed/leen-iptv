@@ -4,7 +4,7 @@ import { SkelBar } from "@/components/gtv"
 import { isTv } from "@/lib/device"
 import { useDetail } from "../../hooks/use-detail"
 import type { Item } from "@/lib/types"
-import { Dropdown, Pick, match } from "../ui"
+import { Dropdown, Pick, SourceChooser, match } from "../ui"
 
 const Links = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="text-sm leading-6"><span className="text-muted-foreground">{label} </span>{children}</div>
@@ -44,6 +44,7 @@ export default function Detail({ id }: { id: string }) {
               {chips.map((c) => <span key={c} className="text-muted-foreground">{c}</span>)}
               {ratings.map((r) => <span key={r.source} className="rounded-sm border border-[var(--fg-40)] px-1.5 text-xs">{r.source} {r.value}</span>)}
             </div>
+            {D.alternatives.length > 1 && <div className="mt-4"><SourceChooser list={D.alternatives} selected={D.selected} onSelect={D.selectSource} /></div>}
             {plot && <p className="mt-4 text-base leading-relaxed md:text-lg">{plot}</p>}
             {loading && !plot && <div role="status" aria-label="Loading details" className="mt-4 space-y-3"><SkelBar className="w-full" /><SkelBar className="w-11/12" /><SkelBar className="w-2/3" /></div>}
             {D.error && <p className="mt-3 text-destructive">{D.error}</p>}

@@ -7,7 +7,7 @@ import { useLayoutAttr, useLayoutDef } from "@/layouts"
 import { useMotion } from "@/lib/motion"
 import { useTheme } from "@/lib/theme"
 import { installNav, useRoute } from "@/lib/nav"
-import { useApp, useSource } from "@/lib/store"
+import { useApp } from "@/lib/store"
 import Browse from "@/pages/browse"
 import CategoryPage from "@/pages/category"
 import Detail from "@/pages/detail"
@@ -61,7 +61,7 @@ function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
 export default function App() {
   const stack = useRoute((s) => s.stack)
   const profileId = useApp((s) => s.profileId)
-  const src = useSource()
+  const sources = useApp((s) => s.sources)
   const last = useRef(new Map<number, HTMLElement>())
   const top = stack.length - 1
   useMode() // keeps html[data-mode] in sync on resize
@@ -80,10 +80,11 @@ export default function App() {
       if (!back() && isTv && stack[0].name !== "profiles") window.close()
     }), [])
 
-  // (re)load the catalog when the active source or profile changes
+  // load every enabled source (already-loaded ones are skipped) when the profile or the source list / enabled flags / order change
+  const srcKey = sources.map((s) => `${s.id}:${s.enabled !== false ? 1 : 0}`).join(",")
   useEffect(() => {
-    if (profileId && src) void useCatalog.getState().load(src, useApp.getState().settings.proxy)
-  }, [profileId, src?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (profileId) void useCatalog.getState().loadAll(useApp.getState().sources, useApp.getState().settings.proxy)
+  }, [profileId, srcKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // remember focus per stacked page so Back returns to the same tile
   useEffect(() => {

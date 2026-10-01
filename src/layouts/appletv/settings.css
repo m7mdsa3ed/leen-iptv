@@ -1,0 +1,21 @@
+/* Apple TV Settings (tvOS style). Scoped; focus = lift, small shadow. */
+html[data-layout=appletv] .atv-set { padding: 5.5rem var(--gx, 1rem) 3rem; }
+html[data-layout=appletv][data-mode=tv] .atv-set { padding-top: 7rem; }
+html[data-layout=appletv] .atv-set-col { margin: 0 auto; width: 100%; max-width: 44rem; padding: 0 .5rem; }
+html[data-layout=appletv][data-mode=tv] .atv-set-col { max-width: 56rem; }
+html[data-layout=appletv] .atv-set-title { text-align: center; margin-bottom: 2rem; }
+html[data-layout=appletv] .atv-set-head { display: flex; align-items: center; gap: 1rem; }
+html[data-layout=appletv] .atv-set-sub { margin: .5rem 0 0 0; color: var(--muted-foreground); }
+html[data-layout=appletv] .atv-set-body { margin-top: 1.5rem; }
+/* sections draw their own cards: make them translucent inset groups */
+html[data-layout=appletv] .atv-set-body section { background: var(--atv-glass); border-radius: 24px; box-shadow: inset 0 0 0 1px var(--atv-hair); }
+html[data-layout=appletv] .atv-set-group { display: flex; flex-direction: column; gap: 2px; border-radius: 24px; padding: 6px; background: var(--atv-glass); box-shadow: inset 0 0 0 1px var(--atv-hair); }
+html[data-layout=appletv] .atv-set-row { display: flex; align-items: center; gap: 1rem; min-height: 3.5rem; padding: .5rem 1.1rem; border-radius: 18px; font-size: 1.125rem; font-weight: 600; color: var(--foreground); background: transparent; transition: transform var(--dur-fast) var(--ease); }
+html[data-layout=appletv][data-mode=tv] .atv-set-row { min-height: 4.25rem; }
+html[data-layout=appletv] .atv-set-ico { width: 1.5rem; height: 1.5rem; flex-shrink: 0; }
+html[data-layout=appletv] .atv-set-val { max-width: 40%; font-weight: 400; color: var(--muted-foreground); }
+html[data-layout=appletv] .atv-set-chev { width: 1.25rem; height: 1.25rem; flex-shrink: 0; color: var(--muted-foreground); }
+html[data-layout=appletv] .atv-set-row:hover { background: var(--atv-glass-on); }
+html[data-layout=appletv][data-mode] .atv-set-row:focus-visible { background: var(--focus-bg) !important; color: var(--focus-fg) !important; transform: scale(1.03); box-shadow: 0 6px 14px rgba(0, 0, 0, .28); outline: none; }
+html[data-layout=appletv][data-mode] .atv-set-row:focus-visible .atv-set-val, html[data-layout=appletv][data-mode] .atv-set-row:focus-visible .atv-set-chev { color: inherit; }
+html[data-layout=appletv][data-mode=mobile] .atv-set { padding-top: 4.5rem; }

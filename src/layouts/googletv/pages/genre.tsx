@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react"
 import { Card, Pill, RoundButton, SkelGrid } from "@/components/gtv"
 import { Empty, Pending, Shell, VGrid } from "@/components/tv/ui"
 import { useGenre } from "@/layouts/hooks/use-genre"
+import { SourceFilter } from "../source-ui"
 import { isTv } from "@/lib/device"
 
 /** A genre (Drama, Comedy...) as a page: popular titles of that genre from the metadata provider that exist in your catalog,
@@ -21,6 +22,7 @@ export default function GenrePage({ id }: { id: string }) {
             {related.map((g) => <Pill key={g} onClick={() => openCategory(g)}>{g}</Pill>)}
             {available && hasMore && <Pill variant="primary" disabled={loading} onClick={() => void more()}>{loading ? "Searching..." : "Find more"}</Pill>}
           </div>
+          <SourceFilter />
           <div className="m-fade min-h-0 flex-1" style={{ "--i": 1 } as React.CSSProperties}>
             {!available ? (
               <Empty>

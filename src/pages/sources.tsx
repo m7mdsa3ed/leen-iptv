@@ -5,6 +5,7 @@ import { useApp } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { explain } from "@/lib/net"
 import { checkPin, createPin, pickConnection, plexServers, type Pin, type PlexServer } from "@/lib/plex"
+import type { ConnMode } from "@/lib/plex-pure"
 
 type Type = "M3U" | "Xtream" | "Plex"
 
@@ -49,11 +50,12 @@ export default function Sources() {
     try { setPin(await createPin()) } catch (e) { setErr(explain(e)) }
     setBusy("")
   }
+  const [connMode, setConnMode] = useState<ConnMode>("auto")
   const choose = async (s: PlexServer) => {
     setErr(""); setBusy(`Connecting to ${s.name}...`)
     try {
-      const server = await pickConnection(s)
-      addSource({ name: s.name, type: "plex", server, token: s.token, serverId: s.id })
+      const server = await pickConnection(s, connMode)
+      addSource({ name: s.name, type: "plex", server, token: s.token, serverId: s.id, conns: s.connections, connMode })
       reset("home")
     } catch (e) { setErr(explain(e)); setBusy("") }
   }
@@ -104,7 +106,14 @@ export default function Sources() {
         )}
         {type === "Plex" && servers && servers.length > 0 && (
           <div className="flex flex-col gap-2">
-            <div className="text-lg">Choose a server</div>
+            <div className="text-lg">Connection</div>
+            <div role="radiogroup" aria-label="Connection mode" data-nav-group className="flex flex-wrap gap-2">
+              {([["auto", "Automatic"], ["norelay", "Never use relay"], ["local", "Local network only"]] as const).map(([v, label]) => (
+                <Pill key={v} role="radio" aria-checked={connMode === v} variant={connMode === v ? "primary" : "tonal"} onClick={() => setConnMode(v)}>{label}</Pill>
+              ))}
+            </div>
+            <div className="text-sm text-muted-foreground">{connMode === "local" ? "Only your home network is used. Nothing goes through the internet or Plex's relay." : connMode === "norelay" ? "Local or direct remote access. Plex's slow relay is never used." : "Local first, then remote, then Plex's relay as a last resort."}</div>
+            <div className="mt-2 text-lg">Choose a server</div>
             {servers.map((s) => (
               <Pill key={s.id} className="h-auto min-h-14 justify-between gap-4 py-2" disabled={!!busy} onClick={() => choose(s)}>
                 <span className="truncate">{s.name}</span><span className="text-sm text-muted-foreground">{conn(s)}</span>

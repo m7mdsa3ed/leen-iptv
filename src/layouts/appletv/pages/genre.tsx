@@ -1,7 +1,7 @@
 import { Empty, Pending, Shell } from "@/components/tv/ui"
 import { SkelGrid } from "@/components/gtv"
 import { useGenre } from "../../hooks/use-genre"
-import { Capsule, Tile } from "../ui"
+import { Capsule, SourceFilter, Tile } from "../ui"
 
 /** One genre: title, related category capsules, poster grid of popular titles found in the catalog. */
 export default function Genre({ id }: { id: string }) {
@@ -15,6 +15,7 @@ export default function Genre({ id }: { id: string }) {
             {related.map((g) => <Capsule key={g} className="!min-h-11 !px-6 !text-base" onClick={() => openCategory(g)}>{g}</Capsule>)}
             {available && hasMore && <Capsule primary disabled={loading} className="!min-h-11 !px-6 !text-base" onClick={() => void more()}>{loading ? "Searching..." : "Find more"}</Capsule>}
           </div>
+          <SourceFilter className="mt-2" />
           {!available ? (
             <div className="flex max-w-xl flex-col items-start gap-4 pt-6 text-lg text-muted-foreground">
               <p>Genre pages use TMDB to find popular {genre} titles. Add a free TMDB key to see them.</p>

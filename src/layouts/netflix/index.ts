@@ -11,6 +11,7 @@ import Library from "./pages/library"
 import Profiles from "./pages/profiles"
 import Category from "./pages/category"
 import Genre from "./pages/genre"
+import Settings from "./pages/settings"
 
-const def: LayoutDef = { id: "netflix", Shell, Home, tabs: TABS_NETFLIX, pages: { movies: Browse, series: Browse, live: Live, detail: Detail, search: Search, library: Library, profiles: Profiles, category: Category, genre: Genre } }
+const def: LayoutDef = { id: "netflix", Shell, Home, tabs: TABS_NETFLIX, pages: { movies: Browse, series: Browse, live: Live, detail: Detail, search: Search, library: Library, profiles: Profiles, category: Category, genre: Genre, settings: Settings } }
 export default def

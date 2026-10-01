@@ -40,3 +40,10 @@ Keyboard: arrows (after focusing an item), Enter, Esc = Back.
 ### Android
 Android uses the PWA (no native wrapper). Open the app in Chrome on the phone and choose "Install app" / "Add to Home screen". Chrome only offers install over HTTPS (or localhost), so put HTTPS in front, e.g. `tailscale serve --bg 4010` and open the `https://<machine>.<tailnet>.ts.net` address.
 `http://` IPTV servers are fetched through the built-in `/p` proxy (Vite dev/preview or `pnpm proxy`), which also handles CORS and mixed content. The hardware Back button pops the in-app stack.
+
+## Supabase setup (optional cloud sync)
+1. Create a project at supabase.com (Authentication > Providers: Email enabled; turn off "Confirm email" if you want instant sign-in).
+2. Open SQL Editor and run `supabase/schema.sql` once (creates `public.user_data` with row-level security).
+3. Project Settings > API: copy the Project URL and the **anon** public key. Either put them in `.env.local` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (restart dev / rebuild), or paste them in Settings > Account & sync.
+4. Sign up / sign in there on each device. Optionally set an encryption passphrase (needs https or localhost; use the same one on every device). Sources hold IPTV credentials, so encrypt.
+5. Never use the service-role key in this app.

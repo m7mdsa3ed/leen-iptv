@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { useOpen } from "@/components/tv/ui"
-import { useCatalog } from "@/lib/catalog"
+import { useCatalogView } from "./use-source-filter"
 import { findInCatalog, usePerson } from "@/lib/meta"
 import type { Credit } from "@/lib/meta/types"
 import { useRoute } from "@/lib/nav"
@@ -19,7 +19,7 @@ export function usePersonPage(id?: string, name?: string) {
     return { id: numeric ? id : undefined, name: name ?? (numeric ? "" : id ?? "") }
   }, [id, name])
   const { info, loading, error, available } = usePerson(ref)
-  const byKind = useCatalog((s) => s.byKind)
+  const { byKind } = useCatalogView()
   const open = useOpen()
   const back = useRoute((s) => s.back)
   const go = useRoute((s) => s.go)

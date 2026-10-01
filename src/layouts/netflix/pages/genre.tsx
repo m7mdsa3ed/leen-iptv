@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react"
 import { Empty, Pending, Shell } from "@/components/tv/ui"
 import { useGenre } from "@/layouts/hooks/use-genre"
 import { isTv } from "@/lib/device"
-import { PagedGrid, SkelRows, Tile, usePlay } from "../ui"
+import { PagedGrid, SkelRows, SourceBar, Tile, usePlay } from "../ui"
 
 /** Genre page, Netflix style: title strip over a poster grid (TMDB-backed, same data as the shared page). Route id = `${kind}|${genre}`. */
 export default function GenrePage({ id }: { id: string }) {
@@ -18,6 +18,7 @@ export default function GenrePage({ id }: { id: string }) {
             {related.map((g) => <button key={g} data-nav onClick={() => openCategory(g)} className="nf-drop">{g}</button>)}
             {available && hasMore && <button data-nav disabled={loading} onClick={() => void more()} className="nf-drop">{loading ? "Searching..." : "Find more"}</button>}
           </div>
+          <SourceBar />
           {!available ? (
             <div className="h-64"><Empty><div className="flex max-w-xl flex-col items-center gap-4 px-6 text-center"><p>Genre pages use TMDB to find popular {genre} titles. Add a free TMDB key to see them.</p><button data-nav data-autofocus="" onClick={() => openSettings()} className="nf-btn nf-play">Open settings</button></div></Empty></div>
           ) : items.length ? (

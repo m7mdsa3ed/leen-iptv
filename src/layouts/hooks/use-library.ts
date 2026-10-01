@@ -4,6 +4,7 @@ import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
 import { useApp, usePData } from "@/lib/store"
 import type { Item, Source } from "@/lib/types"
+import { inSource, useActiveFilter } from "./use-source-filter"
 
 const CAP = 60
 
@@ -20,6 +21,7 @@ export function useLibrary() {
   const status = useCatalog((s) => s.status)
   const byId = useCatalog((s) => s.byId)
   const d = usePData()
+  const filter = useActiveFilter()
   const sources = useApp((s) => s.sources)
   const sourceId = useApp((s) => s.sourceId)
   const setSource = useApp((s) => s.setSource)
@@ -28,10 +30,10 @@ export function useLibrary() {
   const go = useRoute((s) => s.go)
   const open = useOpen()
   const lists = useMemo(() => {
-    const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter(Boolean).slice(0, CAP) as Item[]
+    const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter((x) => x && inSource(x, filter)).slice(0, CAP) as Item[]
     const p = Object.entries(d.progress).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
     return { favorites: get(d.favs), history: get(d.recents), continueWatching: get(p) }
-  }, [d, byId])
+  }, [d, byId, filter])
   return {
     status, ...lists, inProgress: lists.continueWatching,
     pct: (i: Item) => d.progress[i.id] && (d.progress[i.id].pos / d.progress[i.id].dur) * 100,

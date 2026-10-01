@@ -3,6 +3,7 @@ import { Card, Pill, RoundButton } from "@/components/gtv"
 import { Empty, Pending, Shell, VGrid } from "@/components/tv/ui"
 import { Input } from "@/components/ui/input"
 import { useCategory } from "@/layouts/hooks/use-category"
+import { SourceFilter } from "../source-ui"
 import { isTv } from "@/lib/device"
 
 /** Every title of one category, as its own page. Route id = `${kind}|${category}`. */
@@ -23,6 +24,7 @@ export default function CategoryPage({ id }: { id: string }) {
             ))}
             <Input data-nav className="h-11 w-48 rounded-full text-base focus-visible:ring-0 md:w-64 [html[data-mode=mobile]_&]:text-[16px]" type="search" autoComplete="off" placeholder="Filter this category" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
+          <SourceFilter />
           <div className="m-fade min-h-0 flex-1" style={{ "--i": 1 } as React.CSSProperties}>
             {items.length ? <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => open(i)} />} /> : <Empty>Nothing matches</Empty>}
           </div>

@@ -5,6 +5,7 @@ import { useLibrary } from "@/layouts/hooks/use-library"
 import { useRoute } from "@/lib/nav"
 import { cn } from "@/lib/utils"
 import { GRail, useLeft } from "../parts"
+import { SourceFilter } from "../source-ui"
 
 /** Google TV Library: Watchlist, History and Sources as rails. */
 export default function Library() {
@@ -19,6 +20,7 @@ export default function Library() {
   return (
     <Shell page="library" title="Library">
       <div className="no-scrollbar -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)]">
+        <SourceFilter className="mb-2" />
         {status !== "ready" ? <><SkelRail variant="wide" /><SkelRail /></> : (
           <>
             {continueWatching.length > 0 && <GRail title="Continue watching">{continueWatching.map((i) => <Card key={i.id} item={i} variant="wide" pct={pct(i)} sub={left(i)} onOpen={() => open(i)} />)}</GRail>}

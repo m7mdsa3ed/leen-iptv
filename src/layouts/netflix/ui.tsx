@@ -5,6 +5,8 @@ import { useCatalog } from "@/lib/catalog"
 import { useMode } from "@/lib/device"
 import { KEY, useRoute } from "@/lib/nav"
 import { useApp, useProfile } from "@/lib/store"
+import { useSourceFilter } from "../hooks/use-source-filter"
+import { useSourceOf, type SourceMeta } from "@/lib/sources"
 import { cn } from "@/lib/utils"
 import type { Item } from "@/lib/types"
 
@@ -15,6 +17,47 @@ export const rating = (i: Item) => { const r = parseFloat(i.rating ?? ""); retur
 export const match = (i: Item) => Math.min(99, Math.round(rating(i) * 10))
 /** 16:9 tiles when most items have a backdrop, else 2:3 posters. */
 export const variantOf = (l: Item[]): "wide" | "poster" => (l.length && l.slice(0, 5).some((i) => i.backdrop) ? "wide" : "poster")
+
+/** Readable text color on a hex chip. */
+const onColor = (hex: string) => { const n = parseInt(hex.slice(1, 7), 16) || 0; return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150 ? "#111111" : "#ffffff" }
+
+/** Source chip on a tile: label + "+N" when other sources carry the same title. Hidden with one source or when Settings > Sources badges are off. */
+export function SourceBadge({ item }: { item: Item }) {
+  const on = useApp((s) => s.settings.sourceBadges !== false && s.sources.filter((x) => x.enabled !== false).length > 1)
+  const src = useSourceOf(item)
+  if (!on || !src) return null
+  const n = item.alts?.length ?? 0
+  return <span className="nf-src-chip" style={{ background: src.color, color: onColor(src.color) }}>{src.label}{n > 0 ? ` +${n}` : ""}</span>
+}
+
+/** "All | source..." pill bar with colored dots and counts; the active pill gets an underline in its source color. Hidden with one source. */
+export function SourceBar() {
+  const { sources, filter, setFilter, multi } = useSourceFilter()
+  if (!multi) return null
+  const pill = (id: string | null, name: string, color?: string, count?: number) => (
+    <button key={id ?? "all"} data-nav aria-pressed={filter === id} onClick={() => setFilter(id)} className="nf-src-pill" style={filter === id ? { boxShadow: `inset 0 -3px 0 ${color ?? "var(--foreground)"}` } : undefined}>
+      {color && <span aria-hidden className="nf-src-dot" style={{ background: color }} />}{name}{count != null && <span className="text-muted-foreground">{count}</span>}
+    </button>
+  )
+  return <div data-nav-group role="group" aria-label="Source" className="nf-src-bar">{pill(null, "All")}{sources.map((s) => pill(s.id, s.name, s.color, s.count))}</div>
+}
+
+/** "Available on" pills in Detail: pick which source plays. Hidden with one source. */
+export function SourceChooser({ list, selected, onSelect }: { list: { item: Item; source: SourceMeta }[]; selected?: Item; onSelect: (i: Item) => void }) {
+  if (list.length < 2) return null
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-muted-foreground">Available on</span>
+      <div data-nav-group className="nf-src-bar !p-0">
+        {list.map(({ item, source }) => (
+          <button key={item.id} data-nav aria-pressed={item.id === selected?.id} onClick={() => onSelect(item)} className="nf-src-pill" style={item.id === selected?.id ? { boxShadow: `inset 0 -3px 0 ${source.color}` } : undefined}>
+            <span aria-hidden className="nf-src-dot" style={{ background: source.color }} />{source.name}<span className="text-muted-foreground">{source.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 /** Best-rated movies + series of the library. */
 export function useTopRated(n = 10) {
@@ -61,6 +104,7 @@ export function Tile({ item, variant = "wide", pct, sub, fluid, onOpen, onPlay }
           <div className={cn("nf-media", variant === "wide" ? "aspect-video" : "aspect-[2/3]", live && "nf-live")}>
             <Logo item={art} className={cn("size-full", live ? "p-5" : "object-cover")} />
             {(live || noArt) && <div className="nf-cap"><div className="truncate font-semibold">{item.name}</div>{sub ? <div className="truncate text-xs opacity-80">{sub}</div> : null}</div>}
+            <span className="absolute right-1.5 top-1.5"><SourceBadge item={item} /></span>
             {locked && <span className="absolute left-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-black/70"><Lock className="size-3.5 text-white" /></span>}
             {pct ? <div className="absolute inset-x-0 bottom-0 h-1 bg-white/30"><div className="h-full bg-accent-blue" style={{ width: `${Math.min(100, pct)}%` }} /></div> : null}
           </div>

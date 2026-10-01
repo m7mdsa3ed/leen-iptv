@@ -2,6 +2,7 @@ import { Star, Tv } from "lucide-react"
 import { GroupList } from "@/components/tv/groups"
 import { Pill } from "@/components/gtv"
 import { Empty, Logo, Shell, VGrid, Pending, useK } from "@/components/tv/ui"
+import { SourceBadge, SourceFilter } from "../source-ui"
 import { progressPct, useLive } from "@/layouts/hooks/use-live"
 import { useMode } from "@/lib/device"
 import { KEY, useRoute } from "@/lib/nav"
@@ -20,6 +21,7 @@ export default function Live() {
             <span />
             <Pill onClick={() => go("guide")}><Tv />TV guide</Pill>
           </div>
+          <SourceFilter />
           <GroupList kind="live" groups={groups} active={g} onPick={setG} />
           <div className="min-h-0 flex-1">
             {items.length ? (
@@ -32,6 +34,7 @@ export default function Live() {
                         <Logo item={i} className="size-full p-6" />
                         <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-0.5 text-sm text-white">{i.num ?? "•"}</span>
                         {isFav(i) && <span className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-black/60"><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
+                        <SourceBadge item={i} className="absolute bottom-2 right-2" />
                         {n && <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent-blue" style={{ width: `${progressPct(n.s, n.e)}%` }} /></div>}
                       </div>
                       <span data-ring aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit]" />

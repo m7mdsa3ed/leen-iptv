@@ -3,7 +3,7 @@ import { Logo, Shell } from "@/components/tv/ui"
 import { isTv } from "@/lib/device"
 import { useSearch } from "../../hooks/use-search"
 import type { Item } from "@/lib/types"
-import { Grid, Tile, useTopRated, usePlay } from "../ui"
+import { Grid, SourceBar, Tile, useTopRated, usePlay } from "../ui"
 
 /** Search: persistent input on top, results as tile grids by type, "Top Searches" list while empty. */
 export default function Search() {
@@ -22,6 +22,7 @@ export default function Search() {
             {S.q && !isTv && <button type="button" data-nav aria-label="Clear" onClick={() => S.setQ("")} className="nf-hbtn"><X className="size-5" /></button>}
           </label>
         </div>
+        <div className="pt-3"><SourceBar /></div>
         {S.results.length > 0 ? (
           sections.filter(([, l]) => l.length).map(([t, l, v]) => (
             <section key={t} className="mt-4">

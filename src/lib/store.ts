@@ -7,7 +7,7 @@ import type { LayoutId } from "./layouts"
 import type { Profile, Source } from "./types"
 
 type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }> }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; theme: "system" | "dark" | "light"; layout: LayoutId; motion: "full" | "reduced" | "off"; meta?: ProviderCfg[] }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; theme: "system" | "dark" | "light"; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; meta?: ProviderCfg[] }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
 const empty = (): PData => ({ favs: [], recents: [], progress: {} })
@@ -18,6 +18,7 @@ interface S {
   profileId: string | null
   sources: Source[]
   sourceId: string | null
+  sourceFilter: string | null // session only (not persisted); null = All
   data: Record<string, PData>
   settings: Settings
   addProfile: (name: string, pin?: string) => void
@@ -27,6 +28,9 @@ interface S {
   addSource: (s: Omit<Source, "id">) => Source
   removeSource: (id: string) => void
   setSource: (id: string) => void
+  updateSource: (id: string, p: Partial<Omit<Source, "id">>) => void
+  moveSource: (id: string, dir: -1 | 1) => void // priority order
+  setSourceFilter: (id: string | null) => void
   toggleFav: (id: string) => void
   toggleLock: (key: string) => void
   pushRecent: (id: string) => void
@@ -46,8 +50,9 @@ export const useApp = create<S>()(
       profileId: null,
       sources: [],
       sourceId: null,
+      sourceFilter: null,
       data: {},
-      settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, trackHistory: true, theme: "system", layout: "googletv", motion: isTv ? "reduced" : "full" },
+      settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, trackHistory: true, theme: "system", layout: "googletv", motion: isTv ? "reduced" : "full", sourceBadges: true },
       addProfile: (name, pin) =>
         set((s) => ({ profiles: [...s.profiles, { id: uid(), name, pin, color: COLORS[s.profiles.length % COLORS.length], locked: [] }] })),
       updateProfile: (id, p) => set((s) => ({ profiles: s.profiles.map((x) => (x.id === id ? { ...x, ...p } : x)) })),
@@ -57,16 +62,25 @@ export const useApp = create<S>()(
         set({ profileId: id })
       },
       addSource: (src) => {
-        const s = { ...src, id: uid() }
+        const s = { ...src, id: uid(), enabled: src.enabled ?? true }
         set((st) => ({ sources: [...st.sources, s], sourceId: s.id }))
         return s
       },
       removeSource: (id) =>
         set((s) => {
           const sources = s.sources.filter((x) => x.id !== id)
-          return { sources, sourceId: s.sourceId === id ? (sources[0]?.id ?? null) : s.sourceId }
+          return { sources, sourceId: s.sourceId === id ? (sources[0]?.id ?? null) : s.sourceId, sourceFilter: s.sourceFilter === id ? null : s.sourceFilter }
         }),
       setSource: (id) => set({ sourceId: id }),
+      updateSource: (id, p) => set((s) => ({ sources: s.sources.map((x) => (x.id === id ? { ...x, ...p } : x)) })),
+      moveSource: (id, dir) =>
+        set((s) => {
+          const a = [...s.sources], i = a.findIndex((x) => x.id === id), j = i + dir
+          if (i < 0 || j < 0 || j >= a.length) return {}
+          ;[a[i], a[j]] = [a[j], a[i]]
+          return { sources: a }
+        }),
+      setSourceFilter: (id) => set({ sourceFilter: id }),
       toggleFav: (id) => set((s) => upd(s, (d) => ({ ...d, favs: d.favs.includes(id) ? d.favs.filter((x) => x !== id) : [id, ...d.favs] }))),
       toggleLock: (key) =>
         set((s) => ({
@@ -81,7 +95,7 @@ export const useApp = create<S>()(
     {
       name: "iptv-app",
       version: 1,
-      partialize: (s) => ({ ...s, profileId: undefined }), // always re-pick profile on launch
+      partialize: (s) => ({ ...s, profileId: undefined, sourceFilter: undefined }), // always re-pick profile on launch
       // the picked profile survives a refresh (sessionStorage) but a fresh launch asks again
       merge: (saved, cur) => {
         const m = { ...cur, ...(saved as object) } as S
@@ -89,6 +103,7 @@ export const useApp = create<S>()(
         if (!LAYOUT_IDS.includes(m.settings.layout)) m.settings.layout = (m.settings.layout as string) === "cinema" ? "netflix" : "googletv" // renamed / removed layouts
         let id: string | null = null
         try { id = sessionStorage.getItem("iptv-profile") } catch { /* ignore */ }
+        m.sourceFilter = null
         return { ...m, profileId: m.profiles.some((p) => p.id === id) ? id : null }
       },
     },

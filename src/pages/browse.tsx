@@ -1,6 +1,7 @@
 import { ALL, FAV } from "@/components/tv/groups"
 import { Card, Rail, SectionTitle } from "@/components/gtv"
 import { Chips, Empty, Shell, VGrid, Pending } from "@/components/tv/ui"
+import { SourceFilter } from "@/components/source/SourceFilter"
 import { useBrowse } from "@/layouts/hooks/use-browse"
 import { useMode } from "@/lib/device"
 import { KEY } from "@/lib/nav"
@@ -15,6 +16,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
     <Shell page={page} title={kindLabel}>
       {status !== "ready" ? <Pending /> : (
         <div className="flex h-full flex-col">
+          <SourceFilter />
           <Chips items={[ALL, FAV, ...groups]} active={g} onPick={(c) => (c === ALL || c === FAV ? setG(c) : openCategory(c))} locked={isLocked}
             onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
             onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />

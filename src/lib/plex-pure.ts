@@ -21,6 +21,16 @@ export function buildUrl(base: string, path: string, params: Record<string, stri
   return base.replace(/\/+$/, "") + path + (q.length ? "?" + q.join("&") : "")
 }
 
+export type ConnMode = "auto" | "norelay" | "local"
+/** Which addresses a mode allows: local = LAN only (nothing leaves the network), norelay = LAN + direct remote, auto = all. */
+export const allowedConns = (conns: Conn[], mode: ConnMode = "auto"): Conn[] =>
+  conns.filter((c) => (mode === "local" ? !!c.local && !c.relay : mode === "norelay" ? !c.relay : true))
+/** Human label of the address in use: Local / Remote / Relay (or Custom when it is not one of plex.tv's). */
+export const connKind = (conns: Conn[] | undefined, uri: string | undefined): "Local" | "Remote" | "Relay" | "Custom" => {
+  const c = conns?.find((x) => x.uri.replace(/\/+$/, "") === (uri ?? "").replace(/\/+$/, ""))
+  return !c ? "Custom" : c.relay ? "Relay" : c.local ? "Local" : "Remote"
+}
+
 /** Connection test order: direct before relay, local first (TV/LAN), https before http. */
 export function sortConns(conns: Conn[]): Conn[] {
   const rank = (c: Conn) => (c.relay ? 4 : 0) + (c.local ? 0 : 2) + (c.protocol === "https" || c.uri.startsWith("https:") ? 0 : 1)

@@ -1,15 +1,15 @@
 import { useMemo } from "react"
 import { Search as SearchIcon, X } from "lucide-react"
 import { Empty, Shell } from "@/components/tv/ui"
-import { useCatalog } from "@/lib/catalog"
+import { useCatalogView } from "../../hooks/use-source-filter"
 import { isTv } from "@/lib/device"
 import { useSearch } from "../../hooks/use-search"
-import { Shelf, Tile } from "../ui"
+import { Shelf, SourceFilter, Tile } from "../ui"
 
 /** Search: big centred field, results as shelves by type; "Top Searches" (best rated titles) while empty. */
 export default function Search() {
   const S = useSearch()
-  const byKind = useCatalog((s) => s.byKind)
+  const { byKind } = useCatalogView()
   const top = useMemo(() => [...byKind.movie, ...byKind.series].filter((i) => parseFloat(i.rating ?? "") > 0).sort((a, b) => parseFloat(b.rating!) - parseFloat(a.rating!)).slice(0, 10), [byKind])
   return (
     <Shell page="search" title="Search">
@@ -21,6 +21,7 @@ export default function Search() {
             className="atv-search h-14 w-full rounded-full pl-16 pr-14 text-xl text-foreground outline-none placeholder:text-muted-foreground md:h-16 md:text-2xl [html[data-mode=mobile]_&]:text-[16px] [&::-webkit-search-cancel-button]:appearance-none" />
           {S.q && !isTv && <button aria-label="Clear" onClick={() => S.setQ("")} className="absolute inset-y-0 right-0 flex w-14 items-center justify-center text-muted-foreground hover:text-foreground"><X className="size-5" /></button>}
         </div>
+        <SourceFilter className="mx-auto max-w-full" />
         <div className="min-h-0 flex-1">
           {S.results.length ? (
             <div data-nav-group className="atv-scroll !mt-0 !h-full overflow-y-auto">

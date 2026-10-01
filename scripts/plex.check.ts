@@ -1,6 +1,6 @@
 // node scripts/plex.check.ts
 import assert from "node:assert/strict"
-import { buildUrl, mapDetail, mapMeta, photoUrl, sortConns } from "../src/lib/plex-pure.ts"
+import { buildUrl, mapDetail, mapMeta, photoUrl, sortConns, allowedConns, connKind } from "../src/lib/plex-pure.ts"
 
 assert.equal(buildUrl("http://h:32400/", "/library/sections", { a: "x y" }, "T"), "http://h:32400/library/sections?a=x%20y&X-Plex-Token=T")
 assert.equal(buildUrl("http://h", "/identity"), "http://h/identity")
@@ -28,4 +28,18 @@ const d = mapDetail({ summary: "p", year: 1995, duration: 7200000, Genre: [{ tag
 assert.deepEqual(d.meta.ratings.map((r) => r.source), ["IMDb", "Rotten Tomatoes"])
 assert.equal(d.meta.cast[0].photo, "IMG200x200/p")
 assert.equal(d.info.duration, "2h 0m")
+// connection modes: local = LAN only, norelay = no relay, auto = everything
+const conns = [
+  { uri: "https://1-2-3-4.abc.plex.direct:32400", local: false, relay: false, protocol: "https" },
+  { uri: "http://192.168.1.5:32400", local: true, relay: false, protocol: "http" },
+  { uri: "https://relay.plex.direct:8443", local: false, relay: true, protocol: "https" },
+]
+assert.equal(allowedConns(conns, "auto").length, 3)
+assert.deepEqual(allowedConns(conns, "norelay").map((c) => c.uri), [conns[0].uri, conns[1].uri])
+assert.deepEqual(allowedConns(conns, "local").map((c) => c.uri), [conns[1].uri])
+assert.equal(sortConns(allowedConns(conns, "auto"))[0].uri, conns[1].uri) // local first
+assert.equal(sortConns(allowedConns(conns, "auto"))[2].uri, conns[2].uri) // relay last
+assert.equal(connKind(conns, "http://192.168.1.5:32400/"), "Local")
+assert.equal(connKind(conns, conns[2].uri), "Relay")
+assert.equal(connKind(conns, "http://elsewhere:1"), "Custom")
 console.log("plex ok")

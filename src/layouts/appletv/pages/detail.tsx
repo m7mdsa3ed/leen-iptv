@@ -3,7 +3,7 @@ import { Play } from "lucide-react"
 import { SkelBar } from "@/components/gtv"
 import { isTv } from "@/lib/device"
 import { useDetail } from "../../hooks/use-detail"
-import { Capsule, Circle, PersonTile, Shelf, Tile, UpNextButton } from "../ui"
+import { Capsule, Circle, PersonTile, Shelf, SourceChooser, Tile, UpNextButton } from "../ui"
 
 const Col = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="min-w-0"><h3 className="mb-2 text-base font-semibold text-foreground">{title}</h3><div className="space-y-1.5 text-base text-muted-foreground">{children}</div></div>
@@ -29,6 +29,7 @@ export default function Detail({ id }: { id: string }) {
             <Capsule primary data-autofocus="" onClick={D.playMain} disabled={!D.canPlay}><Play className="fill-current" />{D.resumeLabel}</Capsule>
             <UpNextButton on={D.fav} onClick={D.toggleFav} />
           </div>
+          <SourceChooser options={D.alternatives} selectedId={D.selected?.id} onPick={D.selectSource} />
           {plot ? <p className="line-clamp-4 max-w-2xl text-lg text-[var(--fg-80)]">{plot}</p> : loading ? (
             <div role="status" aria-label="Loading details" className="max-w-2xl space-y-3"><SkelBar className="w-full" /><SkelBar className="w-11/12" /><SkelBar className="w-2/3" /></div>
           ) : null}

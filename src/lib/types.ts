@@ -18,6 +18,9 @@ export interface Item {
   backdrop?: string
   resume?: number // seconds watched on the server (Plex)
   dur?: number // seconds
+  srcId?: string // source id (also item.id.split("|")[0])
+  origGroup?: string // category name in its own source when merged under another display name
+  alts?: Item[] // same title from lower-priority sources (movie/series primary only)
 }
 
 export interface Source {
@@ -31,6 +34,11 @@ export interface Source {
   pass?: string
   token?: string // Plex server access token (server = chosen connection URI)
   serverId?: string // Plex machine identifier
+  conns?: { uri: string; local?: boolean; relay?: boolean; protocol?: string }[] // every address plex.tv gave for this server
+  connMode?: "auto" | "norelay" | "local" // which of those addresses may be used (default auto)
+  enabled?: boolean // default true
+  color?: string // hex; default per type
+  label?: string // short chip text; default per type
 }
 
 export interface Profile {

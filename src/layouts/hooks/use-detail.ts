@@ -3,7 +3,9 @@ import { useMeta, useSimilar } from "@/lib/meta"
 import { explain } from "@/lib/net"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
-import { useApp, usePData, useSource } from "@/lib/store"
+import { useApp, usePData } from "@/lib/store"
+import { withMeta, type SourceMeta } from "@/lib/sources"
+import { srcOfId } from "@/lib/merge-pure"
 import { useOpen } from "@/components/tv/ui"
 import type { Meta } from "@/lib/meta/types"
 import type { Episode, Item } from "@/lib/types"
@@ -18,7 +20,8 @@ export type DetailRating = { source: string; value: string; votes?: string }
 /**
  * Everything a Detail page needs; overrides only render.
  * Returns {
- *  item (undefined = not in catalog), isSeries, meta (merged TMDB/OMDb/Xtream or null), loading (metadata still loading), error,
+ *  item (undefined = not in catalog; the item of the route id, used for favorites), selected (the Item that plays / whose info is shown; = item until selectSource),
+ *  alternatives: { item, source }[] (primary + alts, priority order; one entry = only one source), selectSource(item) (switch source: reloads its info/episodes), isSeries, meta (merged TMDB/OMDb/Xtream or null), loading (metadata still loading), error,
  *  plot, chips (year/runtime strings), genres (<=4), ratings, poster (Item whose logo falls back to meta poster), backdrop (url|undefined),
  *  cast (meta.cast), directors, castText (raw Xtream cast string),
  *  episodes, seasons (numbers), season (selected, null = none), setSeason, shown (episodes of the season),
@@ -29,7 +32,21 @@ export type DetailRating = { source: string; value: string; votes?: string }
  */
 export function useDetail(id: string) {
   const item = useCatalog((s) => s.byId.get(id))
-  const src = useSource()
+  const primary = useCatalog((s) => s.primaryOf.get(id)) ?? item // the deduped card (carries alts)
+  const sources = useApp((s) => s.sources)
+  const [pickId, setPickId] = useState<string | undefined>()
+  useEffect(() => setPickId(undefined), [id])
+  const alternatives = useMemo(() => {
+    const out: { item: Item; source: SourceMeta }[] = []
+    for (const i of primary ? [primary, ...(primary.alts ?? [])] : []) {
+      const s = sources.find((x) => x.id === srcOfId(i.id))
+      if (s) out.push({ item: i, source: withMeta(s) })
+    }
+    return out
+  }, [primary, sources])
+  const selected = alternatives.find((a) => a.item.id === pickId)?.item ?? item
+  const src = selected && sources.find((x) => x.id === srcOfId(selected.id))
+  const selId = selected?.id
   const proxy = useApp((s) => s.settings.proxy)
   const toggleFavStore = useApp((s) => s.toggleFav)
   const d = usePData()
@@ -44,20 +61,20 @@ export function useDetail(id: string) {
   const open = useOpen()
 
   useEffect(() => {
-    if (!item) return
-    setBase(undefined)
-    if (!src || src.type === "m3u" || !item.sid) return setLoaded(true)
+    if (!selected) return
+    setBase(undefined); setInfo({}); setEps([]); setSeason(null); setErr("")
+    if (!src || src.type === "m3u" || !selected.sid) return setLoaded(true)
     let live = true
     const run = src.type === "plex"
-      ? plexDetail(src, proxy, item).then((r) => { if (live) { setInfo(r.info as Info); setBase(r.meta); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
-      : item.kind === "series"
-      ? seriesInfo(src, proxy, item).then((r) => { if (live) { setInfo(r.info); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
-      : vodInfo(src, proxy, item.sid).then((r) => live && setInfo(r))
+      ? plexDetail(src, proxy, selected).then((r) => { if (live) { setInfo(r.info as Info); setBase(r.meta); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
+      : selected.kind === "series"
+      ? seriesInfo(src, proxy, selected).then((r) => { if (live) { setInfo(r.info); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
+      : vodInfo(src, proxy, selected.sid).then((r) => live && setInfo(r))
     run.catch((e) => live && setErr(explain(e))).finally(() => live && setLoaded(true))
     return () => { live = false }
-  }, [item, src, proxy])
+  }, [selId, src, proxy]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { meta, loading } = useMeta(item, info, loaded, base)
+  const { meta, loading } = useMeta(selected, info, loaded, base)
   const similar = useSimilar(item, meta)
   const seasons = useMemo(() => [...new Set(episodes.map((e) => e.season))], [episodes])
   const isSeries = item?.kind === "series"
@@ -70,18 +87,18 @@ export function useDetail(id: string) {
     const last = episodes.map((e, i) => [i, progress(e.item)?.t ?? 0] as const).sort((a, b) => b[1] - a[1])[0]
     return last && last[1] ? Math.min(episodes.length - 1, last[0] + (watched(episodes[last[0]].item) ? 1 : 0)) : 0
   })()
-  const play = (queue: Episode[] | null, i: number) => item && go("player", { queue: queue ? queue.map((e) => e.item) : [item], index: i })
+  const play = (queue: Episode[] | null, i: number) => selected && go("player", { queue: queue ? queue.map((e) => e.item) : [selected], index: i })
   const text = (k: string) => (info[k] ? String(info[k]) : "")
   const plot = meta?.plot || text("plot") || text("description") || item?.plot
   const chips = [meta?.year || text("releasedate").slice(0, 4) || text("releaseDate").slice(0, 4) || text("year"), meta?.runtime || text("duration")].filter(Boolean) as string[]
   const genres = (meta?.genres.length ? meta.genres : text("genre").split(/\s*[,/]\s*/)).filter(Boolean).slice(0, 4)
   const ratings: DetailRating[] = meta?.ratings.length ? meta.ratings : [text("rating") || item?.rating].filter(Boolean).map((v) => ({ source: "Rating", value: String(v), votes: undefined }))
   const poster = item && (item.logo ? item : ({ ...item, logo: meta?.poster } as Item))
-  const p = item && progress(item)
+  const p = selected && progress(selected)
   const hasProgress = isSeries ? episodes.some((e) => progress(e.item)) : !!p && p.pos > 30
 
   return {
-    item, isSeries, meta, loading, error, plot, chips, genres, ratings, poster, backdrop: meta?.backdrop || item?.logo,
+    item, selected, alternatives, selectSource: (i: Item) => setPickId(i.id), isSeries, meta, loading, error, plot, chips, genres, ratings, poster, backdrop: meta?.backdrop || item?.logo,
     cast: meta?.cast ?? [], directors: meta?.directors ?? [], castText: text("cast"),
     episodes, seasons, season, setSeason, shown: episodes.filter((e) => e.season === season),
     progress, pct, watched,

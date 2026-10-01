@@ -1,6 +1,7 @@
 import { ArrowLeft, Play, Star } from "lucide-react"
 import { Chips, Logo } from "@/components/tv/ui"
 import { Card, Pill, Rail, RoundButton, SkelBar } from "@/components/gtv"
+import { SourceChooser } from "@/components/source/SourceChooser"
 import { isTv } from "@/lib/device"
 import { useDetail } from "@/layouts/hooks/use-detail"
 
@@ -20,6 +21,7 @@ export default function Detail({ id }: { id: string }) {
           <Logo item={poster!} className="aspect-[2/3] w-36 shrink-0 self-start rounded-2xl object-cover shadow-2xl md:w-64" />
           <div className="min-w-0 md:flex-1">
             <h1 className="text-3xl font-medium tracking-tight text-foreground md:text-5xl">{item.name}</h1>
+            <SourceChooser className="mt-4" alternatives={D.alternatives} selected={D.selected} onSelect={D.selectSource} />
             {(chips.length > 0 || ratings.length > 0 || genreList.length > 0) && (
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {item.group && <button data-nav onClick={() => D.openCategory()} className="rounded-full bg-accent-blue-container px-3 py-1 text-sm text-foreground">{item.group}</button>}

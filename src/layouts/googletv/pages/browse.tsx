@@ -1,7 +1,8 @@
 import { useMemo } from "react"
 import { ALL, FAV } from "@/components/tv/groups"
-import { Card } from "@/components/gtv"
 import { Chips, Empty, Shell, VGrid, Pending } from "@/components/tv/ui"
+import { Card } from "@/components/gtv"
+import { SourceFilter } from "../source-ui"
 import { useBrowse } from "@/layouts/hooks/use-browse"
 import { useMode } from "@/lib/device"
 import { KEY } from "@/lib/nav"
@@ -16,6 +17,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
     <Shell page={page} title={kindLabel}>
       {status !== "ready" ? <Pending shape="grid" /> : (
         <div className="flex h-full flex-col">
+          <SourceFilter />
           {/* one pill row: All, Favorites, genres (open the TMDB genre page), then categories (filter in place; locked ones go through their PIN-gated page) */}
           <Chips items={[ALL, FAV, ...genres.filter((x) => !groups.includes(x)), ...groups]} active={g} locked={isLocked}
             onPick={(c) => (c === ALL || c === FAV || (groups.includes(c) && !isLocked(c)) ? setG(c) : groups.includes(c) ? openCategory(c) : openGenre(c))}

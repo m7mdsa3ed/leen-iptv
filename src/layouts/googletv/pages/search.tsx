@@ -1,11 +1,12 @@
 import { Search as SearchIcon, X } from "lucide-react"
-import { Card } from "@/components/gtv"
 import { Empty, Shell } from "@/components/tv/ui"
 import { isTv } from "@/lib/device"
 import { useCatalog } from "@/lib/catalog"
 import { useLibrary } from "@/layouts/hooks/use-library"
 import { useSearch } from "@/layouts/hooks/use-search"
 import { GRail } from "../parts"
+import { Card } from "@/components/gtv"
+import { SourceFilter } from "../source-ui"
 
 /** Google TV Search: pill field on top, results as rails by type; recent titles when empty. */
 export default function Search() {
@@ -20,6 +21,7 @@ export default function Search() {
           <input data-nav autoFocus={!isTv} className="h-14 w-full rounded-full bg-surface-2 pl-14 pr-14 text-xl text-foreground outline-none placeholder:text-muted-foreground [html[data-mode=mobile]_&]:text-[16px] [&::-webkit-search-cancel-button]:appearance-none" type="search" enterKeyHint="search" autoComplete="off" placeholder={isTv ? "Search (press OK to type)" : "Search movies, shows and channels"} value={q} onChange={(e) => setQ(e.target.value)} />
           {q && !isTv ? <button aria-label="Clear" onClick={() => setQ("")} className="absolute inset-y-0 right-0 flex w-14 items-center justify-center text-muted-foreground hover:text-foreground"><X className="size-5" /></button> : null}
         </div>
+        <SourceFilter className="-mt-2" />
         <div className="min-h-0 flex-1">
           <div className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] no-scrollbar">
             {res.length ? (

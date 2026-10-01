@@ -5,7 +5,7 @@ import { useMode } from "@/lib/device"
 import { KEY } from "@/lib/nav"
 import { useApp } from "@/lib/store"
 import type { Item, Kind } from "@/lib/types"
-import { Hero, Shelf, Tile } from "../ui"
+import { Hero, Shelf, SourceFilter, Tile } from "../ui"
 
 const hue = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7)
 
@@ -28,6 +28,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
             ? <Hero picks={picks} tall={false} onPlay={B.open} isFav={B.isFav} onFav={(i) => toggleFav(i.id)} />
             : <h1 className="atv-h1 pb-2 pt-[calc(var(--hdr)+1rem)] text-[2.5rem]">{B.kindLabel}</h1>}
           <div className="atv-after-hero">
+            <SourceFilter className="-mt-2 mb-2" />
             {B.rails.length ? (
               <>
                 {top.length > 0 && <Shelf title={`Top ${B.kindLabel}`}>{top.map(tile)}</Shelf>}

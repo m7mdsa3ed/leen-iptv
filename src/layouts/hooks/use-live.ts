@@ -4,6 +4,7 @@ import { useOpen } from "@/components/tv/ui"
 import { nowNext, useCatalog } from "@/lib/catalog"
 import { useApp, usePData } from "@/lib/store"
 import type { Item } from "@/lib/types"
+import { useCatalogView } from "./use-source-filter"
 
 export { ALL, FAV }
 /** Percent of a programme elapsed. */
@@ -18,7 +19,8 @@ export const progressPct = (s: number, e: number) => Math.max(0, Math.min(100, (
  * }
  */
 export function useLive() {
-  const { byKind, groups, status, epg } = useCatalog()
+  const { status, epg } = useCatalog()
+  const { byKind, groups } = useCatalogView()
   const d = usePData()
   const toggleFav = useApp((s) => s.toggleFav)
   const open = useOpen()

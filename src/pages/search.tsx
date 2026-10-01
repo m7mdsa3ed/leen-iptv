@@ -1,5 +1,6 @@
 import { Search as SearchIcon, X } from "lucide-react"
 import { Card, Rail } from "@/components/gtv"
+import { SourceFilter } from "@/components/source/SourceFilter"
 import { Empty, Shell } from "@/components/tv/ui"
 import { isTv } from "@/lib/device"
 import { useSearch } from "@/layouts/hooks/use-search"
@@ -14,6 +15,7 @@ export default function Search() {
           <input data-nav autoFocus={!isTv} className="h-12 w-full rounded-full bg-surface-2 pl-14 pr-12 text-base text-foreground outline-none placeholder:text-muted-foreground md:h-14 md:text-xl [html[data-mode=mobile]_&]:text-[16px] [&::-webkit-search-cancel-button]:appearance-none" type="search" enterKeyHint="search" autoComplete="off" placeholder={isTv ? "Search channels, movies, series (press OK to type)" : "Search channels, movies, series"} value={q} onChange={(e) => setQ(e.target.value)} />
           {q && !isTv && <button aria-label="Clear" onClick={() => setQ("")} className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-muted-foreground hover:text-foreground"><X className="size-5" /></button>}
         </div>
+        <SourceFilter className="-mt-2" />
         <div className="min-h-0 flex-1">
           {res.length ? (
             <div className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] no-scrollbar">

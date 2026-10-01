@@ -3,15 +3,15 @@ import { Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Empty, Shell } from "@/components/tv/ui"
 import { SkelGrid } from "@/components/gtv"
-import { useCatalog } from "@/lib/catalog"
+import { useCatalogView } from "../../hooks/use-source-filter"
 import { useLibrary } from "../../hooks/use-library"
 import type { Item } from "@/lib/types"
-import { Capsule, Tile } from "../ui"
+import { Capsule, SourceFilter, Tile } from "../ui"
 
 /** Library: split screen. Left = collections, right = what is in the focused one (poster grid, or the source list). */
 export default function Library() {
   const L = useLibrary()
-  const byKind = useCatalog((s) => s.byKind)
+  const { byKind } = useCatalogView()
   const [sel, setSel] = useState("")
   const cols = useMemo(() => {
     // ponytail: the catalog has no "added" date; newest = last in provider order
@@ -46,6 +46,7 @@ export default function Library() {
         </nav>
         <section aria-label={cur.name} className="no-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto pt-2 md:-mr-[var(--gx)] md:pr-[var(--gx)]">
           <h2 className="atv-shelf-title mb-2 px-1">{cur.name}</h2>
+          {cur.name !== "Sources" && <SourceFilter className="mb-1" />}
           {L.status !== "ready" ? <SkelGrid /> : cur.name === "Sources" ? (
             <div className="flex max-w-2xl flex-col gap-3 px-3 py-1">
               {L.sources.map((s) => (

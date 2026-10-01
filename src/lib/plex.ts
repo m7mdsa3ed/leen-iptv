@@ -4,7 +4,7 @@
 import type { Episode, Item, Source } from "./types"
 import { mixed, plexFetch, px } from "./net"
 import { useApp } from "./store"
-import { buildUrl, identity, mapDetail, mapMeta, photoUrl, sortConns, type Conn } from "./plex-pure"
+import { allowedConns, buildUrl, connKind, identity, mapDetail, mapMeta, photoUrl, sortConns, type Conn, type ConnMode } from "./plex-pure"
 
 export { sortConns }
 export type PlexServer = { name: string; id: string; token: string; owned: boolean; connections: Conn[] }
@@ -60,15 +60,45 @@ export async function plexServers(token: string): Promise<PlexServer[]> {
     .map((r) => ({ name: String(r.name), id: String(r.clientIdentifier), token: String(r.accessToken || token), owned: !!r.owned, connections: (r.connections ?? []) as Conn[] }))
 }
 
-/** First reachable connection URI in priority order (GET /identity, 5s each). */
-export async function pickConnection(s: PlexServer): Promise<string> {
-  for (const c of sortConns(s.connections)) {
+const reach = async (uri: string, token: string, ms = 5000) => {
+  await plexFetch(plexUrl(uri, "/identity", {}, token), proxy(), { headers: JSON_H }, ms)
+  return uri.replace(/\/+$/, "")
+}
+const noRoute = (name: string, mode: ConnMode) =>
+  mode === "local" ? `"${name}" isn't reachable on your local network. Connect to the same network, or switch the connection mode in Settings > Sources.`
+  : mode === "norelay" ? `Couldn't reach "${name}" without Plex's relay. Check that the server is online and remote access is on.`
+  : `Couldn't reach "${name}" on any of its addresses. Check that the server is online and remote access is on.`
+
+/** First reachable address the mode allows, in priority order (GET /identity, 5s each). */
+export async function pickConnection(s: PlexServer, mode: ConnMode = "auto"): Promise<string> {
+  for (const c of sortConns(allowedConns(s.connections, mode))) {
+    try { return await reach(c.uri, s.token) } catch { /* next */ }
+  }
+  throw new Error(noRoute(s.name, mode))
+}
+
+/** Make sure the source's address works: saved one first, then the other addresses the mode allows; the winner is saved. Returns the source to use. */
+export async function ensureConnection(s: Source, force = false): Promise<Source> {
+  const mode = s.connMode ?? "auto"
+  const conns = s.conns ?? []
+  const cur = (s.server ?? "").replace(/\/+$/, "")
+  const allowedNow = !conns.length || allowedConns(conns, mode).some((c) => c.uri.replace(/\/+$/, "") === cur)
+  if (allowedNow && !force) { try { await reach(cur, s.token ?? "", 4000); return s } catch { if (!conns.length) return s /* manual source: nothing else to try */ } }
+  if (!conns.length) return s
+  for (const c of sortConns(allowedConns(conns, mode))) {
     try {
-      await plexFetch(plexUrl(c.uri, "/identity", {}, s.token), proxy(), { headers: JSON_H }, 5000)
-      return c.uri.replace(/\/+$/, "")
+      const uri = await reach(c.uri, s.token ?? "")
+      if (uri !== cur) useApp.getState().updateSource(s.id, { server: uri })
+      return { ...s, server: uri }
     } catch { /* next */ }
   }
-  throw new Error(`Couldn't reach "${s.name}" on any of its addresses. Check that the server is online and remote access is on.`)
+  throw new Error(noRoute(s.name, mode))
+}
+
+/** Settings > Sources "Re-test connection": pick again from scratch under the current mode. */
+export async function retestPlex(s: Source): Promise<"Local" | "Remote" | "Relay" | "Custom"> {
+  const r = await ensureConnection(s, true)
+  return connKind(s.conns, r.server)
 }
 
 /* ---------- requests against the chosen server ---------- */
@@ -88,7 +118,8 @@ export function plexImg(s: Source, path: string, w: number, h: number): string {
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 type Container = { MediaContainer?: { totalSize?: number; size?: number; Directory?: J[]; Metadata?: J[] } }
 
-export async function loadPlex(s: Source, px_: string, step: (m: string) => void): Promise<Item[]> {
+export async function loadPlex(src: Source, px_: string, step: (m: string) => void): Promise<Item[]> {
+  const s = await ensureConnection(src) // home -> away (or back): move to whichever allowed address answers
   const secs = ((await get<Container>(s, px_, "/library/sections")).MediaContainer?.Directory ?? []).filter((d) => d.type === "movie" || d.type === "show")
   const out: Item[] = []
   const img = (p: string, w: number, h: number) => plexImg(s, p, w, h)

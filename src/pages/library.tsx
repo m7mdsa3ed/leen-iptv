@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react"
 import { Card, Pill, Rail, SkelRail } from "@/components/gtv"
+import { SourceFilter } from "@/components/source/SourceFilter"
 import { Empty, Shell } from "@/components/tv/ui"
 import { useLibrary } from "@/layouts/hooks/use-library"
 
@@ -11,6 +12,7 @@ export default function Library() {
   return (
     <Shell page="library" title="Library">
       <div className="no-scrollbar -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)]">
+        <SourceFilter className="pt-2" />
         {status !== "ready" ? <><SkelRail variant="wide" /><SkelRail /></> : (
           <>
             {continueWatching.length > 0 && <Rail title="Continue watching">{continueWatching.map((i) => <Card key={i.id} item={i} variant="wide" pct={pct(i)} onOpen={() => open(i)} />)}</Rail>}

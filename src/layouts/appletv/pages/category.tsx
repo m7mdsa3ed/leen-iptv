@@ -1,6 +1,6 @@
 import { Empty, Pending, Shell } from "@/components/tv/ui"
 import { useCategory } from "../../hooks/use-category"
-import { Capsule, Tile } from "../ui"
+import { Capsule, SourceFilter, Tile } from "../ui"
 
 /** One category: big title, sort capsules, then a poster grid. */
 export default function Category({ id }: { id: string }) {
@@ -14,6 +14,7 @@ export default function Category({ id }: { id: string }) {
             <span className="text-lg text-muted-foreground">{all.length} titles</span>
             {sorts.map(([s, label]) => <Capsule key={s} primary={sort === s} className="!min-h-11 !px-6 !text-base" onClick={() => setSort(s)}>{label}</Capsule>)}
           </div>
+          <SourceFilter className="mt-2" />
           {items.length
             ? <div className="atv-grid pt-4">{items.slice(0, 150).map((i) => <Tile key={i.id} item={i} shape="poster" size="fluid" pct={pct(i)} always onOpen={() => open(i)} />)}</div>
             : <div className="h-48"><Empty>Nothing matches</Empty></div>}

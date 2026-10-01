@@ -5,6 +5,7 @@ import { Card, Pill, RoundButton, SkelBar } from "@/components/gtv"
 import { isTv } from "@/lib/device"
 import { useDetail } from "@/layouts/hooks/use-detail"
 import { GRail } from "../parts"
+import { SourceBadge, SourceChooser } from "../source-ui"
 
 const chip = "rounded-full bg-surface-2 px-3 py-1 text-sm text-foreground/80"
 
@@ -29,12 +30,14 @@ export default function Detail({ id }: { id: string }) {
           <div className="min-w-0 md:flex-1">
             <h1 className="text-4xl font-medium tracking-tight md:text-5xl">{item.name}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              {item && <SourceBadge item={D.selected ?? item} className="text-sm" />}
               {chips.map((m) => <span key={m} className="text-base text-foreground/80">{m}</span>)}
               {ratings.map((r) => <span key={r.source} className="rounded-md border border-foreground/40 px-2 py-0.5 text-sm">{r.source} <b>{r.value}</b></span>)}
               {D.genres.map((g) => <button key={g} data-nav onClick={() => D.openGenre(g)} className={chip}>{g}</button>)}
             </div>
             {plot && <p className="mt-4 line-clamp-4 max-w-2xl text-base text-foreground/80 md:text-lg">{plot}</p>}
             {loading && !plot && <div role="status" aria-label="Loading details" className="mt-4 max-w-2xl space-y-3"><SkelBar className="w-full" /><SkelBar className="w-2/3" /></div>}
+            <SourceChooser alternatives={D.alternatives} selected={D.selected} onSelect={D.selectSource} />
             {D.error && <p className="mt-3 text-destructive">{D.error}</p>}
             <div className="-ml-1 mt-6 flex flex-wrap items-center gap-3 p-1">
               <Pill variant="primary" data-autofocus="" onClick={D.playMain} disabled={!D.canPlay}><Play className="fill-current" />{left ? `Resume · ${left} min left` : D.resumeLabel === "Play" ? "Watch" : "Resume"}</Pill>

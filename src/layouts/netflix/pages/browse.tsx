@@ -4,7 +4,7 @@ import { ALL, FAV, useBrowse } from "../../hooks/use-browse"
 import { useMode } from "@/lib/device"
 import { KEY } from "@/lib/nav"
 import type { Kind } from "@/lib/types"
-import { Dropdown, DropLabel, PagedGrid, Pick, Row, SkelRows, Tile, usePlay, variantOf } from "../ui"
+import { Dropdown, DropLabel, PagedGrid, Pick, Row, SkelRows, SourceBar, Tile, usePlay, variantOf } from "../ui"
 
 /** Shows / Movies: title + Genres dropdown strip, then rows by category exactly like Home (My List grid when Favorites is picked). */
 export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
@@ -43,6 +43,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
               )}
             </Dropdown>
           </div>
+          <SourceBar />
           {B.g === ALL ? (
             B.rails.length ? B.rails.map(([c, a]) => (
               <Row key={c} title={c} onSeeAll={() => B.openCategory(c)}>{a.map((i) => tile(i, variantOf(a)))}</Row>

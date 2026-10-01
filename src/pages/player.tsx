@@ -7,7 +7,8 @@ import { hm, nowNext, useCatalog } from "@/lib/catalog"
 import { isTv } from "@/lib/device"
 import { CORS_HINT, mixed, px, pxStream, statusMsg } from "@/lib/net"
 import { KEY, navState, useRoute } from "@/lib/nav"
-import { useApp, useSource } from "@/lib/store"
+import { useApp } from "@/lib/store"
+import { useSourceOf } from "@/lib/sources"
 import type { Item } from "@/lib/types"
 import { rate, type Quality } from "@/lib/quality"
 import { plexScrobble, plexStopTranscode, plexStreamUrl, plexTimeline } from "@/lib/plex"
@@ -22,7 +23,6 @@ const mmss = (s: number) => { s = Math.max(0, Math.floor(s)); const h = Math.flo
 
 export default function Player({ queue, index }: { queue: Item[]; index: number }) {
   const back = useRoute((s) => s.back)
-  const src = useSource()
   const { settings, toggleFav, pushRecent, setProgress } = useApp()
   const epg = useCatalog((s) => s.epg)
   const favs = useApp((s) => (s.profileId && s.data[s.profileId]?.favs) || NONE)
@@ -45,6 +45,7 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   const [viaHls, setViaHls] = useState("") // url whose native playback failed: some servers 302 a .mp4 to an HLS playlist
   const item = queue[idx]
   const live = item.kind === "live"
+  const src = useSourceOf(item) // the item's own source (multi-source)
   const hideT = useRef(0)
   const bannerT = useRef(0)
   const numT = useRef(0)

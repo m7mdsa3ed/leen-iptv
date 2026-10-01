@@ -1,5 +1,7 @@
 import { Star } from "lucide-react"
 import { GroupList } from "@/components/tv/groups"
+import { SourceFilter } from "@/components/source/SourceFilter"
+import { SourceBadge } from "@/components/source/SourceBadge"
 import { Empty, Logo, Shell, VGrid, Pending, useK } from "@/components/tv/ui"
 import { hm } from "@/lib/catalog"
 import { progressPct as pct, useLive } from "@/layouts/hooks/use-live"
@@ -16,13 +18,14 @@ export default function Live() {
     <Shell page="live" title="Live TV">
       {status !== "ready" ? <Pending shape="grid" /> : (
         <div className="flex h-full flex-col gap-3">
+          <SourceFilter />
           <GroupList kind="live" groups={groups} active={g} onPick={setG} />
           <div className="flex min-h-[5.5rem] shrink-0 items-center gap-4 rounded-3xl bg-surface p-3 pr-5">
             {sel ? (
               <>
                 <Logo item={sel} className="size-16 shrink-0 rounded-2xl" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xl font-medium"><span className="mr-2 text-muted-foreground">{sel.num}</span>{sel.name}</div>
+                  <div className="truncate text-xl font-medium"><span className="mr-2 text-muted-foreground">{sel.num}</span>{sel.name}<SourceBadge item={sel} className="ml-2 align-middle" /></div>
                   {now ? (
                     <>
                       <div className="truncate text-base">{now.t} <span className="text-muted-foreground">{hm(now.s)} - {hm(now.e)}{next ? ` · Next ${hm(next.s)} ${next.t}` : ""}</span></div>
@@ -45,7 +48,7 @@ export default function Live() {
                     <Logo item={i} className="aspect-video h-full shrink-0 rounded-xl bg-surface-3" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-muted-foreground">{i.num}</span>
-                      <span className="block truncate text-base font-medium">{i.name}</span>
+                      <span className="flex items-center gap-2"><span className="block min-w-0 truncate text-base font-medium">{i.name}</span><SourceBadge item={i} dot /></span>
                       <span className="block truncate text-sm text-muted-foreground">{n ? n.t : "No guide data"}</span>
                       {n && <span className="mt-1 block h-1 rounded-full bg-foreground/15"><span className="block h-full rounded-full bg-accent-blue" style={{ width: `${pct(n.s, n.e)}%` }} /></span>}
                     </span>

@@ -5,11 +5,71 @@ import { cn } from "@/lib/utils"
 import { Logo, useLocked } from "@/components/tv/ui"
 import { useApp } from "@/lib/store"
 import type { Item } from "@/lib/types"
+import { useSourceOf } from "@/lib/sources"
+import { useSourceFilter } from "../hooks/use-source-filter"
 
 /** Artwork for wide tiles/hero: Plex/TMDB backdrop when the item has one. */
 export const wideArt = (i: Item): Item => (i.backdrop && i.kind !== "live" ? { ...i, logo: i.backdrop } : i)
 
 type Btn = ButtonHTMLAttributes<HTMLButtonElement>
+
+/** Readable text on a source color (plain hex in, Chrome 94 safe). */
+const onColor = (hex: string) => { const n = parseInt(hex.slice(1, 7), 16); return (((n >> 16) & 255) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150 ? "#111111" : "#ffffff" }
+const Dot = ({ color, className }: { color: string; className?: string }) => <span aria-hidden className={cn("inline-block size-2.5 shrink-0 rounded-full", className)} style={{ background: color }} />
+
+/** Source chip on a tile: colored label (+N when the title exists in more sources). Hidden with one source or settings.sourceBadges off. */
+export function SourceBadge({ item, className }: { item: Item; className?: string }) {
+  const src = useSourceOf(item)
+  const show = useApp((s) => s.settings.sourceBadges !== false && s.sources.filter((x) => x.enabled !== false).length > 1)
+  if (!show || !src) return null
+  const n = item.alts?.length ?? 0
+  return (
+    <span title={src.name} className={cn("pointer-events-none absolute z-[1] rounded-full px-2 py-0.5 text-[11px] font-bold leading-4 shadow-sm", className)} style={{ background: src.color, color: onColor(src.color) }}>
+      {src.label}{n > 0 ? ` +${n}` : ""}
+    </span>
+  )
+}
+
+/** "All" + one capsule per source (color dot + count); the picked one gets a colored underline. Hidden with one source. */
+export function SourceFilter({ className }: { className?: string }) {
+  const { sources, filter, setFilter, multi } = useSourceFilter()
+  if (!multi) return null
+  const pill = (id: string | null, name: string, color?: string, count?: number) => {
+    const on = filter === id
+    return (
+      <button key={id ?? "all"} data-nav data-pill aria-pressed={on} onClick={() => setFilter(id)}
+        style={on && color ? { boxShadow: `inset 0 -3px 0 ${color}` } : undefined}
+        className={cn("atv-pillbtn inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap", on ? "bg-foreground text-background" : "atv-glass text-foreground")}>
+        {color && <Dot color={color} />}{name}{count != null && <span className="font-normal opacity-70">{count}</span>}
+      </button>
+    )
+  }
+  return (
+    <div data-nav-group role="group" aria-label="Source" className={cn("no-scrollbar flex items-center gap-2 overflow-x-auto p-1", className)}>
+      {pill(null, "All")}
+      {sources.map((s) => pill(s.id, s.name, s.color, s.count))}
+    </div>
+  )
+}
+
+/** Detail: "Available on" pills, one per source that has the title; picking one switches what plays. */
+export function SourceChooser({ options, selectedId, onPick }: { options: { item: Item; source: { name: string; label: string; color: string } }[]; selectedId?: string; onPick: (i: Item) => void }) {
+  if (options.length < 2) return null
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="atv-kicker mr-1">Available on</span>
+      {options.map(({ item, source }) => {
+        const on = item.id === selectedId
+        return (
+          <button key={item.id} data-nav data-pill aria-pressed={on} onClick={() => onPick(item)} style={on ? { boxShadow: `inset 0 -3px 0 ${source.color}` } : undefined}
+            className={cn("atv-pillbtn inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap", on ? "bg-foreground text-background" : "atv-glass text-foreground")}>
+            <Dot color={source.color} />{source.name}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 /** tvOS capsule button: white "Play" (primary) or translucent. */
 export function Capsule({ primary, className, type = "button", ...p }: Btn & { primary?: boolean }) {
@@ -64,6 +124,7 @@ export function Tile({ item, shape = "wide", size = "up", pct, sub, title, alway
           <Logo item={wide ? wideArt(item) : item} className={cn("size-full", live ? "object-contain p-[14%]" : "object-cover")} />
           {fav && <span className={cn(chip, "right-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
           {locked && <span className={cn(chip, "left-2")}><Lock className="size-4 text-white" /></span>}
+          <SourceBadge item={item} className={cn("left-2", pct ? "bottom-3.5" : "bottom-2")} />
           {pct ? <div className="atv-bar absolute inset-x-0 bottom-0 h-1.5"><div style={{ width: `${Math.min(100, pct)}%` }} /></div> : null}
         </div>
         <span aria-hidden className="atv-glow" />

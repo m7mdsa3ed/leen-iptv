@@ -4,8 +4,10 @@ import { askPin, useOpen } from "@/components/tv/ui"
 import { useGenres } from "@/lib/meta"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
+import { findLock } from "@/lib/merge-pure"
 import { useApp, usePData, useProfile } from "@/lib/store"
 import type { Item, Kind } from "@/lib/types"
+import { useActiveFilter, useCatalogView, inSource } from "./use-source-filter"
 
 const MAX_RAILS = 30
 const RAIL_ITEMS = 20
@@ -22,7 +24,10 @@ export { ALL, FAV }
  * }
  */
 export function useBrowse(kind: Exclude<Kind, "live">) {
-  const { byKind, groups, status } = useCatalog()
+  const status = useCatalog((s) => s.status)
+  const byId = useCatalog((s) => s.byId)
+  const { byKind, groups } = useCatalogView()
+  const filter = useActiveFilter()
   const d = usePData()
   const p = useProfile()
   const toggleLockStore = useApp((s) => s.toggleLock)
@@ -30,8 +35,8 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
   const go = useRoute((s) => s.go)
   const genres = useGenres(kind)
   const [g, setG] = useState(ALL)
-  const lockKey = (c: string) => `${kind}|${c}`
-  const favorites = useMemo(() => byKind[kind].filter((i) => d.favs.includes(i.id)), [byKind, kind, d.favs])
+  const lockKey = (c: string) => findLock(p?.locked ?? [], kind, c)
+  const favorites = useMemo(() => d.favs.map((id) => byId.get(id)).filter((i): i is Item => !!i && i.kind === kind && inSource(i, filter)), [byId, kind, d.favs, filter]) // via byId: favorites of deduped (alt) items still show
   const items = g === FAV ? favorites : g === ALL ? [] : byKind[kind].filter((i) => i.group === g)
   const rails = useMemo(() => {
     if (g !== ALL) return []
@@ -43,12 +48,13 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
     status, groups: groups[kind], genres, g, setG, items, rails, favorites,
     pct: (i: Item) => d.progress[i.id] && (d.progress[i.id].pos / d.progress[i.id].dur) * 100,
     isFav: (i: Item) => d.favs.includes(i.id),
-    isLocked: (c: string) => !!p?.locked.includes(lockKey(c)),
+    isLocked: (c: string) => !!lockKey(c),
     canLock: !!p?.pin,
     toggleLock: async (c: string) => {
       if (c === FAV || c === ALL || !p?.pin) return
-      if (p.locked.includes(lockKey(c)) && !(await askPin(p.pin))) return
-      toggleLockStore(lockKey(c))
+      const k = lockKey(c)
+      if (k && !(await askPin(p.pin))) return
+      toggleLockStore(k ?? `${kind}|${c}`)
     },
     open: (i: Item) => open(i),
     openCategory: (c: string) => go("category", { id: `${kind}|${c}` }),

@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react"
 import { Empty, Pending, Shell } from "@/components/tv/ui"
 import { useCategory } from "@/layouts/hooks/use-category"
 import { isTv } from "@/lib/device"
-import { PagedGrid, Pick, Dropdown, DropLabel, Tile, usePlay, variantOf } from "../ui"
+import { PagedGrid, Pick, Dropdown, DropLabel, SourceBar, Tile, usePlay, variantOf } from "../ui"
 
 /** Category page, Netflix style: title strip (Sort dropdown, filter) over a plain tile grid. Route id = `${kind}|${category}`. */
 export default function CategoryPage({ id }: { id: string }) {
@@ -22,6 +22,7 @@ export default function CategoryPage({ id }: { id: string }) {
             </Dropdown>
             <label className="nf-search !min-h-0 py-1"><input data-nav type="search" autoComplete="off" placeholder="Filter this category" value={q} onChange={(e) => setQ(e.target.value)} /></label>
           </div>
+          <SourceBar />
           {items.length ? <PagedGrid variant={v} items={items} render={(i) => <Tile key={i.id} item={i} variant={v} fluid pct={pct(i)} onOpen={() => open(i)} onPlay={() => play(i)} />} /> : <div className="h-64"><Empty>Nothing matches</Empty></div>}
         </div>
       )}

@@ -156,3 +156,11 @@ html[data-layout=netflix] [data-ring] { box-shadow: 0 0 0 3px var(--focus-bg); }
 html[data-layout=netflix] .nf-sq { border-radius: .25rem !important; }
 html[data-layout=netflix] .nf-pbtn { display: flex; align-items: center; gap: .25rem; padding-inline: .25rem; }
 html[data-layout=netflix] .nf-fade-s { background-image: linear-gradient(to top, var(--surface) 0%, var(--fade-to) 55%); }
+
+html[data-layout=netflix] .nf-src-chip { display: inline-block; padding: 0 .4rem; border-radius: .125rem; font-size: .7rem; font-weight: 800; line-height: 1.2rem; letter-spacing: .02em; }
+html[data-layout=netflix] .nf-src-bar { display: flex; flex-wrap: wrap; gap: .5rem; }
+html[data-layout=netflix] .nf-src-pill { display: inline-flex; align-items: center; gap: .45rem; min-height: 2.25rem; padding: .2rem .85rem; border: 1px solid var(--fg-40); border-radius: .125rem; background: rgba(0, 0, 0, .35); color: var(--foreground); font-size: .9rem; font-weight: 600; }
+html[data-layout=netflix] .nf-src-pill[aria-pressed=true] { background: var(--surface-3); font-weight: 800; }
+html[data-layout=netflix] .nf-src-pill:focus-visible { background: var(--foreground); color: var(--background); }
+html[data-layout=netflix] .nf-src-pill:focus-visible .text-muted-foreground { color: inherit; }
+html[data-layout=netflix] .nf-src-dot { width: .6rem; height: .6rem; border-radius: 9999px; flex-shrink: 0; }
