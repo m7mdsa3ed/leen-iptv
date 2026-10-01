@@ -1,10 +1,13 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
+import { LAYOUT_IDS } from "./layouts"
 import type { ProviderCfg } from "./meta/types"
+import { isTv } from "./device"
+import type { LayoutId } from "./layouts"
 import type { Profile, Source } from "./types"
 
 type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }> }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; theme: "system" | "dark" | "light"; meta?: ProviderCfg[] }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; theme: "system" | "dark" | "light"; layout: LayoutId; motion: "full" | "reduced" | "off"; meta?: ProviderCfg[] }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
 const empty = (): PData => ({ favs: [], recents: [], progress: {} })
@@ -44,7 +47,7 @@ export const useApp = create<S>()(
       sources: [],
       sourceId: null,
       data: {},
-      settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, theme: "system" },
+      settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, trackHistory: true, theme: "system", layout: "googletv", motion: isTv ? "reduced" : "full" },
       addProfile: (name, pin) =>
         set((s) => ({ profiles: [...s.profiles, { id: uid(), name, pin, color: COLORS[s.profiles.length % COLORS.length], locked: [] }] })),
       updateProfile: (id, p) => set((s) => ({ profiles: s.profiles.map((x) => (x.id === id ? { ...x, ...p } : x)) })),
@@ -83,6 +86,7 @@ export const useApp = create<S>()(
       merge: (saved, cur) => {
         const m = { ...cur, ...(saved as object) } as S
         m.settings = { ...cur.settings, ...m.settings } // settings saved by older versions lack new keys
+        if (!LAYOUT_IDS.includes(m.settings.layout)) m.settings.layout = (m.settings.layout as string) === "cinema" ? "netflix" : "googletv" // renamed / removed layouts
         let id: string | null = null
         try { id = sessionStorage.getItem("iptv-profile") } catch { /* ignore */ }
         return { ...m, profileId: m.profiles.some((p) => p.id === id) ? id : null }

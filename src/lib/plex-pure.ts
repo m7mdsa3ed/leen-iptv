@@ -1,0 +1,87 @@
+// Pure Plex helpers (no '@/' imports, no DOM) so `node scripts/plex.check.ts` can run them.
+import type { Item } from "./types"
+
+export type Conn = { uri: string; local?: boolean; relay?: boolean; protocol?: string }
+export type Ident = Record<string, string>
+type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+
+export const identity = (cid: string): Ident => ({
+  "X-Plex-Product": "Leen",
+  "X-Plex-Client-Identifier": cid,
+  "X-Plex-Version": "1.0",
+  "X-Plex-Platform": "Web",
+  "X-Plex-Device": "Web",
+  "X-Plex-Device-Name": "Leen",
+})
+
+/** base + path + query (values URL-encoded); the token goes last, in the query string, so GETs stay CORS-simple. */
+export function buildUrl(base: string, path: string, params: Record<string, string | number> = {}, token?: string) {
+  const q = Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+  if (token) q.push(`X-Plex-Token=${encodeURIComponent(token)}`)
+  return base.replace(/\/+$/, "") + path + (q.length ? "?" + q.join("&") : "")
+}
+
+/** Connection test order: direct before relay, local first (TV/LAN), https before http. */
+export function sortConns(conns: Conn[]): Conn[] {
+  const rank = (c: Conn) => (c.relay ? 4 : 0) + (c.local ? 0 : 2) + (c.protocol === "https" || c.uri.startsWith("https:") ? 0 : 1)
+  const seen = new Set<string>()
+  return conns.filter((c) => c.uri && !seen.has(c.uri) && seen.add(c.uri)).sort((a, b) => rank(a) - rank(b))
+}
+
+export const photoUrl = (server: string, token: string, path: string, w: number, h: number) =>
+  buildUrl(server, "/photo/:/transcode", { width: w, height: h, minSize: 1, upscale: 1, url: path }, token)
+
+export const tagList = (v: unknown): string[] => (Array.isArray(v) ? (v as J[]).map((x) => String(x.tag ?? "")).filter(Boolean) : [])
+
+/** One Plex Metadata entry -> catalog Item. `img` builds (and proxies) image URLs. */
+export function mapMeta(m: J, o: { sourceId: string; group: string; img: (path: string, w: number, h: number) => string }): Item {
+  const kind = m.type === "show" ? "series" : "movie"
+  const rating = m.rating ?? m.audienceRating
+  const resume = m.viewOffset ? Math.round(m.viewOffset / 1000) : undefined
+  return {
+    id: `${o.sourceId}|${kind}|${m.ratingKey}`,
+    kind,
+    sid: String(m.ratingKey),
+    name: String(m.title ?? "?"),
+    group: o.group,
+    logo: m.thumb ? o.img(m.thumb, 300, 450) : undefined,
+    backdrop: m.art ? o.img(m.art, 1280, 720) : undefined,
+    plot: m.summary || undefined,
+    rating: rating ? Number(rating).toFixed(1) : undefined,
+    year: m.year ? String(m.year) : undefined,
+    genres: tagList(m.Genre),
+    resume,
+    dur: m.duration ? Math.round(m.duration / 1000) : undefined,
+    ext: m.Media?.[0]?.Part?.[0]?.container || m.Media?.[0]?.container || undefined,
+  }
+}
+
+export const ratingSource = (image: string) =>
+  image.startsWith("imdb:") ? "IMDb" : image.startsWith("rottentomatoes:") ? "Rotten Tomatoes" : image.startsWith("themoviedb:") ? "TMDB" : ""
+
+const hm = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m` : `${Math.round(s / 60)}m`)
+
+/** GET /library/metadata/{key} entry -> Xtream-like `info` + normalized meta fields. */
+export function mapDetail(m: J, img: (path: string, w: number, h: number) => string) {
+  const genres = tagList(m.Genre)
+  const cast = ((m.Role ?? []) as J[]).map((r) => ({ name: String(r.tag), role: r.role ? String(r.role) : undefined, photo: r.thumb ? img(r.thumb, 200, 200) : undefined }))
+  const directors = tagList(m.Director)
+  const ratings = ((m.Rating ?? []) as J[]).flatMap((r) => {
+    const source = ratingSource(String(r.image ?? ""))
+    return source && r.value != null ? [{ source, value: String(r.value) }] : []
+  })
+  const sec = m.duration ? Math.round(m.duration / 1000) : 0
+  const year = m.year ? String(m.year) : undefined
+  const runtime = sec ? hm(sec) : undefined
+  return {
+    info: {
+      plot: m.summary ?? "",
+      genre: genres.join(", "),
+      cast: cast.map((c) => c.name).join(", "),
+      releasedate: m.originallyAvailableAt || year || "",
+      duration: sec ? hm(sec) : "",
+      rating: m.rating ?? m.audienceRating ?? "",
+    } as Record<string, unknown>,
+    meta: { plot: m.summary || undefined, genres, runtime, year, ratings, poster: m.thumb ? img(m.thumb, 600, 900) : undefined, backdrop: m.art ? img(m.art, 1280, 720) : undefined, cast, directors },
+  }
+}

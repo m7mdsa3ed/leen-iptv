@@ -11,6 +11,9 @@ export const probeProxy = async () => {
   } catch { /* no local proxy */ }
 }
 
+/** True when this https page can't load the (http) URL directly. */
+export const mixed = (url: string) => location.protocol === "https:" && url.startsWith("http:")
+
 export const px = (url: string, proxy: string) => {
   const p = proxy.trim()
   if (!p) return local ? `/p?url=${encodeURIComponent(url)}` : url
@@ -70,3 +73,15 @@ export async function fetchText(url: string): Promise<string> {
 /** Stream URLs: an explicit proxy only when "Proxy streams too" is on; the built-in same-origin proxy is automatic. */
 export const pxStream = (url: string, s: { proxy: string; proxyStreams: boolean }) =>
   s.proxy.trim() && !s.proxyStreams ? url : px(url, s.proxy)
+
+/** Plex-style fetch: direct first (CORS-simple GETs), through the proxy when mixed content or a network/CORS TypeError. */
+export async function plexFetch(url: string, proxy: string, init?: RequestInit, ms = 30000): Promise<Response> {
+  if (mixed(url)) return fetchT(px(url, proxy), ms, init)
+  try {
+    return await fetchT(url, ms, init)
+  } catch (e) {
+    const p = px(url, proxy)
+    if (!(e instanceof TypeError) || p === url) throw e
+    return fetchT(p, ms, init)
+  }
+}

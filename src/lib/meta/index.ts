@@ -40,8 +40,20 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[]): Promise<Meta> {
   return m
 }
 
+/** Source data (e.g. Plex) beats providers: `base` wins per field, providers only fill gaps. */
+function withBase(m: Meta, b?: Partial<Meta>): Meta {
+  if (!b) return m
+  const r = { ...m }
+  for (const k of ["title", "year", "plot", "runtime", "poster", "backdrop"] as const) r[k] = b[k] || m[k]
+  for (const k of ["genres", "directors", "similar"] as const) (r[k] as unknown[]) = b[k]?.length ? b[k]! : m[k]
+  r.cast = b.cast?.length && (b.cast.some((c) => c.photo) || !m.cast.some((c) => c.photo)) ? b.cast : m.cast
+  r.ratings = [...(b.ratings ?? []), ...m.ratings.filter((x) => !b.ratings?.some((y) => y.source === x.source))]
+  r.ids = { ...m.ids, ...b.ids }
+  return r
+}
+
 /** Details for a movie/series, cached for a week. `ready` = the Xtream info has been fetched (or will not be). */
-export function useMeta(item: Item | undefined, xtream: Record<string, unknown> | undefined, ready: boolean) {
+export function useMeta(item: Item | undefined, xtream: Record<string, unknown> | undefined, ready: boolean, base?: Partial<Meta>) {
   const saved = useApp((s) => s.settings.meta)
   const cfgs = useMemo(() => normalizeCfg(saved), [saved])
   const [meta, setMeta] = useState<Meta | null>(null)
@@ -59,13 +71,13 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
     ;(async () => {
       setLoading(true)
       const c = online ? await get<{ at: number; m: Meta }>(key) : undefined
-      if (c && Date.now() - c.at < (c.m.plot || c.m.cast.length ? WEEK : 864e5)) return live && void setMeta(c.m)
+      if (c && Date.now() - c.at < (c.m.plot || c.m.cast.length ? WEEK : 864e5)) return live && void setMeta(withBase(c.m, base))
       const m = await loadMeta(q, cfgs)
-      if (online) void set(key, { at: Date.now(), m })
-      if (live) setMeta(m)
+      if (online) void set(key, { at: Date.now(), m }) // cached without `base`: source data is merged fresh each time
+      if (live) setMeta(withBase(m, base))
     })().finally(() => live && setLoading(false))
     return () => { live = false }
-  }, [item, xtream, ready, sig]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [item, xtream, ready, sig, base]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { meta, loading, online }
 }
@@ -138,12 +150,14 @@ const withDiscover = (cfgs: ProviderCfg[], need: "genres" | "discover") => cfgs.
 
 /** Genre names for the pills on Movies / Series (empty until a provider with genre support is enabled). */
 export function useGenres(kind: "movie" | "series") {
+  const catGenres = useCatalog((s) => s.byKind[kind])
+  const own = useMemo(() => [...new Set(catGenres.flatMap((i) => i.genres ?? []))].sort(), [catGenres]) // catalog-provided (Plex)
   const saved = useApp((s) => s.settings.meta)
   const cfgs = useMemo(() => withDiscover(normalizeCfg(saved), "genres"), [saved])
   const sig = cfgs.map((c) => `${c.id}:${c.lang ?? ""}`).join(",")
   const [names, setNames] = useState<string[]>([])
   useEffect(() => {
-    if (!cfgs.length) return setNames([])
+    if (own.length || !cfgs.length) return setNames([])
     let live = true
     const key = `genres:${kind}:${sig}`
     ;(async () => {
@@ -155,8 +169,8 @@ export function useGenres(kind: "movie" | "series") {
       }
     })().catch(() => {})
     return () => { live = false }
-  }, [kind, sig]) // eslint-disable-line react-hooks/exhaustive-deps
-  return names
+  }, [kind, sig, own.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  return own.length ? own : names
 }
 
 const BATCH = 4 // provider pages per fetch (20 titles each)
@@ -169,9 +183,10 @@ export function useGenreTitles(kind: "movie" | "series", genre: string) {
   const byKind = useCatalog((s) => s.byKind)
   const [refs, setRefs] = useState<SimilarRef[]>([])
   const [state, setState] = useState({ next: 1, pages: 1, loading: false, unknown: false })
+  const own = useMemo(() => (byKind[kind].some((i) => i.genres?.length) ? byKind[kind].filter((i) => i.genres?.includes(genre)) : null), [byKind, kind, genre])
 
   const loadBatch = async (from: number, reset: boolean) => {
-    if (!cfgs.length) return
+    if (!cfgs.length || own) return
     setState((s) => ({ ...s, loading: true }))
     const cfg = cfgs[0]
     const prov = PROVIDERS.find((p) => p.id === cfg.id)!
@@ -195,5 +210,6 @@ export function useGenreTitles(kind: "movie" | "series", genre: string) {
     for (const r of refs) { const i = findInCatalog(byKind, kind, r.title, r.year, undefined, r.alt); if (i && !out.includes(i)) out.push(i) }
     return out
   }, [refs, byKind, kind])
+  if (own) return { items: own, available: true, ...state, loading: false, unknown: false, hasMore: false, more: async () => {} }
   return { items, available: cfgs.length > 0, ...state, hasMore: state.next <= state.pages, more: () => loadBatch(state.next, false) }
 }

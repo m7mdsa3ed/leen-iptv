@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, type ComponentType } from "react"
 import { Empty, PinModal, usePinAsk, focusFirstSoon } from "@/components/tv/ui"
 import { Boundary } from "@/components/tv/boundary"
 import { useCatalog } from "@/lib/catalog"
 import { isTv, useMode } from "@/lib/device"
+import { useLayoutAttr, useLayoutDef } from "@/layouts"
+import { useMotion } from "@/lib/motion"
 import { useTheme } from "@/lib/theme"
 import { installNav, useRoute } from "@/lib/nav"
 import { useApp, useSource } from "@/lib/store"
@@ -10,8 +12,11 @@ import Browse from "@/pages/browse"
 import CategoryPage from "@/pages/category"
 import Detail from "@/pages/detail"
 import GenrePage from "@/pages/genre"
+import HistoryPage from "@/pages/history"
+import StatsPage from "@/pages/stats"
 import Guide from "@/pages/guide"
 import Home from "@/pages/home"
+import Library from "@/pages/library"
 import Live from "@/pages/live"
 import PersonPage from "@/pages/person"
 import Player from "@/pages/player"
@@ -31,24 +36,26 @@ function RestorePlayer({ id }: { id: string }) {
   return <Player queue={queue} index={queue.indexOf(item)} />
 }
 
+// pages rendered inside a layout Shell: their top bar stays put and only [data-page-content] (the Shell's <main>) animates
+const SHELL_PAGES = new Set(["home", "live", "guide", "movies", "series", "search", "library", "settings", "category", "genre", "history", "stats"])
+
+/** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
+const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
+  profiles: Profiles, live: Live, guide: Guide, movies: Browse, series: Browse, search: Search, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, person: PersonPage, detail: Detail, history: HistoryPage, stats: StatsPage,
+}
+
 function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
+  const over = useLayoutDef().pages
+  const p = r.p ?? {}
   switch (r.name) {
-    case "profiles": return <Profiles />
     case "sources": return <Sources />
     case "home": return <Home />
-    case "live": return <Live />
-    case "guide": return <Guide />
-    case "movies": return <Browse kind="movie" />
-    case "series": return <Browse kind="series" />
-    case "search": return <Search />
-    case "settings": return <Settings />
-    case "genre": return <GenrePage id={r.p!.id as string} />
-    case "category": return <CategoryPage id={r.p!.id as string} />
-    case "person": return <PersonPage id={r.p!.id as string | undefined} name={r.p!.name as string | undefined} />
-    case "detail": return <Detail id={r.p!.id as string} />
-    case "player": return r.p!.queue ? <Player queue={r.p!.queue as never} index={r.p!.index as number} /> : <RestorePlayer id={r.p!.id as string} />
-    default: return null
+    case "player": return p.queue ? <Player queue={p.queue as never} index={p.index as number} /> : <RestorePlayer id={p.id as string} />
   }
+  const C = over?.[r.name as keyof typeof over] ?? DEFAULT_PAGES[r.name]
+  if (!C) return null
+  // props are the same for default and override
+  return <C {...(r.name === "movies" ? { kind: "movie" } : r.name === "series" ? { kind: "series" } : p)} />
 }
 
 export default function App() {
@@ -59,6 +66,8 @@ export default function App() {
   const top = stack.length - 1
   useMode() // keeps html[data-mode] in sync on resize
   useTheme()
+  useMotion()
+  useLayoutAttr()
   const tvScale = useApp((s) => s.settings.tvScale)
   useEffect(() => { document.documentElement.style.setProperty("--tv-scale", String(tvScale)) }, [tvScale])
 
@@ -92,11 +101,15 @@ export default function App() {
     })
   }, [top, stack[top]?.name])
 
+  // the entrance class is dropped once played: display none->block would otherwise replay it when Back reveals a stacked page
+  const endAnim = (e: React.AnimationEvent<HTMLElement>) => {
+    if (e.target === e.currentTarget || (e.target as HTMLElement).hasAttribute("data-page-content")) e.currentTarget.classList.remove("m-rise", "page-enter")
+  }
   // stacked pages stay mounted (scroll + focus preserved), only the top is visible
   return (
     <>
       {stack.map((r, i) => (
-        <div key={i} className="absolute inset-0" style={{ display: i === top ? "block" : "none" }}>
+        <div key={`${i}:${r.name}`} className={`${SHELL_PAGES.has(r.name) ? "page-enter" : "m-rise"} absolute inset-0`} style={{ display: i === top ? "block" : "none" }} onAnimationEnd={endAnim}>
           <Boundary><Page r={r} /></Boundary>
         </div>
       ))}

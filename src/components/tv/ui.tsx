@@ -1,13 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { create } from "zustand"
-import { CalendarDays, Clapperboard, Film, House, Lock, Search, Star, Tv } from "lucide-react"
+import { Lock, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { isTv, useMode } from "@/lib/device"
 import { focusFirst, useRoute } from "@/lib/nav"
 import { useApp, useProfile, useSource } from "@/lib/store"
-import { Avatar, Card, LeenMark, RoundButton, SkelGrid, SkelRail } from "@/components/gtv"
+import { Card, SkelGrid, SkelRail } from "@/components/gtv"
+import { useLayoutDef } from "@/layouts"
 import { useCatalog } from "@/lib/catalog"
 import type { Item } from "@/lib/types"
 
@@ -144,7 +145,7 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render }:
   const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3 })
   useEffect(() => v.measure(), [rowH, v])
   return (
-    <div ref={ref} className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-2">
+    <div ref={ref} className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4">
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((r) => (
           <div key={r.key} className="absolute inset-x-0 grid" style={{ top: r.start, gap, gridTemplateColumns: `repeat(${c}, minmax(0, 1fr))` }}>
@@ -162,10 +163,10 @@ export function VList<T>({ items, rowH: baseH, render, className }: { items: T[]
   const v = useVirtualizer({ count: items.length, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 8 })
   useEffect(() => v.measure(), [rowH, v])
   return (
-    <div ref={ref} className={cn("h-full overflow-y-auto", className)}>
+    <div ref={ref} className={cn("h-full overflow-y-auto [--s:1.025]", className)}>
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((r) => (
-          <div key={r.key} className="absolute inset-x-0 px-3" style={{ top: r.start, height: rowH }}>
+          <div key={r.key} className="absolute inset-x-0 px-5" style={{ top: r.start, height: rowH }}>
             {render(items[r.index], r.index)}
           </div>
         ))}
@@ -175,78 +176,16 @@ export function VList<T>({ items, rowH: baseH, render, className }: { items: T[]
 }
 
 /* ---------- shell ---------- */
-const TABS = [
-  ["home", "For you", House], ["live", "Live", Tv], ["guide", "Guide", CalendarDays], ["movies", "Movies", Film], ["series", "Series", Clapperboard],
-] as const
-const BOTTOM = ["home", "live", "movies", "series", "guide"].map((k) => TABS.find((t) => t[0] === k)!)
-
 export function Clock() {
   const [t, setT] = useState(new Date())
   useEffect(() => { const i = setInterval(() => setT(new Date()), 15000); return () => clearInterval(i) }, [])
   return <>{t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</>
 }
 
-export function Shell({ page, title, children }: { page: string; title?: string; children: ReactNode }) {
-  const reset = useRoute((s) => s.reset)
-  const status = useCatalog((s) => s.status)
-  const profile = useProfile()
-  const mode = useMode()
-  const mobile = mode === "mobile"
-  const tv = mode === "tv"
-  const go = (k: string) => k !== page && reset(k)
-  const search = (
-    <RoundButton label="Search" active={page === "search"} data-autofocus={page === "search" ? "" : undefined} onClick={() => go("search")} className={mobile ? "bg-transparent" : undefined}>
-      <Search />
-    </RoundButton>
-  )
-  const avatar = (
-    <button data-nav data-autofocus={page === "settings" ? "" : undefined} aria-label="Settings" onClick={() => go("settings")} className="grid size-11 shrink-0 place-items-center rounded-full">
-      <Avatar name={profile?.name ?? "?"} color={profile?.color ?? "#5f6368"} className="size-10" />
-    </button>
-  )
-  const state = <span className={cn("text-muted-foreground", tv ? "text-xl" : "text-sm")}>{status === "loading" ? "Updating... " : ""}<Clock /></span>
-  return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background text-foreground">
-      <div aria-hidden className="hdr-fade pointer-events-none absolute inset-x-0 top-0 z-20 h-[calc(var(--hdr)+1.5rem)]" />
-      <header className={cn("absolute inset-x-0 top-0 z-30 flex items-center gap-2 px-[var(--gx)]", mobile ? "min-h-14 pt-[max(0.25rem,env(safe-area-inset-top))]" : tv ? "pb-2 pt-6" : "pb-2 pt-4")}>
-        {mobile ? (
-          <>
-            <LeenMark className="size-8" />
-            <h1 className="min-w-0 flex-1 truncate text-xl font-medium">{title}</h1>
-            {state}
-            {search}
-            {avatar}
-          </>
-        ) : (
-          <>
-            <h1 className="sr-only">{title}</h1>
-            <LeenMark className="mr-1 size-10" />
-            {search}
-            <nav className="-m-2 ml-0 flex min-w-0 gap-1 overflow-x-auto p-2 no-scrollbar">
-              {TABS.map(([k, label]) => (
-                <button key={k} data-nav data-pill data-autofocus={k === page ? "" : undefined} onClick={() => go(k)}
-                  className={cn("min-h-11 rounded-full px-3 py-2 text-base font-medium lg:px-5", k === page ? "bg-surface-2 text-foreground" : "text-foreground/60 hover:bg-foreground/10 hover:text-foreground")}>
-                  {label}
-                </button>
-              ))}
-            </nav>
-            <div className="ml-auto flex items-center gap-4">{state}{avatar}</div>
-          </>
-        )}
-      </header>
-      <main className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6")}>{children}</main>
-      {mobile && (
-        <nav className="flex shrink-0 bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-          {BOTTOM.map(([k, label, Icon]) => (
-            <button key={k} data-nav onClick={() => go(k)} className={cn("flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[11px] [@media(max-height:500px)]:h-12", k === page ? "text-foreground" : "text-muted-foreground")}>
-              <span className={cn("grid h-8 w-16 place-items-center rounded-full", k === page && "bg-accent-blue-container")}><Icon className="size-5" /></span>
-              {label}
-            </button>
-          ))}
-        </nav>
-      )}
-    </div>
-  )
+/** Delegates to the active layout (src/layouts). */
+export function Shell(p: { page: string; title?: string; children: ReactNode }) {
+  const L = useLayoutDef().Shell
+  return <L {...p} />
 }
 
 export const Empty = ({ children }: { children: ReactNode }) => (

@@ -1,0 +1,47 @@
+import { useEffect, useMemo, useState } from "react"
+import { askPin, useOpen } from "@/components/tv/ui"
+import { useCatalog } from "@/lib/catalog"
+import { useRoute } from "@/lib/nav"
+import { usePData, useProfile } from "@/lib/store"
+import type { Item } from "@/lib/types"
+
+export type Sort = "default" | "az" | "rating"
+export const SORTS: [Sort, string][] = [["default", "Default"], ["az", "A-Z"], ["rating", "Top rated"]]
+
+/**
+ * One category page (route id `${kind}|${category}`), incl. the PIN gate (Back if refused).
+ * Returns { kind, group, status, ok (false while the PIN is pending: render nothing), all (every title), items (filtered + sorted),
+ *  sort, setSort, sorts ([Sort,label][] available), q, setQ (title filter), pct(item), open(item), back() }
+ */
+export function useCategory(id: string) {
+  const cut = id.indexOf("|")
+  const kind = (id.slice(0, cut) === "series" ? "series" : "movie") as "movie" | "series"
+  const group = id.slice(cut + 1)
+  const { byKind, status } = useCatalog()
+  const d = usePData()
+  const p = useProfile()
+  const back = useRoute((s) => s.back)
+  const open = useOpen()
+  const locked = !!p?.pin && p.locked.includes(`${kind}|${group}`)
+  const [ok, setOk] = useState(!locked) // locked categories need the PIN even when reached by URL or refresh
+  const [sort, setSort] = useState<Sort>("default")
+  const [q, setQ] = useState("")
+  useEffect(() => {
+    if (ok || !p?.pin) return
+    void askPin(p.pin).then((good) => (good ? setOk(true) : back()))
+  }, [ok, p?.pin, back])
+  const all = useMemo(() => byKind[kind].filter((i) => i.group === group), [byKind, kind, group])
+  const hasRating = useMemo(() => all.some((i) => parseFloat(i.rating ?? "") > 0), [all])
+  const items = useMemo(() => {
+    const f = q.trim().toLowerCase()
+    const l = f ? all.filter((i) => i.name.toLowerCase().includes(f)) : all
+    if (sort === "az") return [...l].sort((a, b) => a.name.localeCompare(b.name))
+    if (sort === "rating") return [...l].sort((a, b) => (parseFloat(b.rating ?? "") || 0) - (parseFloat(a.rating ?? "") || 0))
+    return l
+  }, [all, q, sort])
+  return {
+    kind, group, status, ok, all, items, sort, setSort, sorts: SORTS.filter(([s]) => s !== "rating" || hasRating), q, setQ, back,
+    pct: (i: Item) => d.progress[i.id] && (d.progress[i.id].pos / d.progress[i.id].dur) * 100,
+    open: (i: Item) => open(i),
+  }
+}

@@ -65,6 +65,7 @@
   --secondary-foreground: #1f1f1f;
   --muted: #eceef2;
   --muted-foreground: rgba(0, 0, 0, 0.6);
+  --fg-10: rgba(0, 0, 0, 0.1); --fg-30: rgba(0, 0, 0, 0.3); --fg-40: rgba(0, 0, 0, 0.4); --fg-70: rgba(0, 0, 0, 0.7); --fg-80: rgba(0, 0, 0, 0.8);
   --accent: #e1e4ea;
   --accent-foreground: #1f1f1f;
   --destructive: #d93025;
@@ -118,6 +119,7 @@
   --secondary-foreground: rgba(255, 255, 255, 0.87);
   --muted: #25262a;
   --muted-foreground: rgba(255, 255, 255, 0.6);
+  --fg-10: rgba(255, 255, 255, 0.1); --fg-30: rgba(255, 255, 255, 0.3); --fg-40: rgba(255, 255, 255, 0.4); --fg-70: rgba(255, 255, 255, 0.7); --fg-80: rgba(255, 255, 255, 0.8);
   --accent: #2f3135;
   --accent-foreground: rgba(255, 255, 255, 0.87);
   --destructive: #f28b82;
@@ -172,22 +174,30 @@ html:not([data-mode=tv]) button, html:not([data-mode=tv]) [role=button] { touch-
 [data-nav]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 [data-card]:focus-visible { outline: none; }
 [data-card]:focus-visible [data-tile] { outline: 2px solid var(--ring); outline-offset: 2px; }
-html[data-mode=tv] [data-nav] { transition: transform .15s ease-out; }
+html[data-mode=tv] [data-nav] { transition: transform var(--dur-fast) var(--ease); }
 html[data-mode=tv] [data-nav]:focus-visible, html[data-mode=tv] [data-nav][data-focused="true"] {
   outline: none;
-  transform: scale(1.06);
+  transform: scale(var(--s, 1.06)); /* --s: wide containers (lists) set a smaller scale so they never outgrow their padding */
   z-index: 5;
-  box-shadow: 0 0 0 3px var(--focus-bg), 0 12px 32px rgba(0, 0, 0, .6);
+  /* shadow kept small (<= ~24px) so it fits inside the padding of scroll containers: overflow clips shadows */
+  box-shadow: 0 0 0 3px var(--focus-bg), 0 6px 16px rgba(0, 0, 0, .45);
 }
-html[data-mode=tv] [data-card]:focus-visible, html[data-mode=tv] [data-card][data-focused="true"] { box-shadow: none; }
-html[data-mode=tv] [data-card]:focus-visible [data-tile], html[data-mode=tv] [data-card][data-focused="true"] [data-tile] {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--focus-bg), 0 14px 36px rgba(0, 0, 0, .65);
-}
-html[data-mode=tv] [data-pill]:focus-visible, html[data-mode=tv] [data-pill][data-focused="true"] { background: var(--focus-bg) !important; color: var(--focus-fg) !important; }
+html[data-mode=tv] [data-card]:focus-visible, html[data-mode=tv] [data-card][data-focused="true"] { box-shadow: none; transform: none; }
+html[data-mode=tv] [data-card]:focus-visible [data-tile], html[data-mode=tv] [data-card][data-focused="true"] [data-tile] { outline: none; }
+/* Card focus: the tile wrapper scales (transform) and the ring/shadow overlay fades in (opacity). Nothing animates box-shadow. */
+[data-tilewrap] { transition: transform var(--dur-fast) var(--ease); }
+[data-ring] { opacity: 0; box-shadow: 0 0 0 3px var(--focus-bg), 0 8px 20px rgba(0, 0, 0, .55); transition: opacity var(--dur-fast) var(--ease); }
+html[data-mode=tv] [data-card]:focus-visible [data-tilewrap], html[data-mode=tv] [data-card][data-focused="true"] [data-tilewrap] { transform: scale(1.06); will-change: transform; }
+html[data-mode=tv] [data-card]:focus-visible [data-ring], html[data-mode=tv] [data-card][data-focused="true"] [data-ring] { opacity: 1; }
+html[data-mode=tv] [data-pill]:focus-visible, html[data-mode=tv] [data-pill][data-focused="true"] { background: var(--focus-bg) !important; color: var(--focus-fg) !important; box-shadow: none; } /* the white fill is the focus: no drop shadow, so pills inside scrolling rows/headers are never clipped */
 html[data-mode=tv] [data-guide]:focus-visible, html[data-mode=tv] [data-guide][data-focused="true"] { transform: none; box-shadow: inset 0 0 0 3px var(--focus-bg); }
 
-html[data-mode=tv] [data-pill][data-primary]:focus-visible, html[data-mode=tv] [data-pill][data-primary][data-focused="true"] { box-shadow: 0 0 0 3px var(--accent-blue), 0 0 0 6px var(--focus-bg), 0 12px 32px rgba(0, 0, 0, .6); }
+html[data-mode=tv] [data-pill][data-primary]:focus-visible, html[data-mode=tv] [data-pill][data-primary][data-focused="true"] { box-shadow: 0 0 0 3px var(--accent-blue), 0 0 0 6px var(--focus-bg); }
+
+/* press feedback (transform only); after the TV focus rules so it wins on ties */
+[data-pill] { transition: transform var(--dur-fast) var(--ease); }
+html [data-pill]:active:not(:disabled) { transform: scale(.97); }
+[data-card]:active [data-tilewrap] { transform: scale(.97); }
 
 /* scrollbars */
 html[data-mode=tv] ::-webkit-scrollbar { display: none; }
@@ -204,8 +214,8 @@ html[data-mode=mobile] ::-webkit-scrollbar { display: none; }
   gap: 1rem;
   overflow-x: auto;
   scrollbar-width: none;
-  padding: .75rem var(--gx) 1.25rem;
-  margin: -.25rem calc(var(--gx) * -1) 0;
+  padding: .75rem var(--gx) 2rem; /* bottom room for the focus shadow, cancelled by the negative margin below */
+  margin: -.25rem calc(var(--gx) * -1) -.75rem;
   scroll-padding-inline: var(--gx);
 }
 .rail::-webkit-scrollbar { display: none; }
@@ -217,3 +227,62 @@ html[data-mode=tv] .rail { gap: 1.25rem; }
 @utility pl-safe { padding-left: env(safe-area-inset-left); }
 @utility pr-safe { padding-right: env(safe-area-inset-right); }
 @utility px-safe { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+
+/* ================= MOTION (settings.motion -> html[data-motion=full|reduced|off], set by useMotion in lib/motion.ts) =================
+   webOS rules: animate only transform + opacity; no box-shadow/filter/size animation; no infinite animation except .skel shimmer. */
+:root { --dur-fast: 120ms; --dur: 200ms; --dur-slow: 320ms; --ease: cubic-bezier(.2, 0, 0, 1); --shimmer: rgba(255, 255, 255, .7); }
+.dark { --shimmer: rgba(255, 255, 255, .07); }
+html[data-motion=reduced] { --dur-fast: 100ms; --dur: 150ms; --dur-slow: 150ms; }
+
+@keyframes m-fade-k { from { opacity: 0; } }
+@keyframes m-rise-k { from { opacity: 0; transform: translate3d(0, 14px, 0); } }
+@keyframes m-pop-k { from { opacity: 0; transform: scale(.94); } }
+@keyframes m-slide-k { from { opacity: 0; transform: translate3d(24px, 0, 0); } }
+@keyframes m-shimmer-k { to { transform: translateX(100%); } }
+
+/* entrance utilities (play on mount only; backwards fill so nothing is held afterwards). Stagger: style={{"--i": n}} (capped at 8). */
+.m-fade, .m-rise, .m-pop, .m-slide {
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease);
+  animation-fill-mode: backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 40ms);
+}
+.m-fade { animation-name: m-fade-k; }
+.m-rise { animation-name: m-rise-k; }
+.m-pop { animation-name: m-pop-k; }
+.m-slide { animation-name: m-slide-k; }
+/* Page enter for pages that have a Shell: only the content area animates, never the top bar (App adds .page-enter to the page wrapper) */
+.page-enter [data-page-content] { animation: m-rise-k var(--dur-slow) var(--ease) backwards; }
+/* Rail: first 8 cards rise with a stagger */
+.rail-in > * { animation: m-rise-k var(--dur-slow) var(--ease) backwards; }
+.rail-in > :nth-child(2) { animation-delay: 40ms; }
+.rail-in > :nth-child(3) { animation-delay: 80ms; }
+.rail-in > :nth-child(4) { animation-delay: 120ms; }
+.rail-in > :nth-child(5) { animation-delay: 160ms; }
+.rail-in > :nth-child(6) { animation-delay: 200ms; }
+.rail-in > :nth-child(7) { animation-delay: 240ms; }
+.rail-in > :nth-child(8) { animation-delay: 280ms; }
+.rail-in > :nth-child(n+9) { animation: none; }
+
+/* poster/logo fade-in once loaded (Card sets data-loaded on the tile); tile has a fixed aspect ratio so nothing shifts */
+[data-tile] img[loading=lazy] { transition: opacity var(--dur) var(--ease); }
+[data-tile]:not([data-loaded]) img[loading=lazy] { opacity: 0; }
+
+/* skeleton shimmer: a pseudo-element slides with transform (no pulse, no background-position animation) */
+.skel { position: relative; overflow: hidden; background: var(--surface-2); }
+.skel::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--shimmer), transparent);
+  transform: translateX(-100%);
+  animation: m-shimmer-k 1.4s linear infinite;
+}
+
+html[data-mode=tv] .skel::after { animation: none; }
+
+/* reduced: opacity fades only (<=150ms); focus scale stays */
+html[data-motion=reduced] :is(.m-rise, .m-pop, .m-slide), html[data-motion=reduced] .rail-in > * { animation-name: m-fade-k; animation-delay: 0ms; animation-duration: 150ms; }
+html[data-motion=reduced] .page-enter [data-page-content] { animation-name: m-fade-k; animation-duration: 150ms; }
+html[data-motion=reduced] .rail-in > :nth-child(n+9) { animation: none; }
+
+/* off: nothing moves */
+html[data-motion=off] *, html[data-motion=off] *::before, html[data-motion=off] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }

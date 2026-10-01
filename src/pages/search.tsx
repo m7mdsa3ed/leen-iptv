@@ -1,19 +1,11 @@
-import { useDeferredValue, useMemo, useState } from "react"
 import { Search as SearchIcon, X } from "lucide-react"
 import { Card, Rail } from "@/components/gtv"
-import { Empty, Shell, useOpen } from "@/components/tv/ui"
+import { Empty, Shell } from "@/components/tv/ui"
 import { isTv } from "@/lib/device"
-import { useCatalog } from "@/lib/catalog"
+import { useSearch } from "@/layouts/hooks/use-search"
 
 export default function Search() {
-  const items = useCatalog((s) => s.items)
-  const open = useOpen()
-  const [q, setQ] = useState("")
-  const dq = useDeferredValue(q).trim().toLowerCase()
-  const res = useMemo(() => (dq.length < 2 ? [] : items.filter((i) => i.name.toLowerCase().includes(dq)).slice(0, 300)), [dq, items])
-  const live = useMemo(() => res.filter((i) => i.kind === "live"), [res])
-  const movies = useMemo(() => res.filter((i) => i.kind === "movie"), [res])
-  const series = useMemo(() => res.filter((i) => i.kind === "series"), [res])
+  const { q, setQ, tooShort, results: res, live, movies, series, open } = useSearch()
   return (
     <Shell page="search" title="Search">
       <div className="flex h-full flex-col gap-4">
@@ -29,7 +21,7 @@ export default function Search() {
               {movies.length > 0 && <Rail title="Movies">{movies.map((i) => <Card key={i.id} item={i} onOpen={() => open(i)} />)}</Rail>}
               {series.length > 0 && <Rail title="Series">{series.map((i) => <Card key={i.id} item={i} onOpen={() => open(i)} />)}</Rail>}
             </div>
-          ) : <Empty>{dq.length < 2 ? "Type at least 2 letters" : "No results"}</Empty>}
+          ) : <Empty>{tooShort ? "Type at least 2 letters" : "No results"}</Empty>}
         </div>
       </div>
     </Shell>

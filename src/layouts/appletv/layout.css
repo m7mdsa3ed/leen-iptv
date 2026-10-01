@@ -1,0 +1,166 @@
+/* Apple TV layout. Everything scoped under html[data-layout=appletv]. Animates only transform/opacity. */
+html[data-layout=appletv] {
+  --atv-glass: rgba(255, 255, 255, .72);
+  --atv-glass-solid: rgba(246, 246, 248, .96);
+  --atv-glass-on: rgba(0, 0, 0, .1);
+  --atv-hair: rgba(0, 0, 0, .08);
+  --atv-top: #e9eaee;
+}
+html.dark[data-layout=appletv] {
+  --atv-glass: rgba(44, 44, 48, .72);
+  --atv-glass-solid: rgba(44, 44, 48, .96);
+  --atv-glass-on: rgba(255, 255, 255, .22);
+  --atv-hair: rgba(255, 255, 255, .1);
+  --atv-top: #1c1c20;
+}
+
+/* dark vertical gradient behind everything */
+html[data-layout=appletv] .atv-root { background: linear-gradient(to bottom, var(--atv-top), var(--background) 70%); }
+
+/* glass chrome (static blur only off TV: webOS GPUs are weak) */
+html[data-layout=appletv] .atv-glass { background: var(--atv-glass); box-shadow: inset 0 0 0 1px var(--atv-hair); }
+html[data-layout=appletv]:not([data-mode=tv]) .atv-glass { -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+html[data-layout=appletv][data-mode=mobile] .atv-bar { margin-top: .25rem; }
+html[data-layout=appletv] .atv-round { background: transparent !important; }
+html[data-layout=appletv] .atv-round[data-active] { background: var(--atv-glass-on) !important; }
+html[data-layout=appletv][data-mode=desktop] .atv-round:focus-visible, html[data-layout=appletv][data-mode=desktop] .atv-tab:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
+/* mobile bar sits over scrolling content: no blur, near-opaque */
+html[data-layout=appletv][data-mode=mobile] .atv-glass { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--atv-glass-solid); }
+
+/* tabs: selected = brighter capsule, focused (TV/keyboard) = solid light capsule */
+html[data-layout=appletv] .atv-tab { color: var(--muted-foreground); background: transparent; }
+html[data-layout=appletv] .atv-tab[aria-current] { background: var(--atv-glass-on); color: var(--foreground); }
+html[data-layout=appletv] .atv-tab:hover { color: var(--foreground); }
+html[data-layout=appletv][data-mode] .atv-tab:focus-visible, html[data-layout=appletv][data-mode] .atv-round:focus-visible { box-shadow: none; transform: scale(1.06); }
+html[data-layout=appletv][data-mode=tv] .atv-tab:focus-visible { background: var(--focus-bg) !important; color: var(--focus-fg) !important; }
+html[data-layout=appletv][data-mode=tv] .atv-round:focus-visible { background: var(--focus-bg) !important; }
+
+/* pills/buttons: lift, no ring */
+html[data-layout=appletv][data-mode] [data-pill]:focus-visible, html[data-layout=appletv][data-mode] [data-pill][data-primary]:focus-visible { box-shadow: none; transform: scale(1.06); }
+
+/* shelves: calm bold titles, big rounded cards */
+html[data-layout=appletv] section > h2, html[data-layout=appletv] section button[data-pill] { font-weight: 700; letter-spacing: -.01em; }
+html[data-layout=appletv] .rail { gap: 1.25rem; padding-top: 1.25rem; padding-bottom: 2rem; }
+html[data-layout=appletv] [data-tilewrap] { border-radius: 20px; transition: transform var(--dur) var(--ease); }
+html[data-layout=appletv] .skel.rounded-2xl { border-radius: 20px; }
+html[data-layout=appletv] [data-card].w-64 { width: 19rem; }
+html[data-layout=appletv] [data-card].w-\[9\.5rem\] { width: 11rem; }
+html[data-layout=appletv][data-mode=mobile] [data-card].w-64 { width: 15rem; }
+html[data-layout=appletv][data-mode=mobile] [data-card].w-\[9\.5rem\] { width: 9.5rem; }
+html[data-layout=appletv] [data-card] .truncate:first-child { font-weight: 600; }
+
+/* card focus: lift + scale + soft shadow + gloss; ring fades in by opacity (no thick ring) */
+html[data-layout=appletv] [data-ring] {
+  box-shadow: 0 14px 24px rgba(0, 0, 0, .4);
+  background: linear-gradient(135deg, rgba(255, 255, 255, .3) 0%, rgba(255, 255, 255, 0) 45%);
+  transition: opacity var(--dur) var(--ease);
+}
+html[data-layout=appletv][data-mode] [data-card]:focus-visible [data-tile] { outline: none; }
+html[data-layout=appletv][data-mode] [data-card]:focus-visible [data-tilewrap],
+html[data-layout=appletv][data-mode] [data-card][data-focused="true"] [data-tilewrap] { transform: translateY(-6px) scale(1.08); will-change: transform; }
+html[data-layout=appletv][data-mode] [data-card]:focus-visible [data-ring],
+html[data-layout=appletv][data-mode] [data-card][data-focused="true"] [data-ring] { opacity: 1; }
+@media (hover: hover) {
+  html[data-layout=appletv][data-mode=desktop] [data-card]:hover [data-tilewrap] { transform: translateY(-4px) scale(1.04); }
+  html[data-layout=appletv][data-mode=desktop] [data-card]:hover [data-ring] { opacity: 1; }
+}
+html[data-layout=appletv][data-mode] [data-card]:active [data-tilewrap] { transform: scale(.97); }
+html[data-motion=reduced][data-layout=appletv][data-mode] [data-card]:focus-visible [data-tilewrap] { transform: scale(1.06); }
+
+/* ================= Apple TV page system ================= */
+html[data-layout=appletv] { --aw-up: 22rem; --aw-big: 30rem; --aw-poster: 12.5rem; --aw-person: 8.5rem; }
+html[data-layout=appletv][data-mode=mobile] { --aw-up: 15rem; --aw-big: 18rem; --aw-poster: 9rem; --aw-person: 6.5rem; }
+html[data-layout=appletv] .atv-w-up { width: var(--aw-up); }
+html[data-layout=appletv] .atv-w-big { width: var(--aw-big); }
+html[data-layout=appletv] .atv-w-poster { width: var(--aw-poster); }
+html[data-layout=appletv] .atv-w-person { width: var(--aw-person); }
+html[data-layout=appletv] .atv-w-fluid { width: 100%; min-width: 0; }
+
+/* typography */
+html[data-layout=appletv] .atv-h1 { font-size: 2.25rem; line-height: 1.05; font-weight: 800; letter-spacing: -.02em; color: var(--foreground); }
+html[data-layout=appletv] .atv-kicker { font-size: .8rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-70); }
+html[data-layout=appletv] .atv-shelf-title { font-size: 1.5rem; line-height: 1.2; font-weight: 700; letter-spacing: -.01em; }
+html[data-layout=appletv] .atv-wordmark { font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; }
+@media (min-width: 768px) { html[data-layout=appletv] .atv-h1 { font-size: 3.5rem; } }
+html[data-layout=appletv][data-mode=tv] .atv-h1 { font-size: 4rem; }
+
+/* scroll area: runs under the floating tab bar */
+html[data-layout=appletv] .atv-scroll { margin: calc(var(--hdr) * -1) calc(var(--gx) * -1) 0; height: calc(100% + var(--hdr)); padding: 0 var(--gx) 3rem; scroll-padding-top: calc(var(--hdr) + 1rem); scroll-padding-bottom: 4rem; scrollbar-width: none; }
+html[data-layout=appletv] .atv-scroll::-webkit-scrollbar { display: none; }
+html[data-layout=appletv] .atv-after-hero { position: relative; margin-top: -2.25rem; }
+
+/* hero: full-bleed artwork ~75% of the screen, text bottom-left, dots centred */
+html[data-layout=appletv] .atv-hero { height: 56%; min-height: 20rem; background: var(--surface); }
+html[data-layout=appletv] .atv-hero[data-tall] { height: 75%; min-height: min(26rem, 100%); }
+html[data-layout=appletv] .atv-slide { opacity: 0; transition: opacity 700ms var(--ease); }
+html[data-layout=appletv] .atv-slide[data-on] { opacity: 1; }
+html[data-motion=reduced][data-layout=appletv] .atv-slide { transition-duration: 150ms; }
+html[data-layout=appletv] .atv-hero-shade {
+  background: linear-gradient(to top, var(--background) 0%, rgba(0, 0, 0, 0) 60%);
+  opacity: .95;
+}
+html[data-layout=appletv] .atv-dot span { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--foreground); opacity: .3; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }
+html[data-layout=appletv] .atv-dot[aria-current] span { opacity: 1; transform: scale(1.3); }
+html[data-layout=appletv][data-mode] .atv-dot:focus-visible { box-shadow: none; transform: none; outline: none; }
+html[data-layout=appletv][data-mode] .atv-dot:focus-visible span { opacity: 1; transform: scale(1.6); }
+html[data-layout=appletv] .atv-btn { transition: transform var(--dur-fast) var(--ease); }
+html[data-layout=appletv] .atv-btn.atv-glass { box-shadow: none; background: var(--atv-glass-on); }
+html[data-layout=appletv][data-mode=tv] .atv-btn.atv-glass:focus-visible { background: var(--focus-bg) !important; color: var(--focus-fg) !important; }
+
+/* shelves */
+html[data-layout=appletv] .atv-shelf { margin-bottom: .25rem; }
+html[data-layout=appletv] .atv-shelf .rail { gap: 1.5rem; padding-top: 1.5rem; padding-bottom: 3rem; margin-top: -.5rem; margin-bottom: -1.5rem; }
+html[data-layout=appletv][data-mode=mobile] .atv-shelf .rail { gap: .875rem; }
+html[data-layout=appletv] .atv-shelf-wrap + .atv-shelf, html[data-layout=appletv] .atv-shelf-wrap .atv-shelf { margin-top: 0; }
+html[data-layout=appletv] .atv-chips .rail { padding-bottom: 1rem; }
+html[data-layout=appletv] .atv-chips button, html[data-layout=appletv] .atv-pillbtn { font-weight: 600; }
+html[data-layout=appletv] .atv-chips button:not([class*="bg-accent-blue-container"]) { background: var(--atv-glass-on); color: var(--foreground); }
+html[data-layout=appletv] .atv-chips button[class*="bg-accent-blue-container"] { background: var(--foreground); color: var(--background); }
+
+/* cards: art lifts, shadow + gloss fade in (opacity), caption fades in BELOW on focus; no ring */
+html[data-layout=appletv] .atv-card { position: relative; display: block; flex-shrink: 0; text-align: left; }
+html[data-layout=appletv] .atv-lift { position: relative; border-radius: 18px; transition: transform var(--dur) var(--ease); }
+html[data-layout=appletv] .atv-art { position: relative; overflow: hidden; border-radius: inherit; background: var(--surface); }
+html[data-layout=appletv] .atv-glow { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity var(--dur) var(--ease); box-shadow: 0 14px 24px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(255, 255, 255, .22); background: linear-gradient(135deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, 0) 45%); }
+html[data-layout=appletv] .atv-cap { min-height: 3rem; margin-top: .6rem; padding: 0 .25rem; opacity: 0; transform: translate3d(0, -4px, 0); transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }
+html[data-layout=appletv] .atv-cap[data-always], html[data-layout=appletv][data-mode=mobile] .atv-cap { opacity: 1; transform: none; }
+html[data-layout=appletv] .atv-bar { background: rgba(255, 255, 255, .3); }
+html[data-layout=appletv] .atv-card .atv-bar > div { height: 100%; background: #fff; }
+html[data-layout=appletv][data-mode] .atv-card:focus-visible, html[data-layout=appletv][data-mode] .atv-card[data-focused="true"] { outline: none; box-shadow: none; transform: none; z-index: 6; }
+html[data-layout=appletv][data-mode] .atv-card:focus-visible .atv-lift, html[data-layout=appletv][data-mode] .atv-card[data-focused="true"] .atv-lift { transform: translate3d(0, -.4rem, 0) scale(1.08); will-change: transform; }
+html[data-layout=appletv][data-mode] .atv-card:focus-visible .atv-glow, html[data-layout=appletv][data-mode] .atv-card[data-focused="true"] .atv-glow { opacity: 1; }
+html[data-layout=appletv][data-mode] .atv-card:focus-visible .atv-cap, html[data-layout=appletv][data-mode] .atv-card[data-focused="true"] .atv-cap { opacity: 1; transform: none; }
+html[data-motion=reduced][data-layout=appletv][data-mode] .atv-card:focus-visible .atv-lift { transform: scale(1.05); }
+@media (hover: hover) {
+  html[data-layout=appletv][data-mode=desktop] .atv-card:hover .atv-lift { transform: translate3d(0, -.25rem, 0) scale(1.04); }
+  html[data-layout=appletv][data-mode=desktop] .atv-card:hover .atv-glow { opacity: 1; }
+  html[data-layout=appletv][data-mode=desktop] .atv-card:hover .atv-cap { opacity: 1; transform: none; }
+}
+html[data-layout=appletv][data-mode] .atv-card:active .atv-lift { transform: scale(.97); }
+
+/* grids (favorites, library) */
+html[data-layout=appletv] .atv-grid { display: grid; gap: 1.5rem 1.25rem; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); padding: 1.25rem .5rem 3rem; }
+html[data-layout=appletv] .atv-grid-wide { grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
+html[data-layout=appletv][data-mode=mobile] .atv-grid { grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 1rem .75rem; padding-inline: 0; }
+html[data-layout=appletv][data-mode=mobile] .atv-grid-wide { grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); }
+
+/* list rows (library collections, top searches): selected = tinted, focused = light capsule */
+html[data-layout=appletv] .atv-row { color: var(--muted-foreground); background: transparent; transition: transform var(--dur-fast) var(--ease); }
+html[data-layout=appletv] .atv-row[aria-current] { background: var(--atv-glass-on); color: var(--foreground); }
+html[data-layout=appletv] .atv-row:hover { color: var(--foreground); }
+html[data-layout=appletv][data-mode=tv] .atv-row:focus-visible { background: var(--focus-bg) !important; color: var(--focus-fg) !important; transform: scale(1.03); box-shadow: none; }
+html[data-layout=appletv][data-mode=tv] .atv-row:focus-visible span { color: inherit; }
+html[data-layout=appletv][data-mode=mobile] .atv-colnav { padding-bottom: .5rem; }
+html[data-layout=appletv][data-mode=mobile] .atv-row { background: var(--atv-glass-on); border-radius: 999px; min-height: 2.75rem; }
+
+/* search field */
+html[data-layout=appletv] .atv-search { background: var(--atv-glass-on); }
+html[data-layout=appletv] .atv-search:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
+
+/* detail */
+html[data-layout=appletv] .atv-detail-top { min-height: calc(100% - 5.5rem); max-width: 100%; }
+html[data-layout=appletv] .atv-detail-body { background: linear-gradient(to bottom, rgba(0, 0, 0, 0), var(--background) 6rem); padding-top: 4rem; margin-top: -2rem; }
+html[data-layout=appletv] .atv-hero-shade { pointer-events: none; }
+
+/* static TV focus marks: selected must differ from focused */
+html[data-layout=appletv][data-mode=tv] .atv-btn:focus-visible, html[data-layout=appletv][data-mode=tv] .atv-chips button:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 3px; }

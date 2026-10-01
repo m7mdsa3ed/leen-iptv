@@ -1,0 +1,14 @@
+/* Google TV layout. Nav tab indicator: a pseudo-element whose opacity fades (no background animation). */
+html[data-layout=googletv] .gtv-tab { position: relative; isolation: isolate; transition: transform var(--dur-fast) var(--ease); }
+html[data-layout=googletv] .gtv-tab::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--surface-2); opacity: 0; transition: opacity var(--dur) var(--ease); }
+html[data-layout=googletv] .gtv-tab[aria-current=page]::before { opacity: 1; }
+/* captions sit dim until the card is focused/hovered (opacity only) */
+html[data-layout=googletv] [data-card] > .mt-2 { opacity: .7; transition: opacity var(--dur-fast) var(--ease); }
+html[data-layout=googletv] [data-card]:focus-visible > .mt-2, html[data-layout=googletv] [data-card]:hover > .mt-2 { opacity: 1; }
+/* focused tab = white pill (inverse of the theme); the selected-pill layer hides meanwhile */
+html[data-layout=googletv] .gtv-tab:focus-visible, html[data-layout=googletv] .gtv-tab[data-focused="true"] { background: var(--focus-bg); color: var(--focus-fg); outline: none; }
+html[data-layout=googletv] .gtv-tab:focus-visible::before, html[data-layout=googletv] .gtv-tab[data-focused="true"]::before { opacity: 0; }
+/* top bar goes solid on scroll */
+html[data-layout=googletv] .gtv-hdr-solid { transition: opacity var(--dur) var(--ease); }
+html[data-layout=googletv] .gtv-hero-fade { background-image: linear-gradient(to right, var(--background) 35%, var(--fade-mid) 65%, var(--fade-to)); }
+html[data-layout=googletv] .gtv-hero-fade-b { background-image: linear-gradient(to top, var(--background), var(--fade-to)); }

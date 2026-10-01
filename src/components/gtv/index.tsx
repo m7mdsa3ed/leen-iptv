@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, ReactNode, WheelEvent } from "react"
+import { useEffect, useState } from "react"
+import type { ButtonHTMLAttributes, ReactNode, SyntheticEvent, WheelEvent } from "react"
 import { ChevronRight, Info, Lock, Play, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/lib/store"
@@ -30,7 +31,7 @@ export const Rail = ({ title, children, className, onSeeAll }: { title?: ReactNo
         </button>
       </div>
     ) : title ? <SectionTitle className="mb-1 px-[var(--gx)]">{title}</SectionTitle> : null}
-    <div className="rail !mx-0" onWheel={wheel}>{children}</div>
+    <div className="rail rail-in !mx-0" onWheel={wheel}>{children}</div>
   </section>
 )
 
@@ -86,6 +87,7 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
   const fav = useApp((s) => !!s.profileId && s.data[s.profileId]?.favs.includes(item.id))
   const locked = useLocked(item)
   const live = item.kind === "live"
+  const [loaded, setLoaded] = useState(false)
   const chip = "absolute top-2 grid size-7 place-items-center rounded-full bg-black/60"
   return (
     <button
@@ -96,12 +98,14 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
       onFocus={onFocus}
       className={cn("block shrink-0 text-left", fluid ? "w-full" : variant === "wide" ? "w-64" : "w-[9.5rem]", className)}
     >
-      <div data-tile className={cn("relative overflow-hidden rounded-2xl bg-surface", variant === "wide" ? "aspect-video" : "aspect-[2/3]", live && "bg-gradient-to-br from-surface-3 to-surface")}>
-        {!live && variant === "wide" && item.logo && <img src={item.logo} alt="" aria-hidden className="absolute inset-0 size-full scale-125 object-cover opacity-60 blur-xl" />}
+      <div data-tilewrap className="relative rounded-2xl">
+      <div data-tile data-loaded={loaded ? "" : undefined} onLoadCapture={(e: SyntheticEvent) => { if ((e.target as HTMLImageElement).loading === "lazy") setLoaded(true) }} className={cn("relative overflow-hidden rounded-[inherit] bg-surface", variant === "wide" ? "aspect-video" : "aspect-[2/3]", live && "bg-gradient-to-br from-surface-3 to-surface")}>
         <Logo item={item} className={cn("relative size-full", live ? "p-6" : variant === "wide" ? "object-contain" : "object-cover")} />
         {fav && <span className={cn(chip, "right-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
         {locked && <span className={cn(chip, "left-2")}><Lock className="size-4 text-white" /></span>}
         {pct ? <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} /></div> : null}
+      </div>
+      <span data-ring aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit]" />
       </div>
       <div className="mt-2 px-1">
         <div className="truncate text-base text-foreground">{item.name}</div>
@@ -116,9 +120,22 @@ export function Hero({ item, onPlay, onInfo, onFav, isFav, kicker, children }: {
   item?: Item; onPlay: () => void; onInfo?: () => void; onFav: () => void; isFav?: boolean; kicker?: ReactNode; children?: ReactNode
 }) {
   const meta = item ? [item.group, item.rating ? `★ ${item.rating}` : ""].filter(Boolean).join("  ·  ") : ""
+  // two stacked layers: the new image fades in (opacity) over the previous one, which is dropped once covered
+  const [layers, setLayers] = useState(() => (item?.logo ? [{ k: item.id, src: item.logo }] : []))
+  useEffect(() => {
+    const src = item?.logo
+    if (!src) return setLayers([])
+    setLayers((l) => (l[l.length - 1]?.src === src ? l : [...l.slice(-1), { k: item.id, src }]))
+    const t = setTimeout(() => setLayers((l) => l.slice(-1)), 500)
+    return () => clearTimeout(t)
+  }, [item?.id, item?.logo])
   return (
     <section className="relative -mx-[var(--gx)] mb-4 overflow-hidden bg-gradient-to-br from-accent-blue-container via-surface to-background">
-      {item?.logo && <img key={item.id} src={item.logo} alt="" aria-hidden className="absolute inset-0 size-full animate-in fade-in object-cover opacity-40 duration-300" decoding="async" />}
+      {layers.map((l, i) => (
+        <div key={l.k} aria-hidden className={cn("absolute inset-0", i > 0 && "m-fade")}>
+          <img src={l.src} alt="" className="size-full object-cover opacity-40" decoding="async" />
+        </div>
+      ))}
       <div className="absolute inset-0 bg-background/40" />
       <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
@@ -144,26 +161,26 @@ export function Hero({ item, onPlay, onInfo, onFav, isFav, kicker, children }: {
   )
 }
 
-/** Leen IPTV mark (same artwork as public/logo.svg). */
+/** Leen mark (same artwork as public/logo.svg): a gradient play triangle with a solid core, on a midnight tile. */
 export function LeenMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 100 100" role="img" aria-label="Leen IPTV" className={cn("shrink-0", className)}>
+    <svg viewBox="0 0 100 100" role="img" aria-label="Leen" className={cn("shrink-0", className)}>
       <defs>
-        <linearGradient id="leen-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#4285f4" />
-          <stop offset="1" stopColor="#7c4dff" />
+        <linearGradient id="leen-g" gradientUnits="userSpaceOnUse" x1="30" y1="24" x2="80" y2="76">
+          <stop offset="0" stopColor="#22d3ee" />
+          <stop offset=".55" stopColor="#a855f7" />
+          <stop offset="1" stopColor="#f472b6" />
         </linearGradient>
       </defs>
-      <rect width="100" height="100" rx="24" fill="url(#leen-g)" />
-      <rect x="28" y="22" width="14" height="52" rx="7" fill="#fff" />
-      <rect x="28" y="60" width="46" height="14" rx="7" fill="#fff" />
-      <path d="M52 30v22l20-11z" fill="#fff" stroke="#fff" strokeWidth="5" strokeLinejoin="round" />
+      <rect width="100" height="100" rx="26" fill="#0e1020" />
+      <path d="M36 28V72L76 50Z" fill="none" stroke="url(#leen-g)" strokeWidth="9" strokeLinejoin="round" />
+      <path d="M46 41V59L61 50Z" fill="#fff" stroke="#fff" strokeWidth="4" strokeLinejoin="round" />
     </svg>
   )
 }
 
 /* ---------- loading skeletons (same footprints as the real Card / Rail / Hero so nothing jumps when data arrives) ---------- */
-const sk = "animate-pulse bg-surface-2"
+const sk = "skel"
 
 export const SkelBar = ({ className }: { className?: string }) => <div aria-hidden className={cn(sk, "h-4 rounded-full", className)} />
 

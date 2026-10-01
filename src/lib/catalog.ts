@@ -4,6 +4,8 @@ import type { Item, Kind, Prog, Source } from "./types"
 import { explain, fetchText, px } from "./net"
 import { parseM3U, parseXmltv } from "./parse"
 import { loadXtream, xmltvUrl } from "./xtream"
+import { loadPlex } from "./plex"
+import { useApp } from "./store"
 
 const TTL = 12 * 3600_000
 const empty = { live: [], movie: [], series: [] } as Record<Kind, string[]>
@@ -52,6 +54,7 @@ export const useCatalog = create<C>((setS) => ({
       if (cached && Date.now() - cached.at < TTL) items = cached.items
       if (!items) {
         if (src.type === "xtream") items = await loadXtream(src, proxy, (msg) => setS({ msg }))
+        else if (src.type === "plex") items = await loadPlex(src, proxy, (msg) => setS({ msg }))
         else {
           setS({ msg: "Downloading playlist" })
           items = parseM3U(await fetchText(px(src.url!, proxy)), src.id)
@@ -59,6 +62,7 @@ export const useCatalog = create<C>((setS) => ({
         if (!items.length) throw new Error("No channels found in this source")
         void set("cat:" + src.id, { at: Date.now(), items })
       }
+      if (src.type === "plex") seedProgress(items)
       setS({ ...index(items), status: "ready", msg: "" })
       void loadEpg(src, proxy, force)
     } catch (e) {
@@ -67,7 +71,15 @@ export const useCatalog = create<C>((setS) => ({
   },
 }))
 
+/** Plex watch positions become local progress (once) so Continue watching shows them. */
+function seedProgress(items: Item[]) {
+  const a = useApp.getState()
+  const have = (a.profileId && a.data[a.profileId]?.progress) || {}
+  for (const i of items) if (i.resume && i.resume > 30 && i.dur && !have[i.id]) a.setProgress(i.id, i.resume, i.dur)
+}
+
 async function loadEpg(src: Source, proxy: string, force?: boolean) {
+  if (src.type === "plex") return // no guide for Plex
   const url = src.epgUrl || (src.type === "xtream" ? xmltvUrl(src) : "")
   if (!url) return
   const want = new Set(useCatalog.getState().byKind.live.map((i) => i.epgId).filter(Boolean) as string[])

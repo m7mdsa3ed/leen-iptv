@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Hls from "hls.js"
 import mpegts from "mpegts.js"
-import { ArrowLeft, Captions, Expand, Maximize, Minimize, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Star, Volume1, Volume2, VolumeX } from "lucide-react"
+import { ArrowLeft, Captions, RotateCcw, RotateCw, Expand, Maximize, Minimize, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Star, Volume1, Volume2, VolumeX } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { hm, nowNext, useCatalog } from "@/lib/catalog"
 import { isTv } from "@/lib/device"
-import { CORS_HINT, pxStream, statusMsg } from "@/lib/net"
+import { CORS_HINT, mixed, px, pxStream, statusMsg } from "@/lib/net"
 import { KEY, navState, useRoute } from "@/lib/nav"
 import { useApp, useSource } from "@/lib/store"
 import type { Item } from "@/lib/types"
 import { rate, type Quality } from "@/lib/quality"
+import { plexScrobble, plexStopTranscode, plexStreamUrl, plexTimeline } from "@/lib/plex"
 import { xtreamUrl } from "@/lib/xtream"
+import { useHistory } from "@/lib/history"
 
 const NONE: string[] = []
 const FITS = ["contain", "cover", "fill"] as const
@@ -58,57 +60,79 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   const mp = useRef<mpegts.Player | null>(null)
   const stalls = useRef<number[]>([]) // timestamps of rebuffer events in the last minute
   const played = useRef(false)
+  // watch-history measurements (read by the tracker below)
+  const stallTotal = useRef(0)
+  const errTotal = useRef(0)
+  const attachAt = useRef(0)
+  const startupMs = useRef<number | undefined>(undefined)
+  const statsRef = useRef(stats)
+  statsRef.current = stats
 
-  const raw = item.url ?? xtreamUrl(src!, live ? "live" : "movie", item.sid!, live ? settings.liveExt : item.ext || "mp4")
-  const url = pxStream(raw, settings)
+  const plex = src?.type === "plex" ? src : null
+  const raw = item.url ?? (plex ? plexStreamUrl(plex, item) : xtreamUrl(src!, live ? "live" : "movie", item.sid!, live ? settings.liveExt : item.ext || "mp4"))
+  const url = plex && mixed(raw) ? px(raw, settings.proxy) : pxStream(raw, settings) // plex http on https page must be proxied
 
   /* resume point + history */
   useEffect(() => {
     const p = useApp.getState().data[useApp.getState().profileId ?? ""]?.progress[item.id]
-    resume.current = !live && p && p.pos > 30 && p.pos < p.dur * 0.95 ? p.pos : 0
+    resume.current = !live && p && p.pos > 30 && p.pos < p.dur * 0.95 ? p.pos : !live && !p && item.resume && item.resume > 30 ? item.resume : 0
     pushRecent(item.id)
     setCur(0); setDur(0); setAudio([]); setSubs([]); setBanner(true)
     clearTimeout(bannerT.current)
     bannerT.current = window.setTimeout(() => setBanner(false), 4000)
   }, [item.id, live, pushRecent])
 
-  /* attach the right engine */
+  /* attach the right engine. Teardown is strict: the old stream must be fully closed (requests aborted, decoder released) before
+     the next one opens, because many providers allow only 1-2 connections and a leftover one makes the new channel fail. */
+  const firstAttach = useRef(true)
   useEffect(() => {
     const v = vref.current!
     setErr(""); setBuf(true); setStats(null)
     stalls.current = []; played.current = false
+    attachAt.current = Date.now(); startupMs.current = undefined
     const isHls = viaHls === url || /\.m3u8(\?|$)/i.test(raw) || /[?&]output=m3u8/i.test(raw)
-    let off = () => {}
-    if (isHls && Hls.isSupported()) {
-      const h = new Hls({ maxBufferLength: 30, enableWorker: true })
-      hls.current = h
-      let net = 0
-      h.loadSource(url); h.attachMedia(v)
-      h.on(Hls.Events.MANIFEST_PARSED, () => void v.play().catch(() => {}))
-      h.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => setAudio(h.audioTracks.map((t, i) => ({ id: i, label: t.name || t.lang || `Audio ${i + 1}` }))))
-      h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => setSubs(h.subtitleTracks.map((t, i) => ({ id: i, label: t.name || t.lang || `Subtitle ${i + 1}` }))))
-      h.on(Hls.Events.ERROR, (_e, d) => {
-        if (!d.fatal) return
-        const code = d.response?.code
-        const http = !!code && code >= 400 // 4xx will not fix itself: no retries
-        if (d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && net++ < 3) h.startLoad()
-        else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && net++ < 3) h.recoverMediaError()
-        else setErr(http ? statusMsg(code) : d.type === Hls.ErrorTypes.NETWORK_ERROR ? CORS_HINT : d.type === Hls.ErrorTypes.MEDIA_ERROR ? "This device can't decode the stream." : "Stream unavailable.")
-      })
-      off = () => { h.destroy(); hls.current = null }
-    } else if (live && mpegts.isSupported()) {
-      const p = mpegts.createPlayer({ type: "mpegts", isLive: true, url }, { enableWorker: true, liveBufferLatencyChasing: true })
-      mp.current = p
-      p.attachMediaElement(v); p.load()
-      void Promise.resolve(p.play()).catch(() => {})
-      p.on(mpegts.Events.ERROR, (_t, _d, info: { code?: number }) => setErr(info?.code && info.code >= 400 ? statusMsg(info.code) : "Stream unavailable. The channel may be offline, or the browser blocked it (CORS)."))
-      off = () => { p.destroy(); mp.current = null }
-    } else {
-      v.src = url
-      void v.play().catch(() => {})
-      off = () => { v.removeAttribute("src"); v.load() }
+    let stop = () => {}
+    const start = () => {
+      if (isHls && Hls.isSupported()) {
+        const h = new Hls({ maxBufferLength: 30, enableWorker: true })
+        hls.current = h
+        let net = 0
+        h.loadSource(url); h.attachMedia(v)
+        h.on(Hls.Events.MANIFEST_PARSED, () => void v.play().catch(() => {}))
+        h.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => setAudio(h.audioTracks.map((t, i) => ({ id: i, label: t.name || t.lang || `Audio ${i + 1}` }))))
+        h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => setSubs(h.subtitleTracks.map((t, i) => ({ id: i, label: t.name || t.lang || `Subtitle ${i + 1}` }))))
+        h.on(Hls.Events.ERROR, (_e, d) => {
+          if (!d.fatal) return
+          const code = d.response?.code
+          const http = !!code && code >= 400 // 4xx will not fix itself: no retries
+          if (d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && net++ < 3) h.startLoad()
+          else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && net++ < 3) h.recoverMediaError()
+          else setErr(http ? statusMsg(code) : d.type === Hls.ErrorTypes.NETWORK_ERROR ? CORS_HINT : d.type === Hls.ErrorTypes.MEDIA_ERROR ? "This device can't decode the stream." : "Stream unavailable.")
+        })
+        stop = () => { h.stopLoad(); h.detachMedia(); h.destroy(); hls.current = null }
+      } else if (live && mpegts.isSupported()) {
+        const p = mpegts.createPlayer({ type: "mpegts", isLive: true, url }, { enableWorker: true, liveBufferLatencyChasing: true })
+        mp.current = p
+        p.attachMediaElement(v); p.load()
+        void Promise.resolve(p.play()).catch(() => {})
+        p.on(mpegts.Events.ERROR, (_t, _d, info: { code?: number }) => setErr(info?.code && info.code >= 400 ? statusMsg(info.code) : "Stream unavailable. The channel may be offline, or the browser blocked it (CORS)."))
+        stop = () => { p.pause(); p.unload(); p.detachMediaElement(); p.destroy(); mp.current = null } // unload() aborts the open live connection
+      } else {
+        v.src = url
+        void v.play().catch(() => {})
+      }
     }
-    return off
+    // zapping fast (CH+ held, arrows): only the channel you settle on opens a connection
+    const first = firstAttach.current
+    firstAttach.current = false
+    const t = live && !first ? window.setTimeout(start, 300) : (start(), 0)
+    return () => {
+      clearTimeout(t)
+      stop()
+      v.pause()
+      v.removeAttribute("src") // release the decoder and any buffered/blob source
+      v.load()
+    }
   }, [url, live, retry, viaHls])
 
   /* save progress */
@@ -117,6 +141,57 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
     const t = setInterval(() => { const v = vref.current; if (v && v.duration > 0) setProgress(item.id, v.currentTime, v.duration) }, 10000)
     return () => { clearInterval(t); const v = vref.current; if (v && v.duration > 0) setProgress(item.id, v.currentTime, v.duration) }
   }, [item.id, live, setProgress])
+
+  useEffect(() => { if (err) errTotal.current++ }, [err])
+
+  /* Watch history: one session per playback, +5s while actually playing (paused/buffering time is not counted).
+     Stats and the History page read this; Settings > History turns it off. */
+  useEffect(() => {
+    const pid = useApp.getState().profileId
+    if (!settings.trackHistory || !pid) return
+    const H = useHistory.getState()
+    let sid = ""
+    let alive = true
+    stallTotal.current = 0; errTotal.current = 0
+    let speedSum = 0, speedN = 0
+    const kind = live ? "live" : item.id.includes("|ep|") ? "episode" : "movie"
+    void H.load(pid).then(() => { if (alive) sid = useHistory.getState().start({ item: item.id, kind, name: item.name, group: item.group, logo: item.logo, src: src?.id ?? "" }) })
+    const snap = () => {
+      const v = vref.current
+      const st = statsRef.current
+      if (st?.bw) { speedSum += st.bw / 1e6; speedN++ }
+      return { pos: v?.currentTime, dur: v && isFinite(v.duration) ? v.duration : undefined, stalls: stallTotal.current, errors: errTotal.current, startupMs: startupMs.current, q: st?.q, mbps: speedN ? speedSum / speedN : undefined }
+    }
+    const iv = setInterval(() => {
+      const v = vref.current
+      if (sid && v && !v.paused && v.readyState >= 3) useHistory.getState().tick(sid, 5, snap())
+    }, 5000)
+    return () => {
+      alive = false
+      clearInterval(iv)
+      if (sid) useHistory.getState().patch(sid, snap())
+    }
+  }, [item.id, settings.trackHistory]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Plex: timeline every 10s + on pause/play, stopped (and scrobble when >90%) on leave */
+  useEffect(() => {
+    const v = vref.current
+    if (!plex || live || !v) return
+    let pos = 0, d = 0
+    const rep = (state: "playing" | "paused" | "stopped") => d > 0 && plexTimeline(plex, item, state, pos, d)
+    const tick = () => { if (v.duration > 0) { pos = v.currentTime; d = v.duration } }
+    const on = (state: "playing" | "paused") => () => { tick(); rep(state) }
+    const t = setInterval(() => { tick(); rep(v.paused ? "paused" : "playing") }, 10000)
+    const onPause = on("paused"), onPlay = on("playing")
+    v.addEventListener("pause", onPause); v.addEventListener("play", onPlay); v.addEventListener("timeupdate", tick)
+    return () => {
+      clearInterval(t)
+      v.removeEventListener("pause", onPause); v.removeEventListener("play", onPlay); v.removeEventListener("timeupdate", tick)
+      rep("stopped")
+      plexStopTranscode(plex, item)
+      if (d > 0 && pos / d > 0.9) plexScrobble(plex, item)
+    }
+  }, [item.id, live, plex]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const poke = useCallback(() => {
     setShow(true)
@@ -302,8 +377,8 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
         onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
         onDurationChange={(e) => setDur(e.currentTarget.duration)}
         onVolumeChange={(e) => { setVol(e.currentTarget.volume); setMuted(e.currentTarget.muted) }}
-        onWaiting={() => { setBuf(true); if (played.current) stalls.current.push(Date.now()) }}
-        onPlaying={() => { setBuf(false); setPaused(false); played.current = true }}
+        onWaiting={() => { setBuf(true); if (played.current) { stalls.current.push(Date.now()); stallTotal.current++ } }}
+        onPlaying={() => { setBuf(false); setPaused(false); played.current = true; startupMs.current ??= Date.now() - attachAt.current }}
         onPause={() => setPaused(true)}
         onEnded={() => (idx < queue.length - 1 ? setIdx(idx + 1) : back())}
         onError={() => (!live && !hls.current && viaHls !== url && Hls.isSupported() ? setViaHls(url) : setErr(vref.current?.error?.code === 4 ? "This format isn't supported on this device." : vref.current?.error?.code === 3 ? "The stream is corrupted or can't be decoded." : "Cannot play this stream. It may be offline, or the browser blocked it (CORS)."))}
@@ -343,31 +418,38 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
                   onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); seekTo(e) }}
                   onPointerMove={(e) => e.buttons && seekTo(e)}
                 >
-                  <div className="relative h-1 w-full rounded-full bg-white/25"><div className="h-full rounded-full bg-white" style={{ width: `${dur ? (cur / dur) * 100 : 0}%` }} /><div className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md" style={{ left: `${dur ? (cur / dur) * 100 : 0}%` }} /></div>
+                  <div className="relative h-1 w-full rounded-full bg-white/25"><div className="h-full rounded-full bg-white [html[data-layout=netflix]_&]:bg-[#e50914]" style={{ width: `${dur ? (cur / dur) * 100 : 0}%` }} /><div className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md [html[data-layout=netflix]_&]:bg-[#e50914]" style={{ left: `${dur ? (cur / dur) * 100 : 0}%` }} /></div>
                 </button>
                 <span className="w-14 sm:w-20">{mmss(dur)}</span>
               </div>
             )}
             {stats && <div className="mb-2 text-right text-xs text-white/60 sm:text-sm">{qualityDetail(stats)}</div>}
-            <div className="pointer-events-auto flex flex-wrap items-center gap-2 sm:gap-3">
-              {queue.length > 1 && <RoundButton label="Previous" onClick={prev_}><SkipBack /></RoundButton>}
-              <RoundButton data-play data-primary label={paused ? "Play" : "Pause"} className="size-14 bg-white text-[#1f1f1f] [&_svg]:size-7" onClick={toggle}>{paused ? <Play className="fill-current" /> : <Pause className="fill-current" />}</RoundButton>
-              {queue.length > 1 && <RoundButton label="Next" onClick={next_}><SkipForward /></RoundButton>}
-              <RoundButton label="Favorite" active={isFav} onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} /></RoundButton>
-              {!isTv && (
-                <>
-                  <RoundButton label="Mute" onClick={() => (vref.current!.muted = !muted)}>{muted || !vol ? <VolumeX /> : <Volume2 />}</RoundButton>
-                  <input type="range" aria-label="Volume" min={0} max={1} step={0.05} value={muted ? 0 : vol} onChange={(e) => setVolume(+e.target.value)} className="hidden w-24 accent-primary md:block" />
-                </>
-              )}
-              <Pill aria-label="Audio" className="h-12 px-3 lg:px-6" onClick={() => setMenu("audio")}><Volume1 className={ic} /><span className={lbl}>Audio</span></Pill>
-              <Pill aria-label="Subtitles" className="h-12 px-3 lg:px-6" onClick={openSubs}><Captions className={ic} /><span className={lbl}>Subtitles</span></Pill>
-              <Pill aria-label="Aspect" className="h-12 px-3 lg:px-6" onClick={() => setFit((f) => (f + 1) % FITS.length)}><Maximize className={ic} /><span className={lbl}>{FIT_LABEL[FITS[fit]]}</span></Pill>
-              {canPip && <RoundButton label="Picture in picture" active={pip} onClick={togglePip}><PictureInPicture2 className={pip ? "text-primary" : ""} /></RoundButton>}
-              {!isTv && <RoundButton label="Fullscreen" onClick={toggleFs}>{fs ? <Minimize /> : <Expand />}</RoundButton>}
-              {stats && <QualityBadge s={stats} />}
-              {isTv && <span className="text-sm text-white/60">Red favorite - Green audio - Yellow aspect - Blue subtitles</span>}
+            {/* three zones, always in this order: transport (left) | volume | tools (right). Stacks into two centered rows on narrow screens. */}
+            <div className="pointer-events-auto flex flex-col items-center gap-3 md:flex-row md:justify-between md:gap-6">
+              <div className="flex items-center justify-center gap-2 sm:gap-3">
+                {queue.length > 1 && <RoundButton label="Previous" onClick={prev_}><SkipBack /></RoundButton>}
+                <RoundButton data-play data-primary label={paused ? "Play" : "Pause"} className="size-14 bg-white text-[#1f1f1f] [&_svg]:size-7" onClick={toggle}>{paused ? <Play className="fill-current" /> : <Pause className="fill-current" />}</RoundButton>
+                {!live && <RoundButton label="Back 10 seconds" className="hidden [html[data-layout=netflix]_&]:flex" onClick={() => seek(-10)}><RotateCcw /></RoundButton>}
+                {!live && <RoundButton label="Forward 10 seconds" className="hidden [html[data-layout=netflix]_&]:flex" onClick={() => seek(10)}><RotateCw /></RoundButton>}
+                {queue.length > 1 && <RoundButton label="Next" onClick={next_}><SkipForward /></RoundButton>}
+                {!isTv && (
+                  <div className="ml-1 flex items-center gap-2 sm:ml-3">
+                    <RoundButton label="Mute" onClick={() => (vref.current!.muted = !muted)}>{muted || !vol ? <VolumeX /> : <Volume2 />}</RoundButton>
+                    <input type="range" aria-label="Volume" min={0} max={1} step={0.05} value={muted ? 0 : vol} onChange={(e) => setVolume(+e.target.value)} className="hidden w-24 accent-primary lg:block" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:justify-end">
+                {stats && <QualityBadge s={stats} />}
+                <RoundButton label="Favorite" active={isFav} onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} /></RoundButton>
+                <Pill aria-label="Audio" className="h-12 px-3 lg:px-6" onClick={() => setMenu("audio")}><Volume1 className={ic} /><span className={lbl}>Audio</span></Pill>
+                <Pill aria-label="Subtitles" className="h-12 px-3 lg:px-6" onClick={openSubs}><Captions className={ic} /><span className={lbl}>Subtitles</span></Pill>
+                <Pill aria-label="Aspect" className="h-12 px-3 lg:px-6" onClick={() => setFit((f) => (f + 1) % FITS.length)}><Maximize className={ic} /><span className={lbl}>{FIT_LABEL[FITS[fit]]}</span></Pill>
+                {canPip && <RoundButton label="Picture in picture" active={pip} onClick={togglePip}><PictureInPicture2 className={pip ? "text-primary" : ""} /></RoundButton>}
+                {!isTv && <RoundButton label="Fullscreen" onClick={toggleFs}>{fs ? <Minimize /> : <Expand />}</RoundButton>}
+              </div>
             </div>
+            {isTv && <div className="mt-3 text-center text-sm text-white/60">Red favorite - Green audio - Yellow aspect - Blue subtitles</div>}
           </div>
         )}
       </div>
@@ -402,7 +484,7 @@ const qualityDetail = (s: Stats) =>
 function QualityBadge({ s }: { s: Stats }) {
   const on = s.q === "good" ? 3 : s.q === "fair" ? 2 : 1
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm sm:text-base" title={qualityDetail(s)} aria-label={`Connection quality: ${QL[s.q]}`}>
+    <div className="flex h-12 shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 text-sm sm:text-base" title={qualityDetail(s)} aria-label={`Connection quality: ${QL[s.q]}`}>
       <span className="flex items-end gap-0.5" aria-hidden>
         {[1, 2, 3].map((n) => <span key={n} className={`w-1.5 rounded-sm ${n <= on ? QC[s.q] : "bg-white/25"}`} style={{ height: 6 + n * 4 }} />)}
       </span>

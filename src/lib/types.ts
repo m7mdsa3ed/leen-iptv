@@ -13,17 +13,24 @@ export interface Item {
   num?: number
   rating?: string
   plot?: string
+  genres?: string[] // Plex: genres come with the catalog
+  year?: string
+  backdrop?: string
+  resume?: number // seconds watched on the server (Plex)
+  dur?: number // seconds
 }
 
 export interface Source {
   id: string
   name: string
-  type: "m3u" | "xtream"
+  type: "m3u" | "xtream" | "plex"
   url?: string
   epgUrl?: string
   server?: string
   user?: string
   pass?: string
+  token?: string // Plex server access token (server = chosen connection URI)
+  serverId?: string // Plex machine identifier
 }
 
 export interface Profile {

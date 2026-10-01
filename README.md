@@ -1,7 +1,9 @@
-# Leen IPTV
+# Leen
 
-Leen IPTV: React 19 + Tailwind v4 + shadcn (Base UI) client for LG webOS 23+ (Chromium 94+), desktop and Android (PWA). Google TV style UI, light and dark themes.
-M3U and Xtream sources, live TV + EPG guide, movies, series, favorites, resume, profiles with PIN and category locks.
+Leen: React 19 + Tailwind v4 + shadcn (Base UI) client for LG webOS 23+ (Chromium 94+), desktop and Android (PWA). Google TV style UI, light and dark themes.
+M3U, Xtream and Plex sources, live TV + EPG guide, movies, series, favorites, resume, profiles with PIN and category locks.
+
+Features: Plex source (plex.tv sign-in, server discovery, resume sync); three switchable layouts (Google TV, Apple TV, Netflix) that each reshape the shell, Home and the Movies/Shows/Live/Library/Search/Detail/Category/Genre screens,  and a Motion option (full / reduced / off) under Settings > Display; consistent switches/toggles and improved D-pad navigation on TV.
 
 ## Run
     pnpm dev          # browser preview (use arrow keys / Enter / Esc as the remote)
