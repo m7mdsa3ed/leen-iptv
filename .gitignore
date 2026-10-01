@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+out/
+*.ipk
+*.tsbuildinfo
+
+# env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# local tooling state
+.claude/settings.local.json
+.claude/projects/
+.claude/todos/
+.claude/shell-snapshots/
+
+# test scratch
+public/mock/
+playwright-report/
+test-results/

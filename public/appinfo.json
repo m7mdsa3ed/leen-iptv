@@ -1,0 +1,13 @@
+{
+  "id": "com.leen.iptv",
+  "version": "1.0.0",
+  "vendor": "Leen",
+  "type": "web",
+  "main": "index.html",
+  "title": "Leen IPTV",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0e0f11",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true
+}
