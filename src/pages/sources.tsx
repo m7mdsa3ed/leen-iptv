@@ -6,8 +6,9 @@ import { useRoute } from "@/lib/nav"
 import { explain } from "@/lib/net"
 import { checkPin, createPin, pickConnection, plexServers, type Pin, type PlexServer } from "@/lib/plex"
 import type { ConnMode } from "@/lib/plex-pure"
+import { jellyfinServerInfo, jellyfinSignIn, normServer, quickConnectCheck, quickConnectEnabled, quickConnectFinish, quickConnectStart, type JfAuth } from "@/lib/jellyfin"
 
-type Type = "M3U" | "Xtream" | "Plex"
+type Type = "M3U" | "Xtream" | "Plex" | "Jellyfin"
 
 export default function Sources() {
   const addSource = useApp((s) => s.addSource)
@@ -21,7 +22,9 @@ export default function Sources() {
   const [manual, setManual] = useState(false)
   const [busy, setBusy] = useState("")
   const [err, setErr] = useState("")
-  const ok = type === "Plex" ? /^https?:\/\//.test(f.server) && f.token : f.name && (type === "M3U" ? /^https?:\/\//.test(f.url) : /^https?:\/\//.test(f.server) && f.user && f.pass)
+  // Jellyfin: username/password, or Quick Connect (code approved in another Jellyfin app, polled here)
+  const [qc, setQc] = useState<{ server: string; secret: string; code: string } | null>(null)
+  const ok = type === "Jellyfin" ? f.server && f.user : type === "Plex" ? /^https?:\/\//.test(f.server) && f.token : f.name && (type === "M3U" ? /^https?:\/\//.test(f.url) : /^https?:\/\//.test(f.server) && f.user && f.pass)
 
   useEffect(() => {
     if (!pin) return
@@ -44,6 +47,47 @@ export default function Sources() {
     }, 2000)
     return () => { live = false; clearInterval(t) }
   }, [pin])
+
+  useEffect(() => {
+    if (!qc) return
+    let live = true
+    let busyTick = false // a check can outlast the 3s interval: never run two at once (two would add the source twice)
+    const t = setInterval(async () => {
+      if (busyTick) return
+      busyTick = true
+      try {
+        if (!(await quickConnectCheck(qc.server, qc.secret)) || !live) return
+        clearInterval(t)
+        await jfAdd(qc.server, () => quickConnectFinish(qc.server, qc.secret), () => live)
+      } catch (e) {
+        if (!live) return
+        clearInterval(t)
+        setErr(explain(e)); setQc(null); setBusy("")
+      } finally { busyTick = false }
+    }, 3000)
+    return () => { live = false; clearInterval(t) }
+  }, [qc]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Check the address is a Jellyfin server, sign in, save. */
+  const jfAdd = async (server: string, auth: () => Promise<JfAuth>, live = () => true) => {
+    setErr(""); setBusy("Signing in...")
+    try {
+      const info = await jellyfinServerInfo(server)
+      const a = await auth()
+      if (!live()) return
+      addSource({ name: info.name, type: "jellyfin", server, token: a.token, userId: a.userId, serverId: info.id })
+      reset("home")
+    } catch (e) { if (live()) { setErr(explain(e)); setBusy(""); setQc(null) } }
+  }
+  const jfQuick = async () => {
+    const server = normServer(f.server)
+    setErr(""); setBusy("Contacting server...")
+    try {
+      await jellyfinServerInfo(server)
+      if (!(await quickConnectEnabled(server))) throw new Error("Quick Connect is turned off on this server. Sign in with your username and password.")
+      setQc({ server, ...(await quickConnectStart(server)) }); setBusy("")
+    } catch (e) { setErr(explain(e)); setBusy("") }
+  }
 
   const signIn = async () => {
     setErr(""); setBusy("Contacting plex.tv...")
@@ -81,14 +125,14 @@ export default function Sources() {
       <div className="flex w-full max-w-[40rem] flex-col gap-3 rounded-[28px] bg-surface p-6">
         <h1 className="text-3xl font-medium tracking-tight md:text-4xl">Add a source</h1>
         <div className="flex gap-2 py-2">
-          {(["Xtream", "M3U", "Plex"] as const).map((t) => (
-            <Pill key={t} variant="tonal" className={type === t ? "bg-accent-blue-container text-foreground" : ""} onClick={() => { setType(t); setErr("") }}>{t}</Pill>
+          {(["Xtream", "M3U", "Plex", "Jellyfin"] as const).map((t) => (
+            <Pill key={t} variant="tonal" className={type === t ? "bg-accent-blue-container text-foreground" : ""} onClick={() => { setType(t); setErr(""); setQc(null); setBusy("") }}>{t}</Pill>
           ))}
         </div>
-        {type !== "Plex" && field("name", "Name")}
+        {type !== "Plex" && type !== "Jellyfin" && field("name", "Name")}
         {type === "M3U" && field("url", "Playlist URL (http://...m3u)", "url", "url")}
         {type === "Xtream" && (<>{field("server", "Server (http://host:port)", "url", "url")}{field("user", "Username", "text", undefined, "username")}{field("pass", "Password", "password", undefined, "current-password")}</>)}
-        {type !== "Plex" && field("epgUrl", "EPG / XMLTV URL (optional)", "url", "url")}
+        {type !== "Plex" && type !== "Jellyfin" && field("epgUrl", "EPG / XMLTV URL (optional)", "url", "url")}
 
         {type === "Plex" && !manual && !pin && !servers && (
           <div className="flex flex-col gap-3">
@@ -123,10 +167,23 @@ export default function Sources() {
           </div>
         )}
         {type === "Plex" && manual && (<>{field("server", "Server (http://host:32400)", "url", "url")}{field("token", "Plex token", "password")}{field("name", "Name (optional)")}</>)}
+        {type === "Jellyfin" && !qc && (<>
+          <p className="text-muted-foreground">Movies, shows and live TV (when the server has it) from your Jellyfin server.</p>
+          {field("server", "Server (http://host:8096)", "url", "url")}{field("user", "Username", "text", undefined, "username")}{field("pass", "Password", "password", undefined, "current-password")}
+        </>)}
+        {type === "Jellyfin" && qc && (
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <div className="text-muted-foreground">In a signed-in Jellyfin app open <b className="text-foreground">Settings &gt; Quick Connect</b> and enter</div>
+            <div className="text-6xl font-semibold tracking-[0.3em] md:text-7xl">{qc.code}</div>
+            <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy || "Waiting for approval..."}</div>
+            <Pill variant="ghost" onClick={() => { setQc(null); setBusy("") }}>Cancel</Pill>
+          </div>
+        )}
         {err && <p role="alert" className="text-destructive">{err}</p>}
 
         <div className="flex flex-wrap gap-3 pt-2">
-          {type !== "Plex" && <Pill variant="primary" disabled={!ok} onClick={save}>Save and load</Pill>}
+          {type !== "Plex" && type !== "Jellyfin" && <Pill variant="primary" disabled={!ok} onClick={save}>Save and load</Pill>}
+          {type === "Jellyfin" && !qc && <><Pill variant="primary" disabled={!ok || !!busy} onClick={() => { const sv = normServer(f.server); void jfAdd(sv, () => jellyfinSignIn(sv, f.user, f.pass)) }}>{busy || "Sign in"}</Pill><Pill disabled={!f.server || !!busy} onClick={jfQuick}>Use Quick Connect</Pill></>}
           {type === "Plex" && manual && <><Pill variant="primary" disabled={!ok} onClick={save}>Save and load</Pill><Pill onClick={() => { setManual(false); setErr("") }}>Sign in with Plex</Pill></>}
           {type === "Plex" && servers && <Pill onClick={() => { setServers(null); setErr("") }}>Back</Pill>}
           {cancel()}

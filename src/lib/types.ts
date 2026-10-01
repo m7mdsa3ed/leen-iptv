@@ -13,10 +13,10 @@ export interface Item {
   num?: number
   rating?: string
   plot?: string
-  genres?: string[] // Plex: genres come with the catalog
+  genres?: string[] // Plex/Jellyfin: genres come with the catalog
   year?: string
   backdrop?: string
-  resume?: number // seconds watched on the server (Plex)
+  resume?: number // seconds watched on the server (Plex/Jellyfin)
   dur?: number // seconds
   srcId?: string // source id (also item.id.split("|")[0])
   origGroup?: string // category name in its own source when merged under another display name
@@ -26,14 +26,15 @@ export interface Item {
 export interface Source {
   id: string
   name: string
-  type: "m3u" | "xtream" | "plex"
+  type: "m3u" | "xtream" | "plex" | "jellyfin"
   url?: string
   epgUrl?: string
   server?: string
   user?: string
   pass?: string
-  token?: string // Plex server access token (server = chosen connection URI)
-  serverId?: string // Plex machine identifier
+  token?: string // Plex server access token (server = chosen connection URI) / Jellyfin AccessToken
+  userId?: string // Jellyfin user id
+  serverId?: string // Plex machine identifier / Jellyfin server Id
   conns?: { uri: string; local?: boolean; relay?: boolean; protocol?: string }[] // every address plex.tv gave for this server
   connMode?: "auto" | "norelay" | "local" // which of those addresses may be used (default auto)
   enabled?: boolean // default true

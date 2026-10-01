@@ -40,7 +40,7 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[]): Promise<Meta> {
   return m
 }
 
-/** Source data (e.g. Plex) beats providers: `base` wins per field, providers only fill gaps. */
+/** Source data (e.g. Plex, Jellyfin) beats providers: `base` wins per field, providers only fill gaps. */
 function withBase(m: Meta, b?: Partial<Meta>): Meta {
   if (!b) return m
   const r = { ...m }
@@ -151,7 +151,7 @@ const withDiscover = (cfgs: ProviderCfg[], need: "genres" | "discover") => cfgs.
 /** Genre names for the pills on Movies / Series (empty until a provider with genre support is enabled). */
 export function useGenres(kind: "movie" | "series") {
   const catGenres = useCatalog((s) => s.byKind[kind])
-  const own = useMemo(() => [...new Set(catGenres.flatMap((i) => i.genres ?? []))].sort(), [catGenres]) // catalog-provided (Plex)
+  const own = useMemo(() => [...new Set(catGenres.flatMap((i) => i.genres ?? []))].sort(), [catGenres]) // catalog-provided (Plex, Jellyfin)
   const saved = useApp((s) => s.settings.meta)
   const cfgs = useMemo(() => withDiscover(normalizeCfg(saved), "genres"), [saved])
   const sig = cfgs.map((c) => `${c.id}:${c.lang ?? ""}`).join(",")

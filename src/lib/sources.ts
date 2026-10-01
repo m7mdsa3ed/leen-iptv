@@ -5,10 +5,10 @@ import { srcOfId } from "./merge-pure"
 
 export { srcOfId }
 
-export const SOURCE_COLORS: Record<Source["type"], string> = { xtream: "#3b82f6", m3u: "#64748b", plex: "#e5a00d" }
-export const SOURCE_LABELS: Record<Source["type"], string> = { xtream: "IPTV", m3u: "M3U", plex: "Plex" }
-/** 8 swatches for the color picker (first three = the type defaults). */
-export const SOURCE_SWATCHES = ["#3b82f6", "#64748b", "#e5a00d", "#10b981", "#ef4444", "#ec4899", "#8b5cf6", "#06b6d4"]
+export const SOURCE_COLORS: Record<Source["type"], string> = { xtream: "#3b82f6", m3u: "#64748b", plex: "#e5a00d", jellyfin: "#aa5cc3" }
+export const SOURCE_LABELS: Record<Source["type"], string> = { xtream: "IPTV", m3u: "M3U", plex: "Plex", jellyfin: "Jellyfin" }
+/** 8 swatches for the color picker (first four = the type defaults). */
+export const SOURCE_SWATCHES = ["#3b82f6", "#64748b", "#e5a00d", "#aa5cc3", "#10b981", "#ef4444", "#ec4899", "#06b6d4"]
 
 export type SourceMeta = Source & { color: string; label: string; enabled: boolean }
 

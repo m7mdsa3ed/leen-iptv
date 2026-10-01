@@ -99,7 +99,7 @@ function SignedIn() {
       <SectionCard title="Encryption" description={s.hasPassphrase ? "Cloud data is encrypted with your passphrase (AES-256). Only devices that know it can read it." : undefined}>
         {!s.hasPassphrase && (
           <p role="alert" className="rounded-2xl bg-surface-2 p-3 text-sm text-foreground">
-            Warning: without a passphrase your cloud data is NOT encrypted. It includes IPTV and Plex credentials and API keys, readable by anyone with access to your Supabase project. Set a passphrase below.
+            Warning: without a passphrase your cloud data is NOT encrypted. It includes IPTV, Plex and Jellyfin credentials and API keys, readable by anyone with access to your Supabase project. Set a passphrase below.
           </p>
         )}
         {st.needPass && <p role="alert" className="text-sm text-destructive">The cloud data is encrypted. Enter the passphrase to continue syncing.</p>}

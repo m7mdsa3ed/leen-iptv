@@ -5,6 +5,7 @@ import { explain, fetchText, px } from "./net"
 import { parseM3U, parseXmltv } from "./parse"
 import { loadXtream, xmltvUrl } from "./xtream"
 import { loadPlex } from "./plex"
+import { jellyfinEpg, loadJellyfin } from "./jellyfin"
 import { useApp } from "./store"
 import { mergeSources } from "./merge-pure"
 
@@ -88,6 +89,7 @@ async function loadOne(src: Source, proxy: string, force?: boolean) {
       const step = (msg: string) => live() && patch(src.id, { msg })
       if (src.type === "xtream") items = await loadXtream(src, proxy, step)
       else if (src.type === "plex") items = await loadPlex(src, proxy, step)
+      else if (src.type === "jellyfin") items = await loadJellyfin(src, proxy, step)
       else {
         step("Downloading playlist")
         items = parseM3U(await fetchText(px(src.url!, proxy)), src.id)
@@ -97,7 +99,7 @@ async function loadOne(src: Source, proxy: string, force?: boolean) {
     }
     if (!live()) return
     raw.set(src.id, items)
-    if (src.type === "plex") seedProgress(items)
+    if (src.type === "plex" || src.type === "jellyfin") seedProgress(items)
     patch(src.id, { status: "ready", msg: "", count: items.length })
     remerge()
     void loadEpg(src, proxy, force, live)
@@ -136,14 +138,14 @@ export const useCatalog = create<C>(() => ({
     })
     if (sigOf() !== mergedSig) remerge() // only when a source was removed/reordered/toggled
     await Promise.all(on.map((s) => {
-      if (!force && raw.has(s.id)) { if (s.type === "plex") seedProgress(raw.get(s.id)!); return }
+      if (!force && raw.has(s.id)) { if (s.type === "plex" || s.type === "jellyfin") seedProgress(raw.get(s.id)!); return }
       if (!force && useCatalog.getState().sources[s.id]?.status === "loading") return
       return loadOne(s, proxy, force)
     }))
   },
 }))
 
-/** Plex watch positions become local progress (once) so Continue watching shows them. */
+/** Plex/Jellyfin watch positions become local progress (once) so Continue watching shows them. */
 function seedProgress(items: Item[]) {
   const a = useApp.getState()
   const have = (a.profileId && a.data[a.profileId]?.progress) || {}
@@ -152,9 +154,10 @@ function seedProgress(items: Item[]) {
 
 async function loadEpg(src: Source, proxy: string, force?: boolean, live: () => boolean = () => true) {
   if (src.type === "plex") return // no guide for Plex
-  const url = src.epgUrl || (src.type === "xtream" ? xmltvUrl(src) : "")
-  if (!url) return
+  const jf = src.type === "jellyfin"
+  const url = jf ? "" : src.epgUrl || (src.type === "xtream" ? xmltvUrl(src) : "")
   const want = new Set((raw.get(src.id) ?? []).filter((i) => i.kind === "live").map((i) => i.epgId).filter(Boolean) as string[])
+  if (jf ? !want.size : !url) return // Jellyfin: guide only when the server has live channels
   const from = Date.now() - 3 * 3600_000
   const key = "epg:" + src.id
   try {
@@ -162,7 +165,7 @@ async function loadEpg(src: Source, proxy: string, force?: boolean, live: () => 
     const c = force ? undefined : await get<{ at: number; list: [string, Prog[]][] }>(key)
     if (c && Date.now() - c.at < 6 * 3600_000) epg = new Map(c.list)
     if (!epg) {
-      epg = parseXmltv(await fetchText(px(url, proxy)), want, from, from + 40 * 3600_000)
+      epg = jf ? await jellyfinEpg(src, proxy, [...want], from, from + 40 * 3600_000) : parseXmltv(await fetchText(px(url, proxy)), want, from, from + 40 * 3600_000)
       void set(key, { at: Date.now(), list: [...epg] })
     }
     if (live()) { epgs.set(src.id, epg); useCatalog.setState({ epg: mergeEpg(), epgTick: Date.now() }) }

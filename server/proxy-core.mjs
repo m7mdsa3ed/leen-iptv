@@ -29,7 +29,7 @@ export function proxyHandler(req, res) {
   ;(async () => {
     try {
       const headers = {}
-      for (const [k, v] of Object.entries(req.headers)) if (/^(x-plex-.*|accept|content-type|range)$/.test(k)) headers[k] = v
+      for (const [k, v] of Object.entries(req.headers)) if (/^(x-plex-.*|x-emby-authorization|accept|content-type|range)$/.test(k)) headers[k] = v
       const init = { method: req.method, headers, redirect: "manual", signal: ctl.signal }
       if (req.method !== "GET" && req.method !== "HEAD") {
         const chunks = []

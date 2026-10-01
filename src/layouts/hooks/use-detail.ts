@@ -10,6 +10,7 @@ import { useOpen } from "@/components/tv/ui"
 import type { Meta } from "@/lib/meta/types"
 import type { Episode, Item } from "@/lib/types"
 import { plexDetail } from "@/lib/plex"
+import { jellyfinDetail } from "@/lib/jellyfin"
 import { seriesInfo, vodInfo } from "@/lib/xtream"
 
 type Info = Record<string, string | number | undefined>
@@ -55,7 +56,7 @@ export function useDetail(id: string) {
   const [info, setInfo] = useState<Info>({})
   const [episodes, setEps] = useState<Episode[]>([])
   const [season, setSeason] = useState<number | null>(null)
-  const [base, setBase] = useState<Partial<Meta> | undefined>() // Plex: server data merged first
+  const [base, setBase] = useState<Partial<Meta> | undefined>() // Plex/Jellyfin: server data merged first
   const [error, setErr] = useState("")
   const [loaded, setLoaded] = useState(false) // Xtream info fetched (or not applicable): metadata providers can start
   const open = useOpen()
@@ -65,8 +66,8 @@ export function useDetail(id: string) {
     setBase(undefined); setInfo({}); setEps([]); setSeason(null); setErr("")
     if (!src || src.type === "m3u" || !selected.sid) return setLoaded(true)
     let live = true
-    const run = src.type === "plex"
-      ? plexDetail(src, proxy, selected).then((r) => { if (live) { setInfo(r.info as Info); setBase(r.meta); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
+    const run = src.type === "plex" || src.type === "jellyfin"
+      ? (src.type === "plex" ? plexDetail : jellyfinDetail)(src, proxy, selected).then((r) => { if (live) { setInfo(r.info as Info); setBase(r.meta); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
       : selected.kind === "series"
       ? seriesInfo(src, proxy, selected).then((r) => { if (live) { setInfo(r.info); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
       : vodInfo(src, proxy, selected.sid).then((r) => live && setInfo(r))

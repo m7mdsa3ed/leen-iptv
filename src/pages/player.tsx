@@ -12,6 +12,7 @@ import { useSourceOf } from "@/lib/sources"
 import type { Item } from "@/lib/types"
 import { rate, type Quality } from "@/lib/quality"
 import { plexScrobble, plexStopTranscode, plexStreamUrl, plexTimeline } from "@/lib/plex"
+import { jellyfinMarkPlayed, jellyfinReport, jellyfinStopTranscode, jellyfinStreamUrl } from "@/lib/jellyfin"
 import { xtreamUrl } from "@/lib/xtream"
 import { useHistory } from "@/lib/history"
 
@@ -70,8 +71,15 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
   statsRef.current = stats
 
   const plex = src?.type === "plex" ? src : null
-  const raw = item.url ?? (plex ? plexStreamUrl(plex, item) : xtreamUrl(src!, live ? "live" : "movie", item.sid!, live ? settings.liveExt : item.ext || "mp4"))
-  const url = plex && mixed(raw) ? px(raw, settings.proxy) : pxStream(raw, settings) // plex http on https page must be proxied
+  const jf = src?.type === "jellyfin" ? src : null
+  const raw = item.url ?? (plex ? plexStreamUrl(plex, item) : jf ? jellyfinStreamUrl(jf, item) : xtreamUrl(src!, live ? "live" : "movie", item.sid!, live ? settings.liveExt : item.ext || "mp4"))
+  // Jellyfin plays DIRECT from the browser to the server (it can be on the viewer's LAN while this app is served from elsewhere,
+  // e.g. over Tailscale, where the app's own proxy could not reach it). Proxy only for mixed content, when the user forces it,
+  // or after a network/CORS failure (proxied flag below).
+  const [proxied, setProxied] = useState("")
+  const mediaServer = !!(plex || jf)
+  const direct = !!jf && !mixed(raw) && !settings.proxyStreams && proxied !== raw
+  const url = direct ? raw : mediaServer && mixed(raw) ? px(raw, settings.proxy) : pxStream(raw, settings)
 
   /* resume point + history */
   useEffect(() => {
@@ -106,7 +114,8 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
           if (!d.fatal) return
           const code = d.response?.code
           const http = !!code && code >= 400 // 4xx will not fix itself: no retries
-          if (d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && net++ < 3) h.startLoad()
+          if (direct && d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && !h.levels?.length) setProxied(raw) // direct manifest failed (CORS / unreachable): retry through the proxy once (startLoad would not refetch it)
+          else if (d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && net++ < 3) h.startLoad()
           else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && net++ < 3) h.recoverMediaError()
           else setErr(http ? statusMsg(code) : d.type === Hls.ErrorTypes.NETWORK_ERROR ? CORS_HINT : d.type === Hls.ErrorTypes.MEDIA_ERROR ? "This device can't decode the stream." : "Stream unavailable.")
         })
@@ -192,7 +201,28 @@ export default function Player({ queue, index }: { queue: Item[]; index: number 
       plexStopTranscode(plex, item)
       if (d > 0 && pos / d > 0.9) plexScrobble(plex, item)
     }
-  }, [item.id, live, plex]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [item.id, live, plex?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Jellyfin: start on first play, progress every 10s + on pause/play, stopped (and mark played when >90%) on leave; transcode always stopped */
+  useEffect(() => {
+    const v = vref.current
+    if (!jf || !v) return
+    if (live) return () => jellyfinStopTranscode(jf, item)
+    let pos = 0, d = 0, started = false
+    const tick = () => { if (v.duration > 0) { pos = v.currentTime; d = v.duration } }
+    const rep = () => { tick(); if (started) jellyfinReport(jf, item, "progress", pos, v.paused) }
+    const onPlay = () => { tick(); if (!started) { started = true; jellyfinReport(jf, item, "start", pos) } else rep() }
+    const t = setInterval(rep, 10000)
+    v.addEventListener("pause", rep); v.addEventListener("play", onPlay); v.addEventListener("timeupdate", tick)
+    return () => {
+      clearInterval(t)
+      v.removeEventListener("pause", rep); v.removeEventListener("play", onPlay); v.removeEventListener("timeupdate", tick)
+      if (started) jellyfinReport(jf, item, "stopped", pos)
+      jellyfinStopTranscode(jf, item)
+      if (d > 0 && pos / d > 0.9) jellyfinMarkPlayed(jf, item)
+    }
+    // deps on the id, not the object: a store update (sync pull, source edit) must not stop the transcode mid-play
+  }, [item.id, live, jf?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const poke = useCallback(() => {
     setShow(true)

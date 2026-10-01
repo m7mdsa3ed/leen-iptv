@@ -50,7 +50,7 @@ export default function SourcesSection() {
         const st = stat[s.id]
         const status = !s.enabled ? "Disabled" : st?.status === "ready" ? `${st.count} items` : st?.status === "loading" ? st.msg || "Loading..." : st?.status === "error" ? "Failed" : "Not loaded"
         return (
-          <SectionCard key={s.id} title={<span className="flex items-center gap-3"><span aria-hidden style={{ background: s.color }} className="size-4 shrink-0 rounded-full" />{s.name}</span>} description={`${s.type === "plex" ? "Plex" : s.type === "m3u" ? "M3U" : "Xtream"} - ${status}`}>
+          <SectionCard key={s.id} title={<span className="flex items-center gap-3"><span aria-hidden style={{ background: s.color }} className="size-4 shrink-0 rounded-full" />{s.name}</span>} description={`${s.type === "plex" ? "Plex" : s.type === "jellyfin" ? "Jellyfin" : s.type === "m3u" ? "M3U" : "Xtream"} - ${status}`}>
             {st?.status === "error" && s.enabled && <p role="alert" className="text-sm text-destructive">{st.msg}</p>}
             {s.type === "plex" && <PlexConnection id={s.id} />}
             <Field label="Name" value={s.name} onChange={(v) => v.trim() && updateSource(s.id, { name: v })} error={s.name.trim() ? undefined : "Give the source a name."} />
@@ -68,7 +68,7 @@ export default function SourcesSection() {
         )
       })}
       <SectionCard>
-        <Row label="Add source" description="Xtream, M3U playlist or Plex server."><Pill variant="primary" onClick={() => go("sources")}>Add source</Pill></Row>
+        <Row label="Add source" description="Xtream, M3U playlist, Plex or Jellyfin server."><Pill variant="primary" onClick={() => go("sources")}>Add source</Pill></Row>
         <ToggleRow label="Highlight sources with badges" description="Show a small colored chip with the source on posters and details." checked={badges} onChange={(v) => setSettings({ sourceBadges: v })} />
       </SectionCard>
     </div>
