@@ -51,6 +51,15 @@ export async function loadXtream(s: Source, proxy: string, step: (m: string) => 
   return out
 }
 
+/** Connections in use vs allowed, for the "max connections" message; null when the server won't say. */
+export async function connInfo(s: Source, proxy: string): Promise<{ act: number; max: number } | null> {
+  try {
+    const ui = (await (await fetchT(px(api(s), proxy), 8000)).json())?.user_info
+    const max = Number(ui?.max_connections) || 0
+    return max ? { act: Number(ui.active_cons) || 0, max } : null
+  } catch { return null }
+}
+
 export async function vodInfo(s: Source, proxy: string, sid: string) {
   const r = await call<{ info?: R }>(s, proxy, "get_vod_info", `&vod_id=${sid}`)
   return r.info ?? {}

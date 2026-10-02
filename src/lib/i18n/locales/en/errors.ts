@@ -9,6 +9,8 @@ const d: Dict = {
   "errors.cors": "Couldn't reach the server. Check the address and your connection. If the browser is blocking it (CORS), set a proxy in Settings > Network.",
   "errors.timeout": "The server took too long to answer. Try again.",
   "errors.stream.decode": "This device can't decode the stream.",
+  "errors.maxConn": "Your provider refused the stream: {act} of {max} connections are in use. Stop playback on other devices, or wait a minute for a stale connection to expire, then retry.",
+  "errors.stream.stuck": "The stream didn't start. The provider may be busy or at its connection limit. Try again.",
   "errors.stream.unavailable": "Stream unavailable.",
   "errors.stream.offline": "Stream unavailable. The channel may be offline, or the browser blocked it (CORS).",
   "errors.video.format": "This format isn't supported on this device.",

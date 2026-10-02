@@ -11,7 +11,13 @@
   --pl-fill: #fff;                        /* progress fill + thumb */
   --pl-bar: 4px;
   --pl-thumb: 14px;
+  --pl-h: 2.75rem;                        /* one control height: round buttons and tools; the main play button is 1.3x */
+  --pl-title: 1.25rem; --pl-sub: .875rem; /* headings of the top bar and guide header */
+  --pl-r: 28px;                           /* panel radius: sheets, next card, indicators */
 }
+@media (min-width: 640px) { .pl-root { --pl-h: 3rem; --pl-title: 1.875rem; --pl-sub: 1.125rem; } }
+html[data-mode=tv] .pl-root { --pl-h: 3rem; }        /* rem is 20px x --tv-scale on TV */
+@media (max-height: 520px) { .pl-root { --pl-h: 2.5rem; } .pl-bottom { padding-top: 1.5rem !important; } .pl-top { padding-bottom: 1.5rem !important; } } /* phone landscape */
 /* Google TV: white pill primary, soft surface buttons */
 html[data-layout=googletv] .pl-root { --pl-btn: rgba(255, 255, 255, .12); }
 /* Apple TV: translucent capsules (plain rgba, no blur), thin bar */
@@ -29,7 +35,40 @@ html[data-layout=netflix] .pl-root { --pl-btn: rgba(255, 255, 255, .14); --pl-pr
 .pl-top { transform: translate3d(0, -10px, 0); background: linear-gradient(to bottom, rgba(0, 0, 0, .85), rgba(0, 0, 0, 0)); }
 .pl-bottom { transform: translate3d(0, 10px, 0); background: linear-gradient(to top, rgba(0, 0, 0, .88), rgba(0, 0, 0, 0)); }
 
+/* ---- shared pieces: top bar, guide header, channel strip, next card ---- */
+.pl-pad-top { padding-top: max(1rem, env(safe-area-inset-top)); }
+@media (min-width: 640px) { .pl-pad-top { padding-top: max(1.75rem, env(safe-area-inset-top)); } }
+.pl-title { font-size: var(--pl-title); font-weight: 500; }
+.pl-sub { font-size: var(--pl-sub); color: rgba(255, 255, 255, .7); }
+.pl-chip { display: inline-flex; align-items: center; gap: .5rem; height: calc(var(--pl-h) * .75); padding-inline: 1rem; border-radius: 999px; background: var(--pl-btn); box-shadow: inset 0 0 0 1px var(--pl-btn-edge); color: #fff; font-size: 1rem; }
+.pl-chip svg { width: 1rem; height: 1rem; }
+.pl-progress { display: block; height: .25rem; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .25); }
+.pl-progress > * { display: block; height: 100%; transform-origin: left; border-radius: 999px; background: var(--accent-blue); }
+.pl-root .pl-act { height: var(--pl-h); padding-inline: 1.25rem; }  /* text button: error screen, next card */
+.pl-err-ic { width: calc(var(--pl-h) * 1.3); height: calc(var(--pl-h) * 1.3); color: rgba(255, 255, 255, .7); }
+.pl-h2 { font-size: calc(var(--pl-title) * .8); font-weight: 400; }   /* More panel section heading */
+.pl-lead { font-size: calc(var(--pl-title) * .8); font-weight: 500; }
+.pl-tag { display: inline-flex; align-items: center; padding: .25rem .75rem; border-radius: 999px; background: var(--pl-btn); font-size: var(--pl-sub); }
+.pl-tile { border-radius: calc(var(--pl-r) * .6); }
+
+/* ---- control layout: transport | tools, stacked and centred on narrow screens ---- */
+.pl-bottom { padding-top: 4rem; }
+@media (min-width: 640px) { .pl-bottom { padding-top: 6rem; } }
+.pl-bar-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .5rem 1.5rem; }
+@media (min-width: 768px) { .pl-bar-row { justify-content: space-between; } }
+.pl-transport, .pl-tools { display: flex; align-items: center; justify-content: center; gap: .5rem; }
+.pl-tools { flex-wrap: wrap; }
+@media (min-width: 640px) { .pl-transport, .pl-tools { gap: .75rem; } }
+
 /* ---- buttons ---- */
+.pl-root .pl-rb { width: var(--pl-h); height: var(--pl-h); }
+.pl-root .pl-rb-main { width: calc(var(--pl-h) * 1.3); height: calc(var(--pl-h) * 1.3); }
+.pl-root .pl-tool { height: var(--pl-h); min-width: var(--pl-h); padding-inline: 0; gap: .5rem; }
+.pl-root .pl-tool-lbl { display: none; }
+.pl-root .pl-tool-on { background: rgba(255, 255, 255, .28); }
+@media (min-width: 1024px) { .pl-root .pl-tool-t { padding-inline: 1.1rem; } .pl-root .pl-tool-lbl { display: inline; } }
+html[data-mode=tv] .pl-root .pl-tool-t { padding-inline: 1.1rem; }
+html[data-mode=tv] .pl-root .pl-tool-lbl { display: inline; }
 .pl-root .pl-btn { background: var(--pl-btn); color: #fff; box-shadow: inset 0 0 0 1px var(--pl-btn-edge); }
 .pl-root .pl-primary { background: var(--pl-prim); color: var(--pl-prim-fg); border-radius: var(--pl-prim-r); }
 .pl-root .pl-more-btn { background: transparent; color: #fff; gap: .5rem; }

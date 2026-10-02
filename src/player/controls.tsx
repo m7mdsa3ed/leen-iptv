@@ -1,4 +1,4 @@
-import type { RefObject } from "react"
+import type { ReactNode, RefObject } from "react"
 import { Captions, ChevronsUp, Expand, Gauge, LayoutGrid, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Star, Timer, Volume1, Volume2, VolumeX } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
@@ -43,43 +43,50 @@ export type ControlsProps = {
   onPip: () => void; onFs: () => void; onMore: () => void; onGuide: () => void; onChannels: () => void
 }
 
-/** Bottom block: seek bar + times (VOD), then three zones: transport | tools | quality badge, then the "More" chevron. */
+/** One tool button for every non-transport control: same height and radius everywhere, icon only on phones, icon + label from lg and on TV (CSS decides, see .pl-tool). */
+function Tool({ label, text, active, onClick, children }: { label: string; text?: string; active?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <Pill aria-label={label} className={`pl-btn pl-tool${text ? " pl-tool-t" : ""}${active ? " pl-tool-on" : ""}`} onClick={onClick}>
+      {children}
+      {text && <span className="pl-tool-lbl" dir="auto">{text}</span>}
+    </Pill>
+  )
+}
+
+/** Bottom block: seek bar + times (VOD), then transport (left) and tools (right), then the "More" handle. Sizes come from --pl-h (player.css), so phone, desktop and TV share one layout. */
 export function Controls(c: ControlsProps) {
   const t = useT()
-  const tool = "pl-btn h-12 px-3 lg:px-5"
-  const lbl = "hidden lg:inline"
-  const ic = "lg:me-1"
   return (
-    <div data-on={c.on ? "" : undefined} data-controls className="pl-layer pl-bottom pointer-events-none px-[var(--gx)] pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-16 sm:pt-24">
+    <div data-on={c.on ? "" : undefined} data-controls className="pl-layer pl-bottom pointer-events-none px-[var(--gx)] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {!c.live && <SeekRow vref={c.vref} on={c.on} onSeekFrac={c.onSeekFrac} onToggle={c.onToggle} />}
-      {c.stats && <div className="mb-1 text-end text-xs text-white/60 sm:text-sm">{qualityDetail(c.stats)}</div>}
-      <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 md:justify-between">
-        <div dir="ltr" data-ltr className="flex items-center justify-center gap-2 sm:gap-3">
-          {c.queueLen > 1 && <RoundButton label={t("player.previous")} className="pl-btn" onClick={c.onPrev}><SkipBack /></RoundButton>}
-          {!c.live && <RoundButton label={t("player.back10")} className="pl-btn" onClick={() => c.onSeek(-10)}><RotateCcw /></RoundButton>}
-          <RoundButton data-play data-primary label={c.paused ? t("player.play") : t("player.pause")} className="pl-primary size-14 [&_svg]:size-7" onClick={c.onToggle}>{c.paused ? <Play className="fill-current" /> : <Pause className="fill-current" />}</RoundButton>
-          {!c.live && <RoundButton label={t("player.forward10")} className="pl-btn" onClick={() => c.onSeek(10)}><RotateCw /></RoundButton>}
-          {c.queueLen > 1 && <RoundButton label={t("player.next")} className="pl-btn" onClick={c.onNext}><SkipForward /></RoundButton>}
+      {c.stats && <div className="mb-1 hidden text-end text-sm text-white/60 sm:block">{qualityDetail(c.stats)}</div>}
+      <div className="pl-bar-row pointer-events-auto">
+        <div dir="ltr" data-ltr className="pl-transport">
+          {c.queueLen > 1 && <RoundButton label={t("player.previous")} className="pl-btn pl-rb" onClick={c.onPrev}><SkipBack /></RoundButton>}
+          {!c.live && <RoundButton label={t("player.back10")} className="pl-btn pl-rb" onClick={() => c.onSeek(-10)}><RotateCcw /></RoundButton>}
+          <RoundButton data-play data-primary label={c.paused ? t("player.play") : t("player.pause")} className="pl-primary pl-rb pl-rb-main [&_svg]:size-7" onClick={c.onToggle}>{c.paused ? <Play className="fill-current" /> : <Pause className="fill-current" />}</RoundButton>
+          {!c.live && <RoundButton label={t("player.forward10")} className="pl-btn pl-rb" onClick={() => c.onSeek(10)}><RotateCw /></RoundButton>}
+          {c.queueLen > 1 && <RoundButton label={t("player.next")} className="pl-btn pl-rb" onClick={c.onNext}><SkipForward /></RoundButton>}
           {!c.tv && (
             <div className="ms-1 flex items-center gap-2 sm:ms-3">
-              <RoundButton label={t("player.mute")} className="pl-btn" onClick={c.onMute}>{c.muted || !c.vol ? <VolumeX /> : <Volume2 />}</RoundButton>
+              <Tool label={t("player.mute")} onClick={c.onMute}>{c.muted || !c.vol ? <VolumeX /> : <Volume2 />}</Tool>
               <input type="range" aria-label={t("player.volume")} min={0} max={1} step={0.05} value={c.muted ? 0 : c.vol} onChange={(e) => c.onVolume(+e.target.value)} className="hidden w-24 accent-primary lg:block" />
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-          {!c.touch && <RoundButton label={t("player.favorite")} active={c.isFav} className="pl-btn" onClick={c.onFav}><Star className={c.isFav ? "fill-yellow-400 text-yellow-400" : ""} /></RoundButton>}
-          {c.live && <Pill aria-label={t("player.guide")} className={tool} onClick={c.onGuide}><LayoutGrid className={ic} /><span className={lbl}>{t("player.guide")}</span></Pill>}
-          {c.live && <Pill aria-label={t("player.channels")} className={tool} onClick={c.onChannels}><ListVideo className={ic} /><span className={lbl}>{t("player.channels")}</span></Pill>}
-          <Pill aria-label={t("player.audio")} className={tool} onClick={() => c.onMenu("audio")}><Volume1 className={ic} /><span className={lbl}>{t("player.audio")}</span></Pill>
-          <Pill aria-label={t("player.subtitles")} className={tool} onClick={() => c.onMenu("subs")}><Captions className={ic} /><span className={lbl}>{t("player.subtitles")}</span></Pill>
-          {c.mediaServer && !c.live && <Pill aria-label={t("player.quality")} className={tool} onClick={() => c.onMenu("quality")}><Gauge className={ic} /><span className={lbl}>{c.sq.id === "original" ? t("player.original") : `${c.sq.height}p`}</span></Pill>}
-          {!c.live && <Pill aria-label={t("player.speed")} className={tool} onClick={() => c.onMenu("speed")}><Timer className={ic} /><span className={lbl} dir="ltr">{speedLabel(c.speed)}</span></Pill>}
-          <Pill aria-label={t("player.aspect")} className={tool} onClick={() => c.onMenu("aspect")}><Maximize className={ic} /><span className={lbl}>{c.fitName}</span></Pill>
-          {c.canPip && <RoundButton label={t("player.pip")} active={c.pip} className="pl-btn" onClick={c.onPip}><PictureInPicture2 className={c.pip ? "text-primary" : ""} /></RoundButton>}
-          {!c.tv && <RoundButton label={t("player.fullscreen")} className="pl-btn" onClick={c.onFs}>{c.fs ? <Minimize /> : <Expand />}</RoundButton>}
+        <div className="pl-tools">
+          {!c.touch && <Tool label={t("player.favorite")} active={c.isFav} onClick={c.onFav}><Star className={c.isFav ? "fill-yellow-400 text-yellow-400" : ""} /></Tool>}
+          {c.live && <Tool label={t("player.guide")} text={t("player.guide")} onClick={c.onGuide}><LayoutGrid /></Tool>}
+          {c.live && <Tool label={t("player.channels")} text={t("player.channels")} onClick={c.onChannels}><ListVideo /></Tool>}
+          <Tool label={t("player.audio")} text={t("player.audio")} onClick={() => c.onMenu("audio")}><Volume1 /></Tool>
+          <Tool label={t("player.subtitles")} text={t("player.subtitles")} onClick={() => c.onMenu("subs")}><Captions /></Tool>
+          {c.mediaServer && !c.live && <Tool label={t("player.quality")} text={c.sq.id === "original" ? t("player.original") : `${c.sq.height}p`} onClick={() => c.onMenu("quality")}><Gauge /></Tool>}
+          {!c.live && <Tool label={t("player.speed")} text={speedLabel(c.speed)} onClick={() => c.onMenu("speed")}><Timer /></Tool>}
+          <Tool label={t("player.aspect")} text={c.fitName} onClick={() => c.onMenu("aspect")}><Maximize /></Tool>
+          {c.canPip && <Tool label={t("player.pip")} active={c.pip} onClick={c.onPip}><PictureInPicture2 /></Tool>}
+          {!c.tv && <Tool label={t("player.fullscreen")} onClick={c.onFs}>{c.fs ? <Minimize /> : <Expand />}</Tool>}
+          {c.stats && <QualityBadge s={c.stats} />}
         </div>
-        {c.stats && <QualityBadge s={c.stats} />}
       </div>
       <div className="pointer-events-auto mt-1 flex justify-center">
         <Pill data-more variant="ghost" aria-label={t("player.moreOpen")} className="pl-more-btn text-white/80" onClick={c.onMore}><ChevronsUp className="pl-more-ic" />{t("player.more")}</Pill>

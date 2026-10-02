@@ -66,8 +66,8 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
         }}
         onPointerMove={bump} onWheel={bump}
       >
-        <button tabIndex={-1} aria-label={t("player.strip.category")} onClick={() => cycle(1)} className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-base text-white">
-          <ChevronsUpDown className="size-4" /><bdi dir="auto">{groupLabel(g, t)}</bdi>
+        <button tabIndex={-1} aria-label={t("player.strip.category")} onClick={() => cycle(1)} className="pl-chip mb-3">
+          <ChevronsUpDown /><bdi dir="auto">{groupLabel(g, t)}</bdi>
         </button>
         <div key={g} data-nav-group className="rail !mb-0 !gap-3 !pb-3">
           {shown.map((c) => {
@@ -77,7 +77,7 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
               <button
                 key={c.id} data-nav data-pill data-stile data-cur={cur ? "" : undefined} aria-current={cur}
                 style={{ "--s": 1.04 } as React.CSSProperties}
-                className={`pl-tile flex w-64 shrink-0 flex-col gap-1.5 rounded-2xl bg-surface-2 p-3 text-start text-foreground ${cur ? "pl-cur" : ""}`}
+                className={`pl-tile flex w-64 shrink-0 flex-col gap-1.5 bg-surface-2 p-3 text-start text-foreground ${cur ? "pl-cur" : ""}`}
                 onClick={() => (cur ? close() : tune(c, cat))}
               >
                 <span className="flex items-center gap-2.5">
@@ -85,8 +85,8 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
                   <span dir="auto" className="min-w-0 flex-1 truncate text-base">{c.num ? <bdi className="me-2 opacity-60">{fmt.number(c.num)}</bdi> : null}{c.name}</span>
                 </span>
                 <span dir="auto" className="block h-5 truncate text-sm opacity-70">{now?.t ?? ""}</span>
-                <span dir="ltr" data-ltr className="block h-1 overflow-hidden rounded-full bg-white/20">
-                  {now && <span className="block h-full origin-left rounded-full bg-accent-blue" style={{ transform: `scaleX(${Math.min(1, Math.max(0, (at - now.s) / (now.e - now.s)))})` }} />}
+                <span dir="ltr" data-ltr className="pl-progress">
+                  {now && <span style={{ transform: `scaleX(${Math.min(1, Math.max(0, (at - now.s) / (now.e - now.s)))})` }} />}
                 </span>
               </button>
             )

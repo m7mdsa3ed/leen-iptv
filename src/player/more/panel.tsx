@@ -8,6 +8,7 @@ import type { MoreActions } from "./actions"
 import { EpisodeMore } from "./episode"
 import { LiveMore } from "./live"
 import { MovieMore } from "./movie"
+import { ConnChip } from "./parts"
 
 /** The "More" page: slides up over the (still playing, full-size) video, which peeks above it; the whole layer scrolls on a fading dark gradient (no card, no handle). Lazily mounted by Player; content loads only now.
     [data-modal] keeps the D-pad inside. Memoised with stable props so the 2s stats poll never re-renders it. */
@@ -56,11 +57,12 @@ export const MorePanel = memo(function MorePanel({ item, closing, act }: { item:
           <div className="pl-more-body min-h-[76%] px-[var(--gx)] pb-[max(2rem,env(safe-area-inset-bottom))] pt-10">
             <header className="mb-2 flex items-center gap-3">
               <div className="min-w-0 flex-1">
-                <div dir="auto" className="truncate text-xl font-medium">{title}</div>
-                {sub && <div dir="auto" className="truncate text-sm text-muted-foreground">{sub}</div>}
+                <div dir="auto" className="pl-title truncate">{title}</div>
+                {sub && <div dir="auto" className="pl-sub truncate">{sub}</div>}
               </div>
-              <RoundButton data-close label={t("player.close")} onClick={act.close}><ChevronDown /></RoundButton>
+              <RoundButton data-close label={t("player.close")} className="pl-btn pl-rb" onClick={act.close}><ChevronDown /></RoundButton>
             </header>
+            <ConnChip item={item} />
             {item.kind === "live" ? <LiveMore key={item.id} item={item} act={act} /> : isEpisode(item.id) ? <EpisodeMore key={item.id} item={item} act={act} /> : <MovieMore key={item.id} item={item} act={act} />}
           </div>
         </div>

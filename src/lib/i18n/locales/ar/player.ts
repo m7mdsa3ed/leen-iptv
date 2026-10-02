@@ -74,6 +74,7 @@ const d: Dict = {
   "player.more.nowPlaying": "بيشتغل دلوقتي",
   "player.more.addFav": "ضيف للمفضلة",
   "player.more.removeFav": "شيل من المفضلة",
+  "player.more.conns": "الاتصالات المستخدمة: {used} / {max}",
   "player.more.overview": "نبذة",
   "player.more.trailer": "الإعلان",
   "player.more.details": "التفاصيل كاملة",

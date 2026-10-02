@@ -74,6 +74,7 @@ const d: Dict = {
   "player.more.nowPlaying": "Now playing",
   "player.more.addFav": "Add to favorites",
   "player.more.removeFav": "Remove from favorites",
+  "player.more.conns": "Connections in use: {used} / {max}",
   "player.more.overview": "Overview",
   "player.more.trailer": "Trailer",
   "player.more.details": "Full details",

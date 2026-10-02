@@ -30,9 +30,9 @@ export function MovieMore({ item, act }: { item: Item; act: MoreActions }) {
         {!plot && !D.loading && <p className="text-base text-muted-foreground">{t("player.more.noInfo")}</p>}
         {D.directors.length > 0 && <p dir="auto" className="mt-3 text-base text-foreground/85"><span className="text-muted-foreground">{t("player.more.director")}: </span>{D.directors.join(", ")}</p>}
         <div className="mt-4 flex flex-wrap gap-3">
-          <Pill data-autofocus="" onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />{t(isFav ? "player.more.removeFav" : "player.more.addFav")}</Pill>
-          {D.trailer && <Pill onClick={() => act.trailer(D.trailer!)}><Clapperboard />{t("player.more.trailer")}</Pill>}
-          <Pill onClick={() => act.details(item.id)}><Info />{t("player.more.details")}</Pill>
+          <Pill data-autofocus="" className="pl-btn pl-act" onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />{t(isFav ? "player.more.removeFav" : "player.more.addFav")}</Pill>
+          {D.trailer && <Pill className="pl-btn pl-act" onClick={() => act.trailer(D.trailer!)}><Clapperboard />{t("player.more.trailer")}</Pill>}
+          <Pill className="pl-btn pl-act" onClick={() => act.details(item.id)}><Info />{t("player.more.details")}</Pill>
         </div>
       </Section>
       <CastRail cast={D.cast} loading={D.loading} onOpen={act.person} />

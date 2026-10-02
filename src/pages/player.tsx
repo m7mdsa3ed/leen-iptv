@@ -94,7 +94,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const S = useStream(item, sq, tr)
   const { live } = S
   useSidecar(vref, S.sidecar, subOffset)
-  const E = useEngine({ vref, item, live, raw: S.raw, url: S.url, direct: S.direct, setProxied: S.setProxied })
+  const E = useEngine({ vref, item, live, raw: S.raw, url: S.url, direct: S.direct, setProxied: S.setProxied, src: S.src })
   useTracking({ vref, item, live, src: S.src, plex: S.plex, jf: S.jf, resume, meas: E.meas, statsRef: E.statsRef })
   const hasNext = !live && isEpisode(item.id) && idx < queue.length - 1
   const showNext = useApp((s) => s.settings.nextBanner ?? true), autoNext = useApp((s) => s.settings.autoNext ?? true)

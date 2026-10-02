@@ -14,10 +14,10 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   const t = useT()
   return (
     <div data-modal role="dialog" aria-label={title} className="absolute inset-0 z-20 flex items-end justify-center bg-black/60 m-fade sm:items-center" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pl-sheet m-pop flex max-h-[85%] w-[28rem] max-w-full flex-col gap-2 overflow-y-auto rounded-t-[28px] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-foreground shadow-2xl sm:rounded-[28px]">
-        <div className="mb-1 text-2xl font-semibold">{title}</div>
+      <div className="pl-sheet m-pop flex max-h-[85%] w-[28rem] max-w-full flex-col gap-2 overflow-y-auto rounded-t-[var(--pl-r)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-foreground shadow-2xl sm:rounded-[var(--pl-r)]">
+        <div className="pl-title mb-1">{title}</div>
         {children}
-        <Pill variant="ghost" className="justify-start" onClick={onClose}>{t("player.close")}</Pill>
+        <Pill variant="ghost" className="pl-act justify-start" onClick={onClose}>{t("player.close")}</Pill>
       </div>
     </div>
   )
@@ -25,7 +25,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Item({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <Pill role="menuitemradio" aria-checked={active} data-autofocus={active ? "" : undefined} className={`w-full justify-between rounded-2xl text-start ${active ? "font-semibold" : ""}`} onClick={onClick}>
+    <Pill role="menuitemradio" aria-checked={active} data-autofocus={active ? "" : undefined} className={`pl-act w-full justify-between rounded-[calc(var(--pl-r)*.6)] text-start ${active ? "font-semibold" : ""}`} onClick={onClick}>
       <span className="min-w-0 truncate">{children}</span>
       {active && <Check aria-hidden />}
     </Pill>
@@ -48,9 +48,9 @@ function Step({ label, value, onStep }: { label: string; value: string; onStep: 
   return (
     <div className="flex items-center justify-between gap-2 px-1" dir="ltr">
       <span className="me-auto">{label}</span>
-      <Pill onClick={() => onStep(-1)} aria-label={`${label} -`}>-</Pill>
+      <Pill className="pl-act" onClick={() => onStep(-1)} aria-label={`${label} -`}>-</Pill>
       <span className="w-16 text-center tabular-nums">{value}</span>
-      <Pill onClick={() => onStep(1)} aria-label={`${label} +`}>+</Pill>
+      <Pill className="pl-act" onClick={() => onStep(1)} aria-label={`${label} +`}>+</Pill>
     </div>
   )
 }

@@ -32,12 +32,12 @@ export const GuideOverlay = memo(function GuideOverlay({ item, tune, close }: { 
   const ch = hl?.ch ?? item
   const p = hl?.p
   return (
-    <section ref={ref} data-modal data-guide-overlay role="dialog" aria-label={t("player.guide")} className="pl-guide m-fade absolute inset-0 z-[12] flex flex-col px-[var(--gx)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
+    <section ref={ref} data-modal data-guide-overlay role="dialog" aria-label={t("player.guide")} className="pl-guide m-fade absolute inset-0 z-[12] flex flex-col px-[var(--gx)] pl-pad-top pb-[max(1rem,env(safe-area-inset-bottom))]">
       <header className="mb-3 flex shrink-0 items-center gap-4">
-        <div className="size-14 shrink-0 overflow-hidden rounded-xl bg-surface-3"><Logo item={ch} className="size-full p-1" /></div>
+        <div className="size-14 shrink-0 overflow-hidden rounded-[calc(var(--pl-r)*.4)] bg-surface-3"><Logo item={ch} className="size-full p-1" /></div>
         <div className="min-w-0 flex-1">
-          <div dir="auto" className="truncate text-xl font-medium sm:text-2xl">{ch.num ? <bdi className="me-2 text-white/60">{fmt.number(ch.num)}</bdi> : null}{ch.name}</div>
-          <div className="truncate text-base text-white/80">
+          <div dir="auto" className="pl-title truncate">{ch.num ? <bdi className="me-2 text-white/60">{fmt.number(ch.num)}</bdi> : null}{ch.name}</div>
+          <div className="pl-sub truncate">
             {p ? <><bdi dir="auto">{p.t}</bdi> <bdi dir="ltr" className="text-white/60">{hm(p.s)} - {hm(p.e)}</bdi></> : <span className="text-white/60">{ch.group}</span>}
           </div>
           {p?.d && <div dir="auto" className="line-clamp-1 text-sm text-white/60">{p.d}</div>}
@@ -47,7 +47,7 @@ export const GuideOverlay = memo(function GuideOverlay({ item, tune, close }: { 
           <KeyHint k={isTv ? "Back" : "Esc"} label={t("player.guide.closeHint")} />
         </div>
         <div dir="ltr" className="shrink-0 text-2xl tabular-nums text-white/90"><Clock /></div>
-        <RoundButton data-close label={t("player.close")} className="pl-btn" onClick={close}><X /></RoundButton>
+        <RoundButton data-close label={t("player.close")} className="pl-btn pl-rb" onClick={close}><X /></RoundButton>
       </header>
       <GuideGrid className="min-h-0 flex-1" current={item} onOpen={tune} onFocusProg={onFocusProg} />
     </section>

@@ -31,11 +31,11 @@ export function EpisodeMore({ item, act }: { item: Item; act: MoreActions }) {
   return (
     <>
       <Section title={t("player.more.nowPlaying")}>
-        <div dir="auto" className="text-xl font-medium">{cur ? `${t("player.epShort", { s: cur.season, e: cur.num })}  ·  ${cur.title}` : item.name}</div>
+        <div dir="auto" className="pl-lead">{cur ? `${t("player.epShort", { s: cur.season, e: cur.num })}  ·  ${cur.title}` : item.name}</div>
         {item.plot && <p dir="auto" className="mt-2 max-w-3xl text-base leading-relaxed text-foreground/85">{item.plot}</p>}
         <div className="mt-4 flex flex-wrap gap-3">
-          <Pill data-autofocus="" onClick={() => toggleFav(sid)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />{t(isFav ? "player.more.removeFav" : "player.more.addFav")}</Pill>
-          <Pill onClick={() => act.details(sid)}><Info />{t("player.more.details")}</Pill>
+          <Pill data-autofocus="" className="pl-btn pl-act" onClick={() => toggleFav(sid)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />{t(isFav ? "player.more.removeFav" : "player.more.addFav")}</Pill>
+          <Pill className="pl-btn pl-act" onClick={() => act.details(sid)}><Info />{t("player.more.details")}</Pill>
         </div>
       </Section>
 
@@ -43,7 +43,7 @@ export function EpisodeMore({ item, act }: { item: Item; act: MoreActions }) {
         <Section title={t("player.more.episodes")}>
           {D.seasons.length > 1 && (
             <div data-nav-group className="no-scrollbar mb-2 flex gap-2 overflow-x-auto py-1">
-              {D.seasons.map((s) => <Pill key={s} aria-pressed={s === D.season} variant={s === D.season ? "primary" : "tonal"} onClick={() => D.setSeason(s)}>{t("player.more.season", { n: s })}</Pill>)}
+              {D.seasons.map((s) => <Pill key={s} aria-pressed={s === D.season} className={s === D.season ? "pl-primary pl-act" : "pl-btn pl-act"} onClick={() => D.setSeason(s)}>{t("player.more.season", { n: s })}</Pill>)}
             </div>
           )}
           <div data-nav-group className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr))]">

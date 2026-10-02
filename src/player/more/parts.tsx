@@ -1,18 +1,21 @@
-import type { CSSProperties, ReactNode } from "react"
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react"
 import { Card, SkelBar, SkelGrid } from "@/components/gtv"
-import { useT } from "@/lib/i18n"
+import { useT, fmt } from "@/lib/i18n"
+import { useSourceOf } from "@/lib/sources"
+import { useApp } from "@/lib/store"
+import { connInfo } from "@/lib/xtream"
 import type { Person } from "@/lib/meta/types"
 import type { Item } from "@/lib/types"
 import type { DetailRating } from "@/layouts/hooks/use-detail"
 
 export const Section = ({ title, children }: { title?: ReactNode; children: ReactNode }) => (
   <section className="mt-5">
-    {title && <h2 className="mb-2 text-[1.4rem] font-normal text-foreground">{title}</h2>}
+    {title && <h2 className="pl-h2 mb-2 text-foreground">{title}</h2>}
     {children}
   </section>
 )
 
-export const Chip = ({ children }: { children: ReactNode }) => <span className="rounded-full bg-surface-2 px-3 py-1 text-sm text-foreground/80">{children}</span>
+export const Chip = ({ children }: { children: ReactNode }) => <span className="pl-tag text-foreground/80">{children}</span>
 
 /** Plot / description lines, or placeholders while the metadata loads. */
 export function Plot({ text, loading }: { text?: string; loading: boolean }) {
@@ -57,4 +60,14 @@ export function SimilarRail({ items, loading, onOpen }: { items: Item[]; loading
       </div>
     </Section>
   )
+}
+
+/** Xtream only: connections in use / allowed (includes this stream). Fetched when the panel opens; renders nothing if the server won't say. */
+export function ConnChip({ item }: { item: Item }) {
+  const t = useT()
+  const src = useSourceOf(item)
+  const proxy = useApp((s) => s.settings.proxy)
+  const [c, setC] = useState<{ act: number; max: number } | null>(null)
+  useEffect(() => { if (src?.type === "xtream") void connInfo(src, proxy).then(setC) }, [src?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  return c ? <div className="mb-3"><Chip>{t("player.more.conns", { used: fmt.number(c.act), max: fmt.number(c.max) })}</Chip></div> : null
 }

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
 import Hls from "hls.js"
 import mpegts from "mpegts.js"
+import { useApp } from "@/lib/store"
+import { connInfo } from "@/lib/xtream"
 import { corsHint, statusMsg } from "@/lib/net"
 import { rate } from "@/lib/quality"
 import { t as tn } from "@/lib/i18n"
-import type { Item } from "@/lib/types"
+import type { Item, Source } from "@/lib/types"
 import { audioLabel, type Stats } from "./stats"
 
 export type Track = { id: number; label: string }
@@ -12,8 +14,9 @@ export type Track = { id: number; label: string }
 /** hls.js / mpegts.js / native <video> for one item, plus the connection-quality sampler and the video event handlers that feed it.
     Teardown is strict: the old stream must be fully closed (requests aborted, decoder released) before the next one opens, because many
     providers allow only 1-2 connections and a leftover one makes the new channel fail. */
-export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: Item; live: boolean; raw: string; url: string; direct: boolean; setProxied: (u: string) => void }) {
-  const { vref, item, live, raw, url, direct, setProxied } = o
+export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: Item; live: boolean; raw: string; url: string; direct: boolean; setProxied: (u: string) => void; src?: Source | null }) {
+  const { vref, item, live, raw, url, direct, setProxied, src } = o
+  const proxy = useApp((s) => s.settings.proxy)
   const hls = useRef<Hls | null>(null)
   const mp = useRef<mpegts.Player | null>(null)
   const [err, setErr] = useState("")
@@ -25,6 +28,9 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
   const [retry, setRetry] = useState(0)
   const [viaHls, setViaHls] = useState("") // url whose native playback failed: some servers 302 a .mp4 to an HLS playlist
   const [stats, setStats] = useState<Stats | null>(null)
+  const auto = useRef(0) // automatic restarts since the last good playback (watchdog, mpegts errors, resume); capped so a dead stream still reaches the error screen
+  const timers = useRef<number[]>([])
+  const gen = useRef(0)
   const stalls = useRef<number[]>([]) // timestamps of rebuffer events in the last minute
   const played = useRef(false)
   // watch-history measurements (read by the tracker)
@@ -34,10 +40,20 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
   statsRef.current = stats
 
   useEffect(() => { setAudio([]); setSubs([]) }, [item.id])
+  useEffect(() => { auto.current = 0 }, [url, live])
+
+  /** Final playback error. A refused stream on an Xtream account that is at its connection limit gets the real reason. */
+  const fail = (msg: string, refusal = true) => {
+    const g = gen.current
+    if (!refusal || src?.type !== "xtream") return setErr(msg)
+    void connInfo(src, proxy).then((c) => { if (g === gen.current) setErr(c && c.act >= c.max ? tn("errors.maxConn", { act: c.act, max: c.max }) : msg) })
+  }
+  const again = (ms: number) => { timers.current.push(window.setTimeout(() => setRetry((r) => r + 1), ms)) }
 
   const firstAttach = useRef(true)
   useEffect(() => {
     const v = vref.current!
+    gen.current++
     setErr(""); setBuf(true); setStarted(false); setStats(null); aud.current = {}
     stalls.current = []; played.current = false
     meas.current.attachAt = Date.now(); meas.current.startupMs = undefined
@@ -50,6 +66,7 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
         let net = 0
         h.loadSource(url); h.attachMedia(v)
         h.on(Hls.Events.BUFFER_CODECS, (_e, d) => { const a = d.audio ?? d.audiovideo; if (a?.codec) aud.current = { codec: a.codec, ch: a.metadata?.channelCount } })
+        h.on(Hls.Events.FRAG_BUFFERED, () => { net = 0 }) // retries are per outage, not per session
         h.on(Hls.Events.MANIFEST_PARSED, () => void v.play().catch(() => {}))
         h.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => setAudio(h.audioTracks.map((x, i) => ({ id: i, label: x.name || x.lang || tn("player.audioTrack", { n: i + 1 }) }))))
         h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => setSubs(h.subtitleTracks.map((x, i) => ({ id: i, label: x.name || x.lang || tn("player.subtitleTrack", { n: i + 1 }) }))))
@@ -60,7 +77,7 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
           if (direct && d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && !h.levels?.length) setProxied(raw) // direct manifest failed (CORS / unreachable): retry through the proxy once (startLoad would not refetch it)
           else if (d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && net++ < 3) h.startLoad()
           else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && net++ < 3) h.recoverMediaError()
-          else setErr(http ? statusMsg(code) : d.type === Hls.ErrorTypes.NETWORK_ERROR ? corsHint() : d.type === Hls.ErrorTypes.MEDIA_ERROR ? tn("errors.stream.decode") : tn("errors.stream.unavailable"))
+          else fail(http ? statusMsg(code) : d.type === Hls.ErrorTypes.NETWORK_ERROR ? corsHint() : d.type === Hls.ErrorTypes.MEDIA_ERROR ? tn("errors.stream.decode") : tn("errors.stream.unavailable"))
         })
         stop = () => { h.stopLoad(); h.detachMedia(); h.destroy(); hls.current = null }
       } else if (live && mpegts.isSupported()) {
@@ -69,7 +86,11 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
         p.attachMediaElement(v); p.load()
         p.on(mpegts.Events.MEDIA_INFO, (mi: { audioCodec?: string; audioChannelCount?: number }) => { if (mi.audioCodec) aud.current = { codec: mi.audioCodec, ch: mi.audioChannelCount } })
         void Promise.resolve(p.play()).catch(() => {})
-        p.on(mpegts.Events.ERROR, (_t, _d, info: { code?: number }) => setErr(info?.code && info.code >= 400 ? statusMsg(info.code) : tn("errors.stream.offline")))
+        p.on(mpegts.Events.ERROR, (_t, _d, info: { code?: number }) => {
+          const http = !!info?.code && info.code >= 400
+          if (!http && auto.current++ < 3) again(1000 * auto.current)
+          else fail(http ? statusMsg(info.code!) : tn("errors.stream.offline"))
+        })
         stop = () => { p.pause(); p.unload(); p.detachMediaElement(); p.destroy(); mp.current = null } // unload() aborts the open live connection
       } else {
         v.src = url
@@ -80,14 +101,30 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
     const first = firstAttach.current
     firstAttach.current = false
     const t = live && !first ? window.setTimeout(start, 300) : (start(), 0)
+    // watchdog: a provider that accepts the connection but sends nothing raises no error, so restart (twice), then give up
+    const wd = window.setTimeout(() => { if (!played.current) { if (auto.current++ < 2) setRetry((r) => r + 1); else fail(tn("errors.stream.stuck")) } }, live ? 15000 : 25000)
     return () => {
       clearTimeout(t)
+      clearTimeout(wd)
+      timers.current.forEach(clearTimeout); timers.current = []
       stop()
       v.pause()
       v.removeAttribute("src") // release the decoder and any buffered/blob source
       v.load()
     }
   }, [url, live, retry, viaHls]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Back online / app brought to the front: a dead or still-loading stream restarts (after a pause so the provider drops the old connection) */
+  useEffect(() => {
+    const wake = () => {
+      const v = vref.current
+      if (document.visibilityState === "hidden" || !(err || !played.current || (v && !v.paused && v.readyState < 3))) return
+      auto.current = 0
+      again(1500)
+    }
+    window.addEventListener("online", wake); document.addEventListener("visibilitychange", wake)
+    return () => { window.removeEventListener("online", wake); document.removeEventListener("visibilitychange", wake) }
+  }, [err]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (err) meas.current.errTotal++ }, [err])
 
@@ -115,10 +152,10 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
   /* <video> event handlers owned by the engine (Player adds the rest) */
   const handlers = {
     onWaiting: () => { setBuf(true); if (played.current) { stalls.current.push(Date.now()); meas.current.stallTotal++ } },
-    onPlaying: () => { setBuf(false); setStarted(true); setPaused(false); played.current = true; meas.current.startupMs ??= Date.now() - meas.current.attachAt },
+    onPlaying: () => { auto.current = 0; setBuf(false); setStarted(true); setPaused(false); played.current = true; meas.current.startupMs ??= Date.now() - meas.current.attachAt },
     onPause: () => setPaused(true),
-    onError: () => (!live && !hls.current && viaHls !== url && Hls.isSupported() ? setViaHls(url) : setErr(vref.current?.error?.code === 4 ? tn("errors.video.format") : vref.current?.error?.code === 3 ? tn("errors.video.corrupt") : tn("errors.video.cannotPlay"))),
+    onError: () => (!live && !hls.current && viaHls !== url && Hls.isSupported() ? setViaHls(url) : fail(vref.current?.error?.code === 4 ? tn("errors.video.format") : vref.current?.error?.code === 3 ? tn("errors.video.corrupt") : tn("errors.video.cannotPlay"))),
   }
 
-  return { hls, mp, err, buf, started, paused, audio, subs, setSubs, stats, statsRef, meas, handlers, retry: () => setRetry((r) => r + 1) }
+  return { hls, mp, err, buf, started, paused, audio, subs, setSubs, stats, statsRef, meas, handlers, retry: () => { auto.current = 0; setRetry((r) => r + 1) } }
 }

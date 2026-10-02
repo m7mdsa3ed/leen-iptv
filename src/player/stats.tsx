@@ -24,7 +24,7 @@ export function QualityBadge({ s }: { s: Stats }) {
   const ql = t(`player.q.${s.q}`)
   const on = s.q === "good" ? 3 : s.q === "fair" ? 2 : 1
   return (
-    <div dir="ltr" data-ltr className="pl-badge flex h-12 shrink-0 items-center gap-2 rounded-full px-4 text-sm sm:text-base" title={qualityDetail(s)} aria-label={t("player.q.label", { q: ql })}>
+    <div dir="ltr" data-ltr className="pl-badge flex h-[var(--pl-h)] shrink-0 items-center gap-2 rounded-full px-4 text-sm sm:text-base" title={qualityDetail(s)} aria-label={t("player.q.label", { q: ql })}>
       <span className="flex items-end gap-0.5" aria-hidden>
         {[1, 2, 3].map((n) => <span key={n} className={`w-1.5 rounded-sm ${n <= on ? QC[s.q] : "bg-white/25"}`} style={{ height: 6 + n * 4 }} />)}
       </span>

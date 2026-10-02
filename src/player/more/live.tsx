@@ -42,14 +42,14 @@ export function LiveMore({ item, act }: { item: Item; act: MoreActions }) {
       <Section title={t("player.more.now")}>
         {now ? (
           <div className="max-w-3xl">
-            <div dir="auto" className="text-xl font-medium">{now.t}</div>
+            <div dir="auto" className="pl-lead">{now.t}</div>
             <div dir="ltr" data-ltr className="mt-1 text-sm text-muted-foreground">{hm(now.s)} - {hm(now.e)}</div>
-            <div dir="ltr" data-ltr className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3"><div className="h-full origin-left rounded-full bg-accent-blue" style={{ transform: `scaleX(${Math.min(1, Math.max(0, (at - now.s) / (now.e - now.s)))})` }} /></div>
+            <div dir="ltr" data-ltr className="pl-progress mt-2"><div style={{ transform: `scaleX(${Math.min(1, Math.max(0, (at - now.s) / (now.e - now.s)))})` }} /></div>
             {now.d && <p dir="auto" className="mt-3 text-base leading-relaxed text-foreground/85">{now.d}</p>}
           </div>
         ) : <p className="text-base text-muted-foreground">{t("player.more.noGuide")}</p>}
         <div className="mt-4">
-          <Pill data-autofocus="" onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />{t(isFav ? "player.more.removeFav" : "player.more.addFav")}</Pill>
+          <Pill data-autofocus="" className="pl-btn pl-act" onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />{t(isFav ? "player.more.removeFav" : "player.more.addFav")}</Pill>
         </div>
       </Section>
 
