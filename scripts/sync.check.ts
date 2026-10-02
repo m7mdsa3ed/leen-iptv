@@ -58,3 +58,14 @@ assert.equal(ap3.slice.profiles.length, 0)
 assert.deepEqual(ap3.slice.data, {})
 assert.equal(A0.e["p/p1"].t, 0)
 console.log("sync ok")
+
+// display settings: synced once set, never written while undefined
+{
+  const a = slice({ settings: { theme: "system", trackHistory: true } })
+  assert.equal(flatten(a)["c/cardSize"], undefined)
+  const b = slice({ settings: { theme: "system", trackHistory: true, cardSize: "large", homeOrder: ["live", "cont"] } })
+  const f = flatten(b)
+  assert.equal(f["c/cardSize"].v, "large")
+  assert.deepEqual(f["c/homeOrder"].v, ["live", "cont"])
+}
+console.log("display settings ok")

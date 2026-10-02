@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, LeenMark, Pill } from "@/components/gtv"
 import { askPin } from "@/components/tv/ui"
 import { useApp } from "@/lib/store"
-import { useRoute } from "@/lib/nav"
+import { startPage, useRoute } from "@/lib/nav"
 import { useT } from "@/lib/i18n"
 
 export default function Profiles() {
@@ -19,7 +19,7 @@ export default function Profiles() {
     const p = profiles.find((x) => x.id === id)!
     if (p.pin && !(await askPin(p.pin))) return
     setProfile(id)
-    reset(sources.length ? "home" : "sources")
+    reset(sources.length ? startPage() : "sources")
   }
 
   return (

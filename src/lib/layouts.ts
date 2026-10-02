@@ -8,6 +8,6 @@ export const LAYOUTS_META: { id: LayoutId; name: string; descKey: string }[] = [
   { id: "livetv", name: "Live TV", descKey: "nav.layout.livetv.desc" },
   { id: "prime", name: "Prime", descKey: "nav.layout.prime.desc" },
   { id: "roku", name: "Simple tiles", descKey: "nav.layout.roku.desc" },
-  { id: "wall", name: "Poster wall", descKey: "nav.layout.wall.desc" },
+  { id: "wall", name: "Plex style", descKey: "nav.layout.wall.desc" },
   { id: "kids", name: "Kids", descKey: "nav.layout.kids.desc" },
 ]

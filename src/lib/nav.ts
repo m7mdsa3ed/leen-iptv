@@ -25,6 +25,9 @@ const hashOf = (r: Route) => {
 }
 const baseFor = (id: string): Route["name"] => (id.includes("|live|") ? "live" : id.includes("|movie|") ? "movies" : id.includes("|series|") ? "series" : "home")
 
+/** The page the app opens on (Settings > Display > Startup page); anything but Home needs a loaded profile and a source. */
+export const startPage = (): Route["name"] => useApp.getState().settings.startPage ?? "home"
+
 function initialStack(): Route[] {
   const { profileId, sources } = useApp.getState()
   // opened from a TV's QR code on a phone: the link page needs no profile
@@ -34,6 +37,7 @@ function initialStack(): Route[] {
   const [, name = "", raw = ""] = location.hash.match(/^#\/([a-z]+)(?:\/(.+))?$/) ?? []
   const id = raw ? decodeURIComponent(raw) : ""
   if (!sources.length) return [{ name: "sources" }]
+  if (!name) return [{ name: startPage() }] // fresh launch: no page in the URL
   if (!PAGES.includes(name) || name === "profiles" || name === "sources") return [{ name: "home" }]
   if ((name === "detail" || name === "player") && id) return [{ name: baseFor(id) }, { name, p: { id } }]
   if ((name === "category" || name === "genre") && id) return [{ name: id.startsWith("series|") ? "series" : "movies" }, { name, p: { id } }]
@@ -224,6 +228,8 @@ function pageMove(cur: HTMLElement, sign: 1 | -1) {
   return el === cur ? null : el
 }
 
+/** Set by the on-screen keyboard: return true when it took over the text field (OK pressed in it). */
+export const navHooks: { text?: (el: HTMLInputElement | HTMLTextAreaElement) => boolean } = {}
 const NATIVE_CLICK = /^(BUTTON|A|INPUT|SELECT|TEXTAREA|SUMMARY)$/
 export function installNav(onBack: () => void) {
   const onKey = (e: KeyboardEvent) => {
@@ -233,6 +239,7 @@ export function installNav(onBack: () => void) {
     // typing = text entry only: checkboxes, radios, ranges, buttons... are plain controls (Enter activates, arrows navigate)
     const typing = t instanceof HTMLTextAreaElement || t.isContentEditable || (t instanceof HTMLInputElement && TEXT.test(t.type))
     const page = e.keyCode === KEY.chUp ? -1 : e.keyCode === KEY.chDown ? 1 : 0
+    if (typing && e.keyCode === KEY.enter && e.isTrusted && !e.repeat && navHooks.text?.(t as HTMLInputElement)) { e.preventDefault(); return }
     if (dir || (page && isTv)) {
       // focus may sit on a child of a [data-nav] element (inner input/icon): navigate from the nav element
       const ae = document.activeElement as HTMLElement | null

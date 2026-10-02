@@ -21,7 +21,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
         <div className="flex h-full flex-col">
           <SourceFilter />
           {/* one pill row: All, Favorites, genres (open the TMDB genre page), then categories (filter in place; locked ones go through their PIN-gated page) */}
-          <Chips items={[ALL, FAV, ...genres.filter((x) => !groups.includes(x)), ...groups]} active={g} locked={isLocked}
+          <Chips cat items={[ALL, FAV, ...genres.filter((x) => !groups.includes(x)), ...groups]} active={g} locked={isLocked}
             onPick={(c) => (c === ALL || c === FAV || (groups.includes(c) && !isLocked(c)) ? setG(c) : groups.includes(c) ? openCategory(c) : openGenre(c))}
             onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
             onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />

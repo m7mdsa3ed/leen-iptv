@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { useT } from "@/lib/i18n"
 
-/** Big poster grid (children = fluid Cards). */
+/** Poster grid (children = fluid Cards). */
 export const Grid = ({ children }: { children: ReactNode }) => <div className="rk-grid">{children}</div>
 
 /** Scrolling page body; every Roku page sits in one. */

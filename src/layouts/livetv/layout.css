@@ -1,21 +1,40 @@
-/* Live TV layout: deep green-tinted dark accent. Chrome 94: plain hex / 8-digit hex only. */
-html[data-layout=livetv] { --accent-blue: #0f8a5f; --accent-blue-container: #cdeede; --primary: #0f8a5f; --primary-foreground: #ffffff; --background: #f2f7f4; --surface: #ffffff; --surface-2: #e6efea; --surface-3: #d9e6df; --fade-mid: #f2f7f4b3; --fade-to: #f2f7f400; }
-html[data-layout=livetv].dark { --accent-blue: #3ddc97; --accent-blue-container: #0f4a35; --primary: #3ddc97; --primary-foreground: #04150e; --background: #07100c; --surface: #0e1a14; --surface-2: #15261d; --surface-3: #1d3328; --fade-mid: #07100cb3; --fade-to: #07100c00; }
-html[data-layout=livetv] .dark { --accent-blue: #3ddc97; --accent-blue-container: #0f4a35; }
-html[data-layout=livetv] .lv-tab { position: relative; isolation: isolate; transition: transform var(--dur-fast) var(--ease); }
-html[data-layout=livetv] .lv-tab::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accent-blue-container); opacity: 0; transition: opacity var(--dur) var(--ease); }
-html[data-layout=livetv] .lv-tab[aria-current=page]::before { opacity: 1; }
+/* YouTube TV layout. Research (fetched 2026-10; colours/sizes not published by Google are marked ~ = estimate):
+ * - blog.youtube/news-and-events/youtube-tv-live-guide-and-library (Esther Ahn, 2023): surfaces are Home, Live, Library; Live guide has a
+ *   highlighted state at the top confirming the program being watched, a more compact (condensed) grid, curated recommendations on top;
+ *   side panel with shortcuts (Add to Library, Set Reminder); Library = row of filters (no side nav) + "Catch up on your favorites" shelf.
+ * - techcrunch.com/2023/01/18/youtube-tv-upgrades-its-live-tv-guide-and-library: row of curated recommendations at the top of the guide,
+ *   condensed grid shows more channels/programs, simpler design, more info per program.
+ * - 9to5google.com/2023/08/21/youtube-tv-channel-guide-redesign: TV guide matches Google TV Live tab: tiles with rounded ("radial") edges,
+ *   background darker than before so live/upcoming shows read better.
+ * - 9to5google.com/2026/01/11/youtube-tv-live-guide-redesign-2 + pocket-lint.com/youtube-tv-ui-changes: channel icon/name on the LEFT, programs
+ *   extend right; program shows run time and time left; red "Jump to live"; "Sort" top-left above the channel logos.
+ * - businessinsider.com/reference/how-to-set-up-youtube-tv: tabs are Home, Live, Library (+ search); Live lists what is on now.
+ * Estimates (unverified): near-black #0f0f0f page, #212121/#272727 surfaces, white focus, blue #3ea6ff accent, YouTube red #ff0000 for live. */
+html[data-layout=livetv] { --accent-blue: #065fd4; --accent-blue-container: #d6e4fb; --primary: #065fd4; --primary-foreground: #ffffff; --background: #ffffff; --surface: #f2f2f2; --surface-2: #e8e8e8; --surface-3: #d9d9d9; --fade-mid: #ffffffb3; --fade-to: #ffffff00; }
+html[data-layout=livetv].dark { --accent-blue: #3ea6ff; --accent-blue-container: #1f3b5c; --primary: #3ea6ff; --primary-foreground: #0f0f0f; --background: #0f0f0f; --surface: #181818; --surface-2: #272727; --surface-3: #3f3f3f; --fade-mid: #0f0f0fb3; --fade-to: #0f0f0f00; }
+html[data-layout=livetv] .dark { --accent-blue: #3ea6ff; --accent-blue-container: #1f3b5c; }
+/* top bar: search, then Home / Live / Library, all left-aligned; selected tab = tonal pill, focus = white pill */
+html[data-layout=livetv] .lv-tab { border-radius: 9999px; font-weight: 500; transition: transform var(--dur-fast) var(--ease); }
+html[data-layout=livetv] .lv-tab[aria-current=page] { background: var(--surface-3); color: var(--foreground); }
 html[data-layout=livetv] .lv-tab:focus-visible { background: var(--focus-bg); color: var(--focus-fg); outline: none; }
-html[data-layout=livetv] .lv-tab:focus-visible::before { opacity: 0; }
 html[data-layout=livetv] .lv-hdr-solid { transition: opacity var(--dur) var(--ease); }
-html[data-layout=livetv] .lv-live { display: inline-block; width: .5rem; height: .5rem; border-radius: 9999px; background: #ef4444; }
-html[data-layout=livetv] .lv-prev { display: flex; align-items: center; gap: 1.5rem; padding: 1rem 1.25rem; border-radius: 1.5rem; background: var(--surface); border: 1px solid var(--border); }
-html[data-layout=livetv] .lv-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: 0 1.25rem; border-radius: 9999px; font-size: 1rem; font-weight: 600; background: var(--surface-3); color: var(--foreground); transition: transform var(--dur-fast) var(--ease); }
-html[data-layout=livetv] .lv-btn.lv-play { background: var(--accent-blue); color: var(--primary-foreground); }
-html[data-layout=livetv] .lv-btn:focus-visible { background: var(--focus-bg); color: var(--focus-fg); outline: none; }
-html[data-layout=livetv] .lv-bar { height: .25rem; border-radius: 9999px; background: var(--fg-10); overflow: hidden; }
-html[data-layout=livetv] .lv-bar > div { height: 100%; background: var(--accent-blue); }
+html[data-layout=livetv] .lv-live { display: inline-block; width: .5rem; height: .5rem; border-radius: 9999px; background: #ff0000; }
+/* recommendation tiles above the guide */
+html[data-layout=livetv] .lv-rec { display: flex; flex: none; align-items: center; gap: .75rem; width: 19rem; padding: .5rem .75rem .75rem .5rem; border-radius: .75rem; background: var(--surface-2); text-align: start; position: relative; overflow: hidden; }
+html[data-layout=livetv] .lv-rec:focus-visible { background: var(--focus-bg); color: var(--focus-fg); outline: none; }
+html[data-layout=livetv] .lv-rec .lv-th { flex: none; width: 5.5rem; aspect-ratio: 16 / 9; border-radius: .5rem; background: var(--surface-3); }
+/* highlighted "now playing" strip */
+html[data-layout=livetv] .lv-prev { display: flex; align-items: center; gap: 1rem; padding: .5rem 1rem; border-radius: .75rem; background: var(--surface-2); }
+html[data-layout=livetv] .lv-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.5rem; padding: 0 1.25rem; border-radius: 9999px; font-size: 1rem; font-weight: 500; background: var(--surface-3); color: var(--foreground); }
+html[data-layout=livetv] .lv-btn.lv-play { background: var(--foreground); color: var(--background); }
+html[data-layout=livetv] .lv-btn:focus-visible { background: var(--focus-bg); color: var(--focus-fg); outline: none; box-shadow: 0 0 0 3px var(--accent-blue); }
+html[data-layout=livetv] .lv-bar { height: .1875rem; border-radius: 9999px; background: var(--fg-10); overflow: hidden; }
+html[data-layout=livetv] .lv-bar > div { height: 100%; background: #ff0000; }
+/* guide grid (shared GuideGrid): darker page, rounded program tiles, white focus ring */
+html[data-layout=livetv] [data-guide] { border-radius: .75rem; }
+html[data-layout=livetv] [data-guide]:focus-visible { background: var(--focus-bg); color: var(--focus-fg); }
 html[data-mode=mobile][data-layout=livetv] .lv-prev { flex-wrap: wrap; gap: .75rem; padding: .75rem; }
+html[data-mode=mobile][data-layout=livetv] .lv-rec { width: 16rem; }
 /* rules the reused Google TV pages (Detail hero, Settings panes) depend on */
 html[data-layout=livetv] .gtv-hero-fade { background-image: linear-gradient(to right, var(--background) 35%, var(--fade-mid) 65%, var(--fade-to)); }
 html[dir=rtl][data-layout=livetv] .gtv-hero-fade { background-image: linear-gradient(to left, var(--background) 35%, var(--fade-mid) 65%, var(--fade-to)); }

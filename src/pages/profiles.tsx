@@ -5,7 +5,7 @@ import { Avatar, LeenMark, Pill } from "@/components/gtv"
 import { askPin } from "@/components/tv/ui"
 import { useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
-import { useRoute } from "@/lib/nav"
+import { startPage, useRoute } from "@/lib/nav"
 
 export default function Profiles() {
   const { profiles, sources, setProfile, addProfile } = useApp()
@@ -19,7 +19,7 @@ export default function Profiles() {
     const p = profiles.find((x) => x.id === id)!
     if (p.pin && !(await askPin(p.pin))) return
     setProfile(id)
-    reset(sources.length ? "home" : "sources")
+    reset(sources.length ? startPage() : "sources")
   }
 
   return (

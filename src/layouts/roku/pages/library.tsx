@@ -1,20 +1,19 @@
-import { Card, SkelGrid } from "@/components/gtv"
+import { Card, Rail, SkelGrid } from "@/components/gtv"
 import { Empty, Shell } from "@/components/tv/ui"
 import { SourceFilter } from "@/components/source/SourceFilter"
 import { useT } from "@/lib/i18n"
 import type { Item } from "@/lib/types"
 import { useLibrary } from "../../hooks/use-library"
-import { Grid, Page } from "../ui"
+import { Page } from "../ui"
 
-/** Library: Continue watching, Favorites and Recently watched as plain big grids. */
+/** Library: Continue watching, Favorites and Recently watched as rails of tiles. */
 export default function Library() {
   const t = useT()
   const L = useLibrary()
   const sec = (title: string, list: Item[]) => list.length > 0 && (
-    <section key={title}>
-      <h2 className="rk-h">{title}</h2>
-      <Grid>{list.map((i) => <Card key={i.id} fluid item={i} variant={i.kind === "live" ? "wide" : "poster"} pct={L.pct(i)} onOpen={() => L.open(i)} />)}</Grid>
-    </section>
+    <Rail key={title} title={title}>
+      {list.map((i) => <Card key={i.id} item={i} variant={i.kind === "live" ? "wide" : "poster"} pct={L.pct(i)} onOpen={() => L.open(i)} />)}
+    </Rail>
   )
   const empty = !L.favorites.length && !L.continueWatching.length && !L.history.length
   return (

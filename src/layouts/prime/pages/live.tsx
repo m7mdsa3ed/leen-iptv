@@ -24,7 +24,7 @@ export default function Live() {
             <h1 className="pv-h1">{t("pv.live.title")}</h1>
             <button data-nav onClick={() => go("guide")} className="pv-btn pv-sec"><Tv />{t("pv.live.guide")}</button>
           </div>
-          <Chips items={[ALL, FAV, ...L.groups]} active={L.g} onPick={L.setG} />
+          <Chips cat items={[ALL, FAV, ...L.groups]} active={L.g} onPick={L.setG} />
           <SourceBar />
           {L.items.length ? <PagedGrid items={L.items} render={tile} /> : <div className="h-64"><Empty>{t("pv.live.none")}</Empty></div>}
         </div>

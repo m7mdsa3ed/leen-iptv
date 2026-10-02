@@ -38,5 +38,13 @@ const d: Dict = {
   "common.moviesIn": "Movies · {g}",
   "common.showsIn": "Shows · {g}",
   "common.del": "Del",
+  "kb.title": "Keyboard",
+  "kb.shift": "Shift",
+  "kb.backspace": "Delete",
+  "kb.language": "Language",
+  "kb.left": "Move left",
+  "kb.right": "Move right",
+  "kb.space": "Space",
+  "kb.done": "Enter",
 }
 export default d

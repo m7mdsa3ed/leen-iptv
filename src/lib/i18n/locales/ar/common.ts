@@ -38,5 +38,13 @@ const d: Dict = {
   "common.moviesIn": "أفلام · {g}",
   "common.showsIn": "مسلسلات · {g}",
   "common.del": "مسح",
+  "kb.title": "الكيبورد",
+  "kb.shift": "شيفت",
+  "kb.backspace": "مسح",
+  "kb.language": "اللغة",
+  "kb.left": "شمال",
+  "kb.right": "يمين",
+  "kb.space": "مسافة",
+  "kb.done": "إدخال",
 }
 export default d

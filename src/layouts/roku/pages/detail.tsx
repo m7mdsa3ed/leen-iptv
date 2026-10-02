@@ -16,8 +16,9 @@ export default function Detail({ id }: { id: string }) {
     <Shell page="detail" title={item.name}>
       <Page>
         <div className="rk-det">
+          {D.backdrop && <img aria-hidden src={D.backdrop} alt="" className="rk-det-bg" />}
           <div className="rk-det-poster"><Logo item={D.poster ?? item} className="size-full object-cover" /></div>
-          <div className="min-w-0">
+          <div className="relative min-w-0">
             <h2 dir="auto" className="line-clamp-2 text-5xl font-black leading-tight">{item.name}</h2>
             <div dir="auto" className="mt-2 text-xl opacity-80">{[...chips, ...D.ratings.slice(0, 1).map((r) => `${r.source} ${r.value}`), ...genres.slice(0, 2)].join("  ·  ")}</div>
             <div className="mt-5 flex flex-wrap gap-4">

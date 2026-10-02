@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react"
-import { ChevronRight, Lock } from "lucide-react"
+import { Check, ChevronRight, Lock } from "lucide-react"
 import { Logo, useLocked } from "@/components/tv/ui"
 import { SourceBadge } from "@/components/source/SourceBadge"
 import { useSourceFilter } from "../hooks/use-source-filter"
@@ -9,16 +9,18 @@ import type { Item } from "@/lib/types"
 
 /** Prime-style building blocks. Styles: layout.css (.pv-*). */
 
-/** Wide 16:9 tile, title (+ optional sub line) under it. Fixed width inside .pv-rail, fills the cell inside .pv-grid. */
-export function Tile({ item, pct, sub, onOpen }: { item: Item; pct?: number; sub?: string; onOpen: () => void }) {
+/** Wide 16:9 tile (blue included check, optional Top 10 numeral), title (+ optional sub line) under it. Fixed width inside .pv-rail, fills the cell inside .pv-grid. */
+export function Tile({ item, pct, sub, rank, onOpen }: { item: Item; pct?: number; sub?: string; rank?: number; onOpen: () => void }) {
   const locked = useLocked(item)
   const live = item.kind === "live"
   return (
-    <button data-nav data-card data-id={item.id} onClick={onOpen} className="pv-tile">
+    <button data-nav data-card data-poster data-live={live ? "" : undefined} data-id={item.id} onClick={onOpen} className="pv-tile">
       <div className={cn("pv-media", live && "pv-live")}>
         <Logo item={live ? item : { ...item, logo: item.backdrop ?? item.logo }} className={cn("size-full", live ? "p-4" : "object-cover")} />
         <SourceBadge item={item} dot className="absolute end-1.5 top-1.5" />
         {locked && <span className="absolute start-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-black/70"><Lock className="size-3.5 text-white" /></span>}
+        {!live && <span aria-hidden className="pv-check"><Check strokeWidth={3} /></span>}
+        {rank ? <span dir="ltr" aria-hidden className="pv-rank">{rank}</span> : null}
         {pct ? <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-white/30"><div className="h-full bg-accent-blue" style={{ width: `${Math.min(100, pct)}%` }} /></div> : null}
       </div>
       <div dir="auto" className="pv-name">{item.name}</div>

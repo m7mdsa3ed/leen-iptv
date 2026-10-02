@@ -11,6 +11,10 @@ import { inSource, useActiveFilter, useCatalogView } from "./hooks/use-source-fi
 
 const CAP = 20
 
+/** Home rows the user can reorder / hide (Settings > Display). A rail key maps to one of these. */
+export const HOME_ROWS = ["cont", "favs", "recents", "live", "movies", "series"] as const
+export const homeRowOf = (key: string) => (["cont", "favs", "recents", "live"].includes(key) ? key : key.startsWith("movie") ? "movies" : "series")
+
 export type HeroPick = { item: Item; kicker: string }
 export type HomeRail = {
   key: string
@@ -42,6 +46,7 @@ export function useHomeData() {
   const openItem = useOpen()
   const toggleFav = useApp((s) => s.toggleFav)
   const proxy = useApp((s) => s.settings.proxy)
+  const homeOrder = useApp((s) => s.settings.homeOrder), homeHide = useApp((s) => s.settings.homeHide)
   const { lang } = useLang() // t() below is non-reactive: rebuild on language change
 
   const data = useMemo(() => {
@@ -80,9 +85,12 @@ export function useHomeData() {
       const title = t(r.k === "movie" ? "common.moviesIn" : "common.showsIn", { g: r.g })
       rails.push({ key: r.k + r.g, title, kind: "poster", items: r.items, seeAll: seeAll(r.k, r.g) })
     }
+    const order: readonly string[] = homeOrder?.length ? homeOrder : HOME_ROWS, hide = homeHide ?? []
+    const rank = (r: HomeRail) => { const i = order.indexOf(homeRowOf(r.key)); return i < 0 ? 99 : i }
+    rails.splice(0, rails.length, ...rails.filter((r) => !hide.includes(homeRowOf(r.key))).sort((a, b) => rank(a) - rank(b))) // stable: genre rails keep their order
     const hp: HeroPick | undefined = hero ? { item: hero, kicker: kicker(hero) } : undefined
     return { hero: hp, featured, rails, live, favIds: d.favs }
-  }, [d, byId, byKind, groups, epg, go, filter, lang])
+  }, [d, byId, byKind, groups, epg, go, filter, lang, homeOrder, homeHide])
 
   return {
     status, msg, ...data,

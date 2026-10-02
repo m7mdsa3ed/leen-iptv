@@ -1,42 +1,50 @@
-import { useMemo, useState } from "react"
-import { Shell } from "@/components/tv/ui"
+import { useMemo } from "react"
+import { Empty, Pending, Shell, TvButton } from "@/components/tv/ui"
+import { Card } from "@/components/gtv"
 import { SourceFilter } from "@/components/source/SourceFilter"
 import { useT } from "@/lib/i18n"
 import { useHomeData } from "../home-data"
 import { useCatalogView } from "../hooks/use-source-filter"
-import { Opt, PosterGrid, Split } from "./parts"
-import { Pending } from "@/components/tv/ui"
-import type { Item } from "@/lib/types"
+import { Fanart, Hub, InfoBar, useFollow, useSeed } from "./parts"
 
-type Sec = "all" | "cont" | "added" | "favs"
-
-/** Home wall: Continue watching + Recently added + Favorites in one grid, section chips filter it. */
+/** Plex home: fanart + inline info for the focused title, then hubs (Continue Watching, Recently Added movies / shows, favorites, ...). */
 export default function Home() {
   const t = useT()
   const h = useHomeData()
   const { byKind } = useCatalogView()
-  const [sec, setSec] = useState<Sec>("all")
-  const cont = h.rails.find((r) => r.key === "cont")
-  const favs = h.rails.find((r) => r.key === "favs")
+  const follow = useFollow()
   // newest additions (catalog order, last = newest)
-  const added = useMemo(() => [...byKind.movie.slice(-20), ...byKind.series.slice(-20)].reverse(), [byKind])
-  const lists: [Sec, Item[]][] = [["cont", cont?.items ?? []], ["added", added], ["favs", favs?.items ?? []]]
-  const shown = useMemo(() => {
-    const seen = new Set<string>()
-    const on = lists.some(([k, l]) => k === sec && l.length) ? sec : "all" // a vanished section falls back to All
-    return lists.filter(([k]) => on === "all" || k === on).flatMap(([, l]) => l).filter((i) => !seen.has(i.id) && !!seen.add(i.id))
-  }, [sec, cont, favs, added]) // eslint-disable-line react-hooks/exhaustive-deps
-  const chips = [["all", t("pw.sec.all")] as const, ...lists.filter(([, l]) => l.length).map(([k]) => [k, t(`pw.sec.${k}`)] as const)]
-  const active: Sec = chips.some(([k]) => k === sec) ? sec : "all"
+  const addedMovies = useMemo(() => byKind.movie.slice(-20).reverse(), [byKind])
+  const addedShows = useMemo(() => byKind.series.slice(-20).reverse(), [byKind])
+  const cont = h.rails.find((r) => r.key === "cont")
+  const rest = h.rails.filter((r) => r.key !== "cont")
+  useSeed(cont?.items.length ? cont.items : addedMovies.length ? addedMovies : addedShows)
+  const open = (i: Parameters<typeof h.open>[0], l: Parameters<typeof h.open>[1]) => () => h.open(i, l)
+  const posters = (l: typeof addedMovies) => l.map((i) => <Card key={i.id} item={i} onOpen={open(i, l)} />)
   return (
     <Shell page="home" title={h.sourceName ?? t("pw.home.title")}>
-      {h.status !== "ready" ? <Pending shape="grid" /> : (
-        <Split bar={<>
-          <div data-nav-group className="flex flex-wrap items-center gap-2">{chips.map(([k, l]) => <Opt key={k} on={k === active} onClick={() => setSec(k)}>{l}</Opt>)}</div>
-          <SourceFilter />
-        </>}>
-          <PosterGrid items={shown} pct={cont?.pct} onOpen={(i) => h.open(i, shown)} empty={t("pw.home.empty")} />
-        </Split>
+      {h.status === "loading" && <Pending />}
+      {h.status === "error" && (
+        <Empty><div className="flex flex-col items-center gap-4"><div className="text-destructive">{h.msg}</div>
+          <div className="flex gap-3"><TvButton onClick={h.retry}>{t("pw.home.retry")}</TvButton><TvButton variant="secondary" onClick={h.changeSource}>{t("pw.home.changeSource")}</TvButton></div></div></Empty>
+      )}
+      {h.status === "ready" && (
+        <div className="relative -mx-[var(--gx)] h-full">
+          <Fanart />
+          <div onFocus={follow} className="pw-scroll relative h-full overflow-y-auto px-[var(--gx)] [scroll-padding-block:6rem]">
+            <InfoBar onPlay={h.play} />
+            <div className="mb-2"><SourceFilter /></div>
+            {cont && <Hub title={cont.title}>{cont.items.map((i) => <Card key={i.id} item={i} variant={cont.card ?? cont.kind} pct={cont.pct?.(i)} sub={cont.sub?.(i)} onOpen={open(i, cont.items)} />)}</Hub>}
+            {addedMovies.length > 0 && <Hub title={t("pw.hub.addedMovies")}>{posters(addedMovies)}</Hub>}
+            {addedShows.length > 0 && <Hub title={t("pw.hub.addedShows")}>{posters(addedShows)}</Hub>}
+            {rest.map((r) => (
+              <Hub key={r.key} title={r.title} onSeeAll={r.seeAll}>
+                {r.items.map((i) => <Card key={i.id} item={i} variant={r.card ?? r.kind} pct={r.pct?.(i)} sub={r.sub?.(i)} onOpen={open(i, r.items)} />)}
+              </Hub>
+            ))}
+            {!cont && !addedMovies.length && !addedShows.length && !rest.length && <Empty>{t("pw.home.empty")}</Empty>}
+          </div>
+        </div>
       )}
     </Shell>
   )

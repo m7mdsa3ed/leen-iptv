@@ -11,6 +11,8 @@ import { TrailerModal, closeTrailer, useTrailer } from "@/components/TrailerModa
 import { RecoveryGate } from "@/settings/AccountSync"
 import { ExitConfirm, askExit, closeExit, useExitAsk } from "@/components/tv/exit-confirm"
 import { installNav, useRoute } from "@/lib/nav"
+import { CARD_K } from "@/lib/cards"
+import { OnScreenKeyboard, closeKeyboard, installKeyboard, useKbd } from "@/components/tv/keyboard"
 import { useApp } from "@/lib/store"
 import Browse from "@/pages/browse"
 import CategoryPage from "@/pages/category"
@@ -83,12 +85,23 @@ export default function App() {
   // Back: close the PIN prompt / exit prompt first; at the root page on TV ask before leaving the app
   useEffect(() =>
     installNav(() => {
+      if (useKbd.getState().el) return closeKeyboard()
       const ask = usePinAsk.getState().ask
       if (ask) return ask.resolve(false), usePinAsk.setState({ ask: null })
       if (useTrailer.getState().cur) return closeTrailer()
       if (useExitAsk.getState().open) return closeExit()
       if (!useRoute.getState().back() && isTv) askExit()
     }), [])
+
+  useEffect(() => installKeyboard(), [])
+  const catNav = useApp((s) => s.settings.catNav ?? "bar")
+  useEffect(() => { document.documentElement.dataset.catnav = catNav }, [catNav])
+  const cardSize = useApp((s) => s.settings.cardSize ?? "normal"), cardInfo = useApp((s) => s.settings.cardInfo ?? "show")
+  useEffect(() => {
+    const h = document.documentElement
+    h.dataset.cardinfo = cardInfo
+    h.style.setProperty("--card-k", String(CARD_K[cardSize]))
+  }, [cardSize, cardInfo])
 
   // load every enabled source (already-loaded ones are skipped) when the profile or the source list / enabled flags / order change
   const srcKey = sources.map((s) => `${s.id}:${s.enabled !== false ? 1 : 0}`).join(",")
@@ -125,6 +138,7 @@ export default function App() {
         </div>
       ))}
       <PinModal />
+      <OnScreenKeyboard />
       <ExitConfirm />
       <RecoveryGate />
       <TrailerModal />

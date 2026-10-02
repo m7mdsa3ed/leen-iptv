@@ -6,7 +6,7 @@ import { findLock } from "@/lib/merge-pure"
 import type { Kind } from "@/lib/types"
 import { useMode } from "@/lib/device"
 import { useT } from "@/lib/i18n"
-import { askPin, groupLabel } from "./ui"
+import { askPin, groupLabel, useCatSide } from "./ui"
 
 export const FAV = "Favorites"
 export const ALL = "All"
@@ -19,6 +19,7 @@ export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups
   const list = [FAV, ALL, ...groups]
   const lockKey = (g: string) => findLock(p?.locked ?? [], kind, g)
   const mode = useMode()
+  const ref = useCatSide()
   const toggle = async (g: string) => {
     if (g === FAV || g === ALL || !p?.pin) return
     const k = lockKey(g)
@@ -29,7 +30,7 @@ export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups
   // right-click / touch long-press (contextmenu) toggles the lock outside tv
   const onCtx = (e: React.MouseEvent, g: string) => { if (mode !== "tv" && p?.pin && g !== FAV && g !== ALL) { e.preventDefault(); toggle(g) } }
   return (
-    <div className="shrink-0">
+    <div ref={ref} className="cat-side shrink-0">
       <div className="rail no-scrollbar -mb-2 !gap-2">
         {list.map((g) => (
           <button key={g} data-nav data-pill aria-pressed={g === active} onKeyDown={(e) => onKey(e, g)} onContextMenu={(e) => onCtx(e, g)} onClick={() => onPick(g)}

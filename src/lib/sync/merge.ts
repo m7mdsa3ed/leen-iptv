@@ -43,8 +43,11 @@ export type AppSlice = {
   profiles: P[]
   sources: P[]
   data: Record<string, { favs: string[]; recents: string[]; progress: Record<string, Prog> }>
-  settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown }
+  settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown } & Partial<Record<DisplayKey, unknown>>
 }
+/** Display preferences that follow the account. Only written once set (an untouched device never overwrites a customised one); "reset" stores an empty value, not undefined. */
+export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav"] as const
+type DisplayKey = (typeof DISPLAY_KEYS)[number]
 export const RECENTS_MAX = 40
 
 /** Current synced values keyed like Snapshot.e, with a hash for change detection. */
@@ -62,6 +65,7 @@ export function flatten(s: AppSlice): Record<string, { h: string; v?: unknown }>
   put("c/theme", s.settings.theme ?? null)
   put("c/trackHistory", s.settings.trackHistory ?? null)
   put("c/meta", s.settings.meta ?? null)
+  for (const k of DISPLAY_KEYS) if (s.settings[k] !== undefined) put(`c/${k}`, s.settings[k])
   put("c/sourceOrder", s.sources.map((x) => x.id))
   return o
 }
@@ -128,7 +132,7 @@ export function applySnapshot(cur: AppSlice, m: Snapshot): { slice: AppSlice; da
     if (pset.has(pid)) data[pid].progress[id] = m.progress[k]
   }
   const settings = { ...cur.settings }
-  for (const key of ["theme", "trackHistory", "meta"] as const) {
+  for (const key of ["theme", "trackHistory", "meta", ...DISPLAY_KEYS] as const) {
     const x = alive(`c/${key}`)
     if (x) (settings as Record<string, unknown>)[key] = x.v === null ? undefined : x.v
   }

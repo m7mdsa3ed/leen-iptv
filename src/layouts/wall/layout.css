@@ -1,47 +1,80 @@
-/* Poster wall layout (Kodi/Emby style). Scoped under html[data-layout=wall]. Chrome 94: plain hex / 8-digit hex / rgba only. Always near-black with an amber accent. */
+/*
+  Plex layout ("wall"). Research (web, fetched this session; visual specifics beyond text are unverified):
+  - plex.tv brand palette: gold #e5a00d (RGB 229,160,13) + near-black #282a2d  (designpieces.com/palette/plex-color-palette-hex-and-rgb, htmlcolors.com/brand-color/plex)
+  - Plex Support "Navigating the Big Screen Apps" (support.plex.tv/articles/navigating-the-big-screen-apps): navigation sidebar on the left edge,
+    sources (libraries, Live TV, Discover) as entries; Home = Continue Watching, Recently Added (per media type), What's On Now hubs;
+    a source has tabs Recommended / Library / Collections / Playlists / Categories; Library has filter + sort controls near the top; Live TV default = guide.
+  - Plex Support "Interface Overview" (web app): left navigation sidebar, top action bar, Home dashboard of Recommended rows, posters with hover actions.
+  - Plex blog "Introducing Modern Layout" (plex.tv/blog/choose-your-own-adventure-introducing-modern-layout): artwork front and centre, "inline metadata"
+    (genres, rating, short synopsis) for the focused poster shown at the top, title not repeated under the poster, background tinted from artwork, dimmed full-bleed art on detail pages.
+  - Pocket-lint (Plex nav update): the left-justified collapsible sidebar returned on TV after a top-strip nav drew backlash.
+  - Kodi Estuary (forum.kodi.tv, kodi.wiki Estuary settings): fanart as page background that follows the focused media item, with an info panel; used here only for the fanart + info bar.
+  UNVERIFIED (best knowledge): charcoal surfaces #1f2326 / #282a2d, hover gold #ebaf00, ~8px poster radius, 3px gold focus ring + slight scale, sidebar ~14rem, orange Play button on item pages.
+  Chrome 94: plain hex / 8-digit hex only. Scoped under html[data-layout=wall].
+*/
 
 html[data-layout=wall] {
   color-scheme: dark;
   --hdr: 3.5rem;
-  --background: #0b0a09; --surface: #151311; --surface-2: #201d19; --surface-3: #2b2721;
-  --card: #151311; --popover: #201d19; --secondary: #201d19; --muted: #201d19; --accent: #2b2721;
-  --foreground: #f4efe8; --card-foreground: #f4efe8; --popover-foreground: #f4efe8; --secondary-foreground: #f4efe8; --accent-foreground: #f4efe8;
-  --muted-foreground: #f4efe899;
+  --background: #1f2326; --surface: #282a2d; --surface-2: #31343a; --surface-3: #3b3e45;
+  --card: #282a2d; --popover: #31343a; --secondary: #31343a; --muted: #31343a; --accent: #3b3e45;
+  --foreground: #ffffff; --card-foreground: #ffffff; --popover-foreground: #ffffff; --secondary-foreground: #ffffff; --accent-foreground: #ffffff;
+  --muted-foreground: #ffffffa6;
   --fg-10: #ffffff1a; --fg-30: #ffffff4d; --fg-40: #ffffff66; --fg-70: #ffffffb3; --fg-80: #ffffffcc;
   --border: #ffffff1a; --input: #ffffff26;
-  --primary: #f5a524; --primary-foreground: #1a1100; --ring: #f5a524;
-  --accent-blue: #f5a524; --accent-blue-container: #4a3410;
-  --focus-bg: #f5a524; --focus-fg: #1a1100;
-  --fade-mid: #0b0a09b3; --fade-to: #0b0a0900;
-  --float-bg: #201d19b3; --scroll-thumb: #ffffff33; --destructive: #f28b82;
+  --primary: #e5a00d; --primary-foreground: #1f2326; --ring: #e5a00d;
+  --accent-blue: #e5a00d; --accent-blue-container: #4d3a0c;
+  --focus-bg: #e5a00d; --focus-fg: #1f2326;
+  --fade-mid: #1f2326b3; --fade-to: #1f232600;
+  --float-bg: #282a2dd9; --scroll-thumb: #ffffff33; --destructive: #f28b82;
+  --pw-side: 14rem;
 }
-html[data-layout=wall][data-mode=tv] { --hdr: 4.25rem; }
+html[data-layout=wall][data-mode=tv] { --hdr: 4.25rem; --pw-side: 15rem; }
 html[data-layout=wall][data-mode=mobile] { --hdr: calc(3.5rem + env(safe-area-inset-top)); }
 
-/* ---------- top bar ---------- */
-html[data-layout=wall] .pw-hdr { height: var(--hdr); border-bottom: 1px solid var(--fg-10); }
-html[data-layout=wall][data-mode=mobile] .pw-hdr { padding-top: env(safe-area-inset-top); }
-html[data-layout=wall] .pw-logo { font-weight: 800; font-size: 1.35rem; letter-spacing: .02em; color: #f5a524; margin-inline-end: 1rem; }
-html[data-layout=wall] .pw-tab { min-height: 2.5rem; padding: .25rem 1rem; border-radius: 9999px; font-size: 1rem; font-weight: 500; color: var(--muted-foreground); white-space: nowrap; }
-html[data-layout=wall] .pw-tab[aria-current=page] { color: var(--foreground); font-weight: 700; box-shadow: inset 0 -3px 0 #f5a524; border-radius: .25rem; }
-html[data-layout=wall] .pw-tab:hover { color: var(--foreground); }
+/* ---------- left sidebar ---------- */
+html[data-layout=wall] .pw-side { flex: 0 0 var(--pw-side); width: var(--pw-side); display: flex; flex-direction: column; gap: 1.25rem; padding: 1.25rem .75rem; background: #191c1f; border-inline-end: 1px solid var(--fg-10); z-index: 10; }
+html[data-layout=wall] .pw-logo { display: flex; align-items: center; gap: .6rem; padding-inline: .5rem; font-size: 1.5rem; font-weight: 800; letter-spacing: .01em; color: #e5a00d; }
+html[data-layout=wall] .pw-nav { display: flex; align-items: center; gap: .9rem; width: 100%; min-height: 2.9rem; padding: .35rem .9rem; border-radius: .5rem; border-inline-start: 4px solid transparent; font-size: 1.05rem; font-weight: 500; color: var(--fg-80); text-align: start; }
+html[data-layout=wall] .pw-nav:hover { background: var(--fg-10); color: #ffffff; }
+html[data-layout=wall] .pw-nav[aria-current=page] { color: #e5a00d; font-weight: 700; background: #ffffff0d; border-inline-start-color: #e5a00d; }
+html[data-layout=wall][data-mode=tv] .pw-nav { min-height: 3.1rem; font-size: 1.1rem; }
+html[data-layout=wall] .pw-hdr { height: var(--hdr); padding-top: env(safe-area-inset-top); background: #1f2326f2; }
 
-/* ---------- wall: grid (left ~70%) + detail pane (right ~30%) ---------- */
-html[data-layout=wall] .pw-split { display: flex; height: 100%; min-height: 0; margin-inline: calc(var(--gx) * -1); }
-html[data-layout=wall] .pw-left { flex: 7 1 0; min-width: 0; display: flex; flex-direction: column; padding-inline: var(--gx); padding-top: .5rem; }
-html[data-layout=wall] .pw-bar { display: flex; flex-direction: column; gap: .25rem; flex-shrink: 0; }
-html[data-layout=wall] .pw-pane { position: relative; flex: 3 1 0; min-width: 17rem; max-width: 34rem; overflow: hidden; background: var(--surface); border-inline-start: 1px solid var(--fg-10); }
-html[data-layout=wall][data-mode=mobile] .pw-pane { display: none; }
-html[data-layout=wall] .pw-pane-img { position: absolute; inset-inline: 0; top: 0; width: 100%; height: 45%; object-fit: cover; opacity: .55; }
-html[data-layout=wall] .pw-pane-fade { position: absolute; inset: 0; background-image: linear-gradient(to bottom, var(--fade-to) 0%, var(--fade-to) 15%, var(--surface) 45%); }
-html[data-layout=wall] .pw-body { position: relative; height: 100%; display: flex; flex-direction: column; gap: .75rem; padding: 1.5rem; padding-top: 8rem; overflow: hidden; }
-html[data-layout=wall] .pw-title { font-size: 1.6rem; line-height: 1.15; font-weight: 800; letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-html[data-layout=wall][data-mode=tv] .pw-title { font-size: 1.9rem; }
-html[data-layout=wall] .pw-meta { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .95rem; font-weight: 600; color: #f5a524; }
-html[data-layout=wall] .pw-chip { padding: .15rem .7rem; border-radius: 9999px; font-size: .85rem; background: var(--surface-3); color: var(--foreground); }
-html[data-layout=wall] .pw-plot { font-size: 1rem; line-height: 1.5; color: var(--fg-80); display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }
-html[data-layout=wall] .pw-hint { margin-top: auto; align-self: flex-start; padding: .4rem 1.1rem; border-radius: 9999px; background: #f5a524; color: #1a1100; font-weight: 700; font-size: .95rem; }
+/* ---------- posters: rounded corners, gold focus ring ---------- */
+html[data-layout=wall] [data-tilewrap] { border-radius: .5rem; }
+html[data-layout=wall] [data-tile] { background: #282a2d; }
+
+/* ---------- home hubs ---------- */
+html[data-layout=wall] .pw-hub-title { font-size: 1.35rem; font-weight: 700; line-height: 1.6; letter-spacing: .005em; color: #ffffff; }
+html[data-layout=wall] .pw-scroll { scrollbar-width: none; }
+html[data-layout=wall] .pw-scroll::-webkit-scrollbar { display: none; }
+
+/* Kodi-style fanart behind the page, following focus */
+html[data-layout=wall] .pw-fanart { position: absolute; inset-inline: 0; top: 0; height: 60%; pointer-events: none; overflow: hidden; }
+html[data-layout=wall] .pw-fanart img { width: 100%; height: 100%; object-fit: cover; object-position: center top; opacity: .45; }
+html[data-layout=wall] .pw-fanart::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(to bottom, #1f232600 0%, #1f232699 55%, #1f2326 100%), linear-gradient(to right, #1f2326cc 0%, #1f232600 60%); }
+html[data-layout=wall][dir=rtl] .pw-fanart::after { background-image: linear-gradient(to bottom, #1f232600 0%, #1f232699 55%, #1f2326 100%), linear-gradient(to left, #1f2326cc 0%, #1f232600 60%); }
+
+/* Plex inline metadata */
+html[data-layout=wall] .pw-info { display: flex; align-items: flex-end; gap: 1.5rem; min-height: 8.5rem; max-height: 10rem; padding-top: 1.25rem; padding-bottom: 1rem; overflow: hidden; }
+html[data-layout=wall][data-mode=mobile] .pw-info { display: none; }
+html[data-layout=wall] .pw-title { font-size: 1.9rem; line-height: 1.15; font-weight: 800; letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-layout=wall][data-mode=tv] .pw-title { font-size: 2.1rem; }
+html[data-layout=wall] .pw-meta { display: flex; flex-wrap: wrap; gap: .1rem 1rem; margin-top: .35rem; font-size: .95rem; font-weight: 600; color: #ffffffcc; }
+html[data-layout=wall] .pw-meta span:first-child { color: #e5a00d; }
+html[data-layout=wall] .pw-plot { margin-top: .4rem; max-width: 46rem; font-size: 1rem; line-height: 1.45; color: var(--fg-70); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-layout=wall] .pw-page-title { font-size: 1.9rem; font-weight: 800; letter-spacing: -.01em; }
+
+/* orange Play */
+html[data-layout=wall] .pw-play.pw-play { background: #e5a00d; color: #1f2326; font-weight: 700; flex-shrink: 0; }
+html[data-layout=wall] .pw-play.pw-play:hover { background: #ebaf00; }
+html[data-layout=wall][data-mode=tv] .pw-play.pw-play:focus { background: #ebaf00 !important; box-shadow: 0 0 0 3px #ffffff !important; }
+
+/* ---------- toolbar (library / live) ---------- */
+html[data-layout=wall] .pw-bar { display: flex; flex-direction: column; gap: .5rem; flex-shrink: 0; padding-bottom: .5rem; }
+html[data-layout=wall] .pw-opt[aria-pressed=true] { background: #e5a00d; color: #1f2326; font-weight: 700; }
 
 /* ---------- live rows ---------- */
-html[data-layout=wall] .pw-row { display: flex; align-items: center; gap: .75rem; width: 100%; height: calc(100% - .5rem); padding: .25rem .75rem; border-radius: .75rem; background: var(--surface); text-align: start; }
-html[data-layout=wall] .pw-row:focus-visible { outline: 3px solid #f5a524; outline-offset: -3px; background: var(--surface-3); }
+html[data-layout=wall] .pw-row { display: flex; align-items: center; gap: .75rem; width: 100%; height: calc(100% - .5rem); padding: .25rem .75rem; border-radius: .5rem; background: var(--surface); text-align: start; }
+html[data-layout=wall] .pw-row:focus-visible { outline: 3px solid #e5a00d; outline-offset: -3px; background: var(--surface-3); }

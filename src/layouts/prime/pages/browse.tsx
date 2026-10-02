@@ -17,7 +17,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
       {B.status !== "ready" ? <Pending /> : (
         <div className="pv-page">
           <h1 className="pv-h1">{B.kindLabel}</h1>
-          <Chips items={[ALL, FAV, ...B.groups]} active={B.g} locked={B.isLocked}
+          <Chips cat items={[ALL, FAV, ...B.groups]} active={B.g} locked={B.isLocked}
             onPick={(c) => { if (c === ALL || c === FAV) B.setG(c); else B.openCategory(c) }}
             onKey={(e, c) => { if (e.keyCode === KEY.yellow) B.toggleLock(c) }}
             onCtx={(e, c) => { if (mode !== "tv" && B.canLock && c !== FAV && c !== ALL) { e.preventDefault(); B.toggleLock(c) } }} />

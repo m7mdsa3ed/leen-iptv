@@ -100,6 +100,8 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
     <button
       data-nav
       data-card
+      data-poster
+      data-live={live ? "" : undefined}
       data-id={item.id}
       onClick={onOpen}
       onFocus={onFocus}
@@ -115,7 +117,7 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
       </div>
       <span data-ring aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit]" />
       </div>
-      <div className="mt-2 px-1">
+      <div className="card-info mt-2 px-1">
         <div dir="auto" className="truncate text-base text-foreground">{item.name}</div>
         {sub ? <div className="truncate text-sm text-muted-foreground">{sub}</div> : null}
       </div>

@@ -6,7 +6,7 @@ import { hm } from "@/lib/catalog"
 import { fmt, useT } from "@/lib/i18n"
 import { KEY, useRoute } from "@/lib/nav"
 import { progressPct, useLive } from "../../hooks/use-live"
-import { Opt, Split, useSeed } from "../parts"
+import { InfoBar, Opt, useFollow, useSeed } from "../parts"
 
 /** Live wall: channel list with now/next on the left, the detail pane (now/next, description) on the right. */
 export default function Live() {
@@ -14,14 +14,18 @@ export default function Live() {
   const t = useT()
   const go = useRoute((s) => s.go)
   useSeed(L.items)
+  const follow = useFollow()
   return (
     <Shell page="live" title={t("pw.live.title")}>
       {L.status !== "ready" ? <Pending shape="grid" /> : (
-        <Split bar={<>
-          <div className="flex items-center gap-2"><Opt onClick={() => go("guide")}><Tv />{t("pw.live.guide")}</Opt></div>
-          <SourceFilter />
-          <GroupList kind="live" groups={L.groups} active={L.g} onPick={L.setG} />
-        </>}>
+        <div onFocus={follow} className="flex h-full flex-col pt-5">
+          <InfoBar onPlay={(i) => L.open(i, L.items)} />
+          <div className="pw-bar">
+            <div className="flex flex-wrap items-center gap-3"><h2 className="pw-page-title">{t("pw.live.title")}</h2><Opt onClick={() => go("guide")}><Tv />{t("pw.live.guide")}</Opt></div>
+            <SourceFilter />
+            <GroupList kind="live" groups={L.groups} active={L.g} onPick={L.setG} />
+          </div>
+          <div className="min-h-0 flex-1">
           {L.items.length ? (
             <VList items={L.items} rowH={76} render={(i) => {
               const { now: n, next: nx } = L.nowOf(i)
@@ -38,7 +42,8 @@ export default function Live() {
               )
             }} />
           ) : <Empty>{t("pw.live.none")}</Empty>}
-        </Split>
+          </div>
+        </div>
       )}
     </Shell>
   )

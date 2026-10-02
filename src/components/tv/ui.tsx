@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { isTv, useMode } from "@/lib/device"
 import { focusFirst, useRoute } from "@/lib/nav"
 import { useApp, useProfile } from "@/lib/store"
+import { CARD_K } from "@/lib/cards"
 import { Card, SkelGrid, SkelRail } from "@/components/gtv"
 import { useLayoutDef } from "@/layouts"
 import { useCatalog } from "@/lib/catalog"
@@ -66,9 +67,21 @@ export function TvButton({ className, ...p }: React.ComponentProps<typeof Button
 /** Display name of a group chip: the FAV / ALL pseudo groups are localised, real categories are shown as-is. (FAV/ALL live in groups.tsx; literals here avoid an import cycle.) */
 export const groupLabel = (g: string, t: TFn) => (g === "Favorites" ? t("common.favorites") : g === "All" ? t("common.all") : g === "Other" ? t("common.other") : g)
 
-export function Chips({ items, active, onPick, locked, onKey, onCtx }: { items: string[]; active: string; onPick: (g: string) => void; locked?: (g: string) => boolean; onKey?: (e: React.KeyboardEvent, g: string) => void; onCtx?: (e: React.MouseEvent, g: string) => void }) {
+/** Category lists can be shown as a start-side sidebar (Settings > Display > Categories): marks the page content so CSS reserves room for it. */
+export function useCatSide() {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const m = ref.current?.closest<HTMLElement>("[data-page-content]")
+    m?.setAttribute("data-cats", "")
+    return () => m?.removeAttribute("data-cats")
+  }, [])
+  return ref
+}
+
+export function Chips({ items, active, onPick, locked, onKey, onCtx, cat }: { cat?: boolean; items: string[]; active: string; onPick: (g: string) => void; locked?: (g: string) => boolean; onKey?: (e: React.KeyboardEvent, g: string) => void; onCtx?: (e: React.MouseEvent, g: string) => void }) {
   const t = useT()
-  return (
+  const ref = useCatSide()
+  const row = (
     <div className="rail !mb-0 !gap-3 !pb-2">
       {items.map((g) => (
         <button
@@ -88,6 +101,7 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx }: { items: 
       ))}
     </div>
   )
+  return cat ? <div ref={ref} className="cat-side">{row}</div> : row
 }
 
 export function Logo({ item, className }: { item: Item; className?: string }) {
@@ -145,8 +159,9 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render }:
     return () => ro.disconnect()
   }, [])
   const k = useK()
+  const ck = CARD_K[useApp((s) => s.settings.cardSize) ?? "normal"]
   const gap = isTv ? 24 * k : mode === "mobile" ? 12 : 16
-  const c = cols ?? Math.max(1, Math.floor((w + gap) / (minW + gap)))
+  const c = cols ?? Math.max(1, Math.floor((w + gap) / (minW * ck + gap)))
   const rowH = Math.round(((w - gap * (c - 1)) / c) * ratio + label * k) + gap
   const rows = Math.ceil(items.length / c)
   const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3 })

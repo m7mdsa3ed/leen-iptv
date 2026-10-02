@@ -29,7 +29,8 @@ export default function Detail({ id }: { id: string }) {
         <div aria-hidden className="pv-dhero-fade" />
         <div className="pv-dband">
           <h1 dir="auto" className="line-clamp-2 text-[clamp(1.6rem,3.4vw,3rem)] font-extrabold leading-tight tracking-tight">{item.name}</h1>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {!isSeries && item.kind !== "live" && <span className="pv-incl"><Check strokeWidth={3} />{t("pv.included")}</span>}
             {chips.map((c) => <span key={c} dir="auto" className="pv-chip pv-meta">{c}</span>)}
             {ratings.map((r) => <span key={r.source} className="pv-chip pv-rate">{D.ratingName(r.source)} {r.value}</span>)}
           </div>

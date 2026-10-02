@@ -19,7 +19,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
       {status !== "ready" ? <Pending /> : (
         <div className="flex h-full flex-col">
           <SourceFilter />
-          <Chips items={[ALL, FAV, ...groups]} active={g} onPick={(c) => (c === ALL || c === FAV ? setG(c) : openCategory(c))} locked={isLocked}
+          <Chips cat items={[ALL, FAV, ...groups]} active={g} onPick={(c) => (c === ALL || c === FAV ? setG(c) : openCategory(c))} locked={isLocked}
             onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
             onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
           <div className="min-h-0 flex-1">

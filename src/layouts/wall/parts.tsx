@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react"
 import { create } from "zustand"
+import { Play } from "lucide-react"
 import { Pill } from "@/components/gtv"
 import { Empty, Logo, Poster, VGrid } from "@/components/tv/ui"
 import { nowNext, useCatalog } from "@/lib/catalog"
@@ -8,38 +9,57 @@ import { fmt, useT } from "@/lib/i18n"
 import { useMeta } from "@/lib/meta"
 import type { Item } from "@/lib/types"
 
-/** The poster the detail pane follows. Written on focus, read only by Pane, so moving focus never re-renders the grid. */
+/** The title the info bar / fanart follows. Written on focus, read only by InfoBar/Fanart, so moving focus never re-renders the rows. */
 const useWall = create<{ item?: Item; set: (i?: Item) => void }>((set) => ({ set: (item) => set({ item }) }))
+export const useFocused = () => useWall((s) => s.item)
 
-/** Seed the pane with the first item whenever the list changes. */
+/** Seed the info bar with the first item whenever the list changes. */
 export function useSeed(items: Item[]) {
   const set = useWall((s) => s.set)
   useEffect(() => set(items[0]), [items]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-/** Small toggle pill for the filter rows. */
-export const Opt = ({ on, ...p }: ComponentProps<typeof Pill> & { on?: boolean }) => <Pill variant={on ? "primary" : "tonal"} aria-pressed={on} className="!min-h-9 !px-4 !text-sm" {...p} />
-
-/** ~70% left column (filter bar + body) and the persistent detail pane. Focus on any [data-id] element inside feeds the pane. */
-export function Split({ bar, children }: { bar: ReactNode; children: ReactNode }) {
+/** Focus handler for a container: any [data-id] element that takes focus becomes the focused title. */
+export function useFollow() {
   const byId = useCatalog((s) => s.byId)
   const set = useWall((s) => s.set)
-  return (
-    <div className="pw-split">
-      <section className="pw-left" onFocus={(e) => { const id = (e.target as HTMLElement).closest?.("[data-id]")?.getAttribute("data-id"); const i = id ? byId.get(id) : undefined; if (i) set(i) }}>
-        <div className="pw-bar">{bar}</div>
-        <div className="min-h-0 flex-1">{children}</div>
-      </section>
-      <Pane />
-    </div>
-  )
+  return (e: { target: EventTarget }) => {
+    const id = (e.target as HTMLElement).closest?.("[data-id]")?.getAttribute("data-id")
+    const i = id ? byId.get(id) : undefined
+    if (i) set(i)
+  }
 }
+
+/** Filter/sort toolbar pill (Plex: orange when selected). */
+export const Opt = ({ on, ...p }: ComponentProps<typeof Pill> & { on?: boolean }) => <Pill variant={on ? "primary" : "tonal"} aria-pressed={on} className="pw-opt !min-h-9 !px-4 !text-sm" {...p} />
+
+/** Plex row hub: bold title over a horizontal poster row. */
+export const Hub = ({ title, children, onSeeAll }: { title: string; children: ReactNode; onSeeAll?: () => void }) => (
+  <section className="pw-hub -mx-[var(--gx)] mb-3">
+    <div className="px-[var(--gx)]">
+      {onSeeAll ? <button data-nav data-pill onClick={onSeeAll} className="pw-hub-title -ms-3 rounded-full px-3">{title}</button> : <h2 className="pw-hub-title">{title}</h2>}
+    </div>
+    <div data-nav-group className="rail rail-in !mx-0">{children}</div>
+  </section>
+)
 
 export function PosterGrid({ items, pct, onOpen, empty }: { items: Item[]; pct?: (i: Item) => number | undefined; onOpen: (i: Item) => void; empty: string }) {
   const mode = useMode()
-  useSeed(items)
   if (!items.length) return <Empty>{empty}</Empty>
   return <VGrid items={items} minW={mode === "tv" ? 150 : mode === "mobile" ? 105 : 128} render={(i) => <Poster key={i.id} item={i} pct={pct?.(i)} onOpen={() => onOpen(i)} />} />
+}
+
+/** Kodi-style fanart behind the page: the focused title's backdrop, faded into the charcoal background. Hidden on mobile. */
+export function Fanart() {
+  const mode = useMode()
+  const item = useFocused()
+  const img = item?.backdrop
+  if (mode === "mobile" || !img) return null
+  return (
+    <div aria-hidden className="pw-fanart">
+      <img key={img} src={img} alt="" decoding="async" className="m-fade" />
+    </div>
+  )
 }
 
 const mins = (r: string | number | undefined, dur?: number) => {
@@ -47,10 +67,11 @@ const mins = (r: string | number | undefined, dur?: number) => {
   return s ? Math.round(s / 60) : 0
 }
 
-export function Pane() {
+/** Plex "inline metadata" for the focused title: name, meta line, genres, synopsis, orange Play. Live: now / next. Hidden on mobile. */
+export function InfoBar({ onPlay }: { onPlay?: (i: Item) => void }) {
   const t = useT()
   const mode = useMode()
-  const item = useWall((s) => s.item)
+  const item = useFocused()
   const epg = useCatalog((s) => s.epg)
   useCatalog((s) => s.epgTick)
   // fetch meta only after focus has rested ~400 ms on a poster
@@ -58,7 +79,7 @@ export function Pane() {
   useEffect(() => { const id = setTimeout(() => setRest(item), 400); return () => clearTimeout(id) }, [item])
   const { meta: m } = useMeta(mode === "mobile" ? undefined : rest, undefined, true)
   if (mode === "mobile") return null
-  if (!item) return <aside className="pw-pane"><div className="pw-body text-muted-foreground">{t("pw.pane.empty")}</div></aside>
+  if (!item) return <div className="pw-info" />
   const meta = rest === item ? m : null
   const live = item.kind === "live"
   const { now, next } = live ? nowNext(epg, item.epgId) : ({} as ReturnType<typeof nowNext>)
@@ -67,28 +88,17 @@ export function Pane() {
   const bits = [item.year ?? meta?.year, rating ? `★ ${fmt.digits(rating)}` : "", min ? t("pw.pane.min", { n: fmt.number(min) }) : "", live ? item.group : ""].filter(Boolean)
   const genres = meta?.genres.length ? meta.genres : item.genres ?? []
   const plot = meta?.plot ?? item.plot
-  const cast = meta?.cast.slice(0, 8).map((c) => c.name).join(" · ")
-  const img = meta?.backdrop ?? item.backdrop
   return (
-    <aside className="pw-pane" aria-live="polite">
-      {img && <img key={img} src={img} alt="" aria-hidden decoding="async" className="pw-pane-img" />}
-      <div aria-hidden className="pw-pane-fade" />
-      <div className="pw-body">
-        {live && <Logo item={item} className="mb-3 size-20 rounded-xl p-2" />}
+    <div className="pw-info" aria-live="polite">
+      <div className="min-w-0 flex-1">
         <h2 dir="auto" className="pw-title">{item.name}</h2>
-        {bits.length > 0 && <div dir="auto" className="pw-meta">{bits.map((b, i) => <span key={i}>{b}</span>)}</div>}
-        {genres.length > 0 && <div className="flex flex-wrap gap-2">{genres.slice(0, 4).map((g) => <span key={g} dir="auto" className="pw-chip">{g}</span>)}</div>}
-        {live && now && (
-          <div className="flex flex-col gap-1 text-base">
-            <div dir="auto"><span className="text-muted-foreground">{t("pw.pane.now")} </span>{fmt.time(now.s)} {now.t}</div>
-            {now.d ? <p dir="auto" className="line-clamp-3 text-sm text-muted-foreground">{now.d}</p> : null}
-            {next && <div dir="auto"><span className="text-muted-foreground">{t("pw.pane.next")} </span>{fmt.time(next.s)} {next.t}</div>}
-          </div>
-        )}
-        {!live && plot ? <p dir="auto" className="pw-plot">{plot}</p> : null}
-        {cast ? <div dir="auto" className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">{t("pw.pane.cast")}: </span>{cast}</div> : null}
-        <div aria-hidden className="pw-hint">▶ {t(live ? "pw.pane.hintLive" : "pw.pane.hint")}</div>
+        {(bits.length > 0 || genres.length > 0) && <div dir="auto" className="pw-meta">{[...bits, ...genres.slice(0, 3)].map((b, i) => <span key={i}>{b}</span>)}</div>}
+        {live && now ? (
+          <p dir="auto" className="pw-plot"><span className="font-semibold text-foreground">{t("pw.pane.now")} </span>{fmt.time(now.s)} {now.t}{next ? <> <span className="font-semibold text-foreground"> · {t("pw.pane.next")} </span>{fmt.time(next.s)} {next.t}</> : null}</p>
+        ) : plot ? <p dir="auto" className="pw-plot">{plot}</p> : null}
       </div>
-    </aside>
+      {onPlay && <Pill variant="primary" onClick={() => onPlay(item)} className="pw-play"><Play className="fill-current" />{t("pw.pane.play")}</Pill>}
+      {live && <Logo item={item} className="hidden size-16 shrink-0 rounded-lg p-1.5 lg:block" />}
+    </div>
   )
 }

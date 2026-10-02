@@ -1,59 +1,95 @@
-/* Roku (Simple tiles) layout. Scoped under html[data-layout=roku]. Chrome 94: plain hex / rgba only. */
-html[data-layout=roku] { --accent-blue: #6c2bd9; --accent-blue-container: #e6d9fb; --primary: #6c2bd9; --primary-foreground: #ffffff; --rk-gap: 1.5rem; }
-html[data-layout=roku].dark { --accent-blue: #b48cff; --accent-blue-container: #3d2a6e; --primary: #b48cff; --primary-foreground: #1d0b45; }
-html[data-layout=roku] .dark { --accent-blue: #b48cff; --primary: #b48cff; --primary-foreground: #1d0b45; } /* the player's own dark scope */
-html[data-layout=roku][data-mode=tv] { --rk-gap: 2rem; }
+/* Roku OS layout. Scoped under html[data-layout=roku]. Chrome 94: plain hex / rgba only.
+ * Research (read 2026-10; some pages are marketing/news, treat colours of the CLASSIC OS as best knowledge):
+ * - support.roku.com/article/roku-new-os-features: "The menu now sits neatly on the left side of your screen... Press left on your remote to expand it
+ *   and jump to Home, Live TV, Sports, Subscriptions, Search, and more." (May 2026 home screen; roku.com/blog/new-home-screen: menu "stays tucked away until you need it").
+ * - Yahoo/TechCrunch "Live TV Zone": "the main, left-side navigation"; Roku Channel live guide started as "a branded, purple tile".
+ * - pcworld.com/article/3149985 (May 2026): the home screen was "a simple grid of apps"; tile size Small = 5 per row, Medium = 4, Large = 3 (classic 3-wide grid
+ *   next to a banner ad; OS 12 added a 4-wide option); sidebar entries For You, Subscriptions, Featured Free; "Continue Watching", "Save List"; Settings > Home Screen.
+ * - developer.roku.com/docs/developer-program/discovery/channel-store/graphics: FHD UI 1920x1080; Title safe zone 80% (1534x866 at 192,106),
+ *   Action safe zone 90% (1726x970 at 96,53) -> content inset ~10% each side on TV; app posters are the home tiles (classic FHD channel tile 4:3, 290x218).
+ * - ilovemyroku.com brand guidelines: Primary Purple #4F01A3 (HEX), Midnight Purple #20004C, Electric Purple #853DFF, accents Pink #EC4AF0, Orange #FF8553,
+ *   Teal #1BCECB, greys #646464 #969696 #C8C8C8; purple gradients Electric -> Primary/Midnight; Roku Sans (UI family); playful rounded icons.
+ * - The classic OS purple (#662D91 / #6C1D9B, from the brief) is used for the background; brand-guide purples for the darker end. Corner radius (~8-12px at FHD),
+ *   white focus border (~4px) with ~1.08 scale, focused menu item = light bar are UNVERIFIED best knowledge (no official spec found).
+ */
+html[data-layout=roku] { --accent-blue: #b98ae0; --accent-blue-container: #4f1d78; --primary: #ffffff; --primary-foreground: #662d91; --rk-gap: 1.25rem; --rk-menu: 14rem; }
+html[data-layout=roku][data-mode=tv] { --rk-gap: 1.5rem; --rk-menu: 16rem; }
+html[data-layout=roku][data-mode=mobile] { --rk-gap: 1rem; }
 
-/* header */
-html[data-layout=roku] .rk-logo { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; color: var(--accent-blue); }
-html[data-layout=roku] .rk-clock { font-size: 1.5rem; font-weight: 600; }
-html[data-layout=roku] .rk-back { display: inline-flex; align-items: center; gap: .6rem; min-height: 3.25rem; padding: .4rem 1.5rem; border-radius: 9999px; background: var(--surface-2); font-size: 1.25rem; font-weight: 700; }
-html[data-layout=roku] .rk-back svg { width: 1.6rem; height: 1.6rem; }
-html[data-layout=roku] .rk-avatar { border-radius: 9999px; padding: .2rem; }
-html[data-layout=roku] .rk-avatar:focus-visible { outline: 4px solid var(--focus-bg); outline-offset: 2px; }
+html[data-layout=roku] .rk-shell { background: linear-gradient(160deg, #20004c 0%, #4f1d78 35%, #662d91 100%); color: #ffffff; }
 
-/* page scroller */
-html[data-layout=roku] .rk-page { height: 100%; overflow-y: auto; margin-inline: calc(var(--gx) * -1); padding: .5rem var(--gx) 6rem; scroll-padding-block: 6rem; scrollbar-width: none; }
+/* left menu: narrow list of text items; focus = white pill, current page = bold with start bar */
+html[data-layout=roku] .rk-menu { flex: 0 0 var(--rk-menu); display: flex; flex-direction: column; justify-content: center; gap: .25rem; padding: 1rem .75rem 1rem 0; padding-inline: 0 .75rem; background: rgba(0, 0, 0, .22); }
+html[data-layout=roku] .rk-mi { display: block; width: 100%; padding: .7rem 1.25rem; border-inline-start: .3rem solid transparent; border-radius: 0 .5rem .5rem 0; text-align: start; font-size: 1.25rem; font-weight: 500; color: #e7d9f4; }
+html[dir=rtl][data-layout=roku] .rk-mi { border-radius: .5rem 0 0 .5rem; }
+html[data-layout=roku] .rk-mi[aria-current=page] { border-inline-start-color: #ffffff; color: #ffffff; font-weight: 800; background: rgba(255, 255, 255, .12); }
+html[data-layout=roku] .rk-mi:focus-visible, html[data-layout=roku] .rk-mi[data-focused="true"] { background: #ffffff !important; color: #662d91 !important; font-weight: 800; outline: none !important; box-shadow: none !important; }
+
+/* top end: clock + profile */
+html[data-layout=roku] .rk-top { display: flex; align-items: center; flex-shrink: 0; height: 4.25rem; padding-inline: var(--gx); }
+html[data-layout=roku][data-mode=tv] .rk-top { height: 5rem; }
+html[data-layout=roku] .rk-clock { font-size: 1.35rem; font-weight: 500; color: #e7d9f4; }
+html[data-layout=roku] .rk-top-title { font-size: 1.5rem; font-weight: 800; }
+html[data-layout=roku] .rk-avatar { display: grid; place-items: center; border-radius: 9999px; padding: .2rem; }
+html[data-layout=roku] .rk-avatar:focus-visible { outline: 3px solid #ffffff !important; outline-offset: 2px; }
+
+/* mobile bottom bar */
+html[data-layout=roku] .rk-bar-nav { position: absolute; inset-inline: 0; bottom: 0; z-index: 30; display: flex; padding-bottom: env(safe-area-inset-bottom); background: #20004c; }
+html[data-layout=roku] .rk-bt { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: .15rem; padding: .6rem 0; font-size: 11px; color: #c9b3df; }
+html[data-layout=roku] .rk-bt[aria-current=page] { color: #ffffff; font-weight: 700; }
+html[data-layout=roku][data-mode=mobile] main[data-page-content] { padding-bottom: calc(4rem + env(safe-area-inset-bottom)); }
+
+/* page scroller (scrolls row by row; focused tile stays in view) */
+html[data-layout=roku] .rk-page { height: 100%; overflow-y: auto; padding: .5rem var(--gx) 6rem; scroll-padding-block: 4rem; scrollbar-width: none; }
 html[data-layout=roku] .rk-page::-webkit-scrollbar { display: none; }
-html[data-layout=roku] .rk-h { font-size: 2.25rem; font-weight: 800; padding: .5rem 0 1rem; }
-html[data-layout=roku] .rk-status { padding: 1rem 0; font-size: 1.25rem; color: var(--muted-foreground); }
-html[data-layout=roku] .rk-pill { display: inline-flex; min-height: 3.5rem; align-items: center; padding: .5rem 2rem; border-radius: 9999px; background: var(--surface-2); font-size: 1.25rem; font-weight: 600; }
+html[data-layout=roku] .rk-h { font-size: 2rem; font-weight: 800; padding: .5rem 0 1rem; }
+html[data-layout=roku] .rk-status { padding: 1rem 0; font-size: 1.25rem; color: #e7d9f4; }
+html[data-layout=roku] .rk-pill { display: inline-flex; min-height: 3.25rem; align-items: center; gap: .5rem; padding: .5rem 2rem; border-radius: .75rem; background: rgba(255, 255, 255, .16); font-size: 1.25rem; font-weight: 600; color: #ffffff; }
+html[data-layout=roku] .rk-pill:focus-visible { background: #ffffff; color: #662d91; }
 
-/* home tiles */
-html[data-layout=roku] .rk-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--rk-gap); padding: 1rem .5rem; }
-html[data-layout=roku][data-mode=mobile] .rk-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding-inline: 0; }
-html[data-layout=roku] .rk-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; min-height: 12rem; padding: 1.25rem; border-radius: 1.75rem; color: #ffffff; text-align: center; transition: transform var(--dur-fast) var(--ease); background-image: linear-gradient(135deg, var(--t1), var(--t2)); }
-html[data-layout=roku][data-mode=tv] .rk-tile { min-height: 15rem; }
-html[data-layout=roku] .rk-tile-ico { width: 4rem; height: 4rem; stroke-width: 1.75; }
-html[data-layout=roku] .rk-tile-label { font-size: 1.75rem; font-weight: 800; line-height: 1.15; }
-html[data-layout=roku] .rk-tile-sub { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.1rem; opacity: .85; }
-html[data-layout=roku] .rk-tile[data-c="1"] { --t1: #7c3aed; --t2: #5b21b6; }
-html[data-layout=roku] .rk-tile[data-c="2"] { --t1: #db2777; --t2: #9d174d; }
-html[data-layout=roku] .rk-tile[data-c="3"] { --t1: #0891b2; --t2: #155e75; }
-html[data-layout=roku] .rk-tile[data-c="4"] { --t1: #e11d48; --t2: #9f1239; }
-html[data-layout=roku] .rk-tile[data-c="5"] { --t1: #16a34a; --t2: #166534; }
-html[data-layout=roku] .rk-tile[data-c="6"] { --t1: #2563eb; --t2: #1e40af; }
-html[data-layout=roku] .rk-tile[data-c="7"] { --t1: #d97706; --t2: #92400e; }
-html[data-layout=roku] .rk-tile[data-c="8"] { --t1: #4b5563; --t2: #1f2937; }
-html[data-layout=roku] .rk-tile[data-c="9"] { --t1: #9333ea; --t2: #6b21a8; }
-html[data-layout=roku] .rk-tile:focus-visible, html[data-layout=roku] .rk-tile[data-focused="true"] { outline: 6px solid var(--focus-bg) !important; outline-offset: 4px; box-shadow: none !important; transform: scale(1.06) !important; }
+/* home: channel tile grid, 4:3 tiles, rounded, white focus border + scale */
+html[data-layout=roku] .rk-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: var(--rk-gap); padding: 1rem .5rem; }
+html[data-layout=roku][data-mode=tv] .rk-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+html[data-layout=roku][data-mode=mobile] .rk-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: 0; }
+html[data-layout=roku] .rk-tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; aspect-ratio: 4 / 3; overflow: hidden; border-radius: .75rem; background: #2c0f47; color: #ffffff; text-align: center; transition: transform var(--dur-fast) var(--ease); }
+html[data-layout=roku] .rk-tile-ico { width: 3.25rem; height: 3.25rem; stroke-width: 1.75; }
+html[data-layout=roku] .rk-tile-label { font-size: 1.5rem; font-weight: 800; line-height: 1.15; }
+html[data-layout=roku] .rk-tile-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #3a1660; }
+html[data-layout=roku] .rk-tile-name { position: absolute; inset-inline: 0; bottom: 0; padding: 1.5rem .6rem .5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.05rem; font-weight: 600; text-align: start; background: linear-gradient(to top, rgba(0, 0, 0, .8), rgba(0, 0, 0, 0)); }
+html[data-layout=roku] .rk-tile-cat[data-c="1"] { background: linear-gradient(135deg, #853dff, #4f01a3); }
+html[data-layout=roku] .rk-tile-cat[data-c="2"] { background: linear-gradient(135deg, #ec4af0, #8a1f8f); }
+html[data-layout=roku] .rk-tile-cat[data-c="3"] { background: linear-gradient(135deg, #1bcecb, #0b6a7a); }
+html[data-layout=roku] .rk-tile-cat[data-c="4"] { background: linear-gradient(135deg, #ff8553, #b23a1e); }
+html[data-layout=roku] .rk-tile:focus-visible, html[data-layout=roku] .rk-tile[data-focused="true"] { position: relative; z-index: 2; outline: 4px solid #ffffff !important; outline-offset: 0; box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .5) !important; transform: scale(1.08) !important; }
 
-/* grids and lists */
-html[data-layout=roku] .rk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 1.5rem 1.25rem; align-items: start; padding: .75rem .5rem 1.5rem; }
-html[data-layout=roku][data-mode=tv] .rk-grid { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 2rem 1.5rem; }
+/* Roku Channel hero banner (Browse) */
+html[data-layout=roku] .rk-hero { position: relative; display: flex; align-items: flex-end; min-height: 16rem; margin-bottom: 1rem; overflow: hidden; border-radius: .75rem; background: #2c0f47; }
+html[data-layout=roku][data-mode=tv] .rk-hero { min-height: 20rem; }
+html[data-layout=roku] .rk-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .55; }
+html[data-layout=roku] .rk-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to right, rgba(32, 0, 76, .95), rgba(32, 0, 76, 0) 70%); }
+html[dir=rtl][data-layout=roku] .rk-hero::after { background: linear-gradient(to left, rgba(32, 0, 76, .95), rgba(32, 0, 76, 0) 70%); }
+html[data-layout=roku] .rk-hero-body { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; max-width: 36rem; padding: 1.5rem; }
+html[data-layout=roku] .rk-hero-title { font-size: 2.5rem; font-weight: 800; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-layout=roku] .rk-hero-sub { font-size: 1.2rem; color: #e7d9f4; }
+
+/* lists */
+html[data-layout=roku] .rk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 1.5rem 1.25rem; align-items: start; padding: .75rem .5rem 1.5rem; }
+html[data-layout=roku][data-mode=tv] .rk-grid { grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); }
 html[data-layout=roku][data-mode=mobile] .rk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding-inline: 0; }
-html[data-layout=roku] .rk-list { display: flex; flex-direction: column; gap: .75rem; padding: .75rem 0 1.5rem; }
-html[data-layout=roku] .rk-ch { display: flex; align-items: center; gap: 1.25rem; width: 100%; min-height: 6rem; padding: .75rem 1.25rem; border-radius: 1.25rem; background: var(--surface-2); color: var(--foreground); text-align: start; }
-html[data-layout=roku] .rk-ch-logo { width: 7rem; height: 4.5rem; flex-shrink: 0; border-radius: .75rem; background: var(--surface-3); padding: .25rem; }
-html[data-layout=roku] .rk-bar { display: block; height: .4rem; margin: .4rem 0; border-radius: 9999px; background: var(--fg-30); overflow: hidden; }
-html[data-layout=roku] .rk-bar > span { display: block; height: 100%; background: var(--accent-blue); }
-html[data-layout=roku] .rk-ch:focus-visible, html[data-layout=roku] .rk-ch[data-focused="true"] { background: var(--focus-bg) !important; color: var(--focus-fg) !important; }
+html[data-layout=roku] .rk-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(24rem, 1fr)); gap: .75rem; padding: .75rem 0 1.5rem; }
+html[data-layout=roku][data-mode=mobile] .rk-list { grid-template-columns: 1fr; }
+html[data-layout=roku] .rk-ch { display: flex; align-items: center; gap: 1rem; width: 100%; min-height: 6rem; padding: .6rem 1rem; border-radius: .75rem; background: rgba(255, 255, 255, .12); color: #ffffff; text-align: start; }
+html[data-layout=roku] .rk-ch-logo { width: 6.5rem; aspect-ratio: 4 / 3; flex-shrink: 0; border-radius: .5rem; background: #3a1660; padding: .25rem; }
+html[data-layout=roku] .rk-bar { display: block; height: .35rem; margin: .4rem 0; border-radius: 9999px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+html[data-layout=roku] .rk-bar > span { display: block; height: 100%; background: #ffffff; }
+html[data-layout=roku] .rk-ch:focus-visible, html[data-layout=roku] .rk-ch[data-focused="true"] { background: #ffffff !important; color: #662d91 !important; outline: none !important; box-shadow: none !important; }
 
-/* detail */
-html[data-layout=roku] .rk-det { display: grid; grid-template-columns: minmax(12rem, 20rem) minmax(0, 1fr); gap: 2.5rem; padding: 1rem 0 2rem; align-items: start; }
+/* detail: blurred backdrop, poster tile, white Play button */
+html[data-layout=roku] .rk-det { position: relative; display: grid; grid-template-columns: minmax(10rem, 17rem) minmax(0, 1fr); gap: 2rem; padding: 1rem 0 2rem; align-items: start; }
 html[data-layout=roku][data-mode=mobile] .rk-det { grid-template-columns: 1fr; }
-html[data-layout=roku] .rk-det-poster { aspect-ratio: 2 / 3; overflow: hidden; border-radius: 1.5rem; background: var(--surface-2); }
-html[data-layout=roku] .rk-play { display: inline-flex; align-items: center; gap: .75rem; min-height: 4.5rem; padding: .5rem 3rem; border-radius: 9999px; background: var(--accent-blue); color: var(--primary-foreground); font-size: 1.75rem; font-weight: 800; }
-html[data-layout=roku] .rk-play svg { width: 2rem; height: 2rem; }
+html[data-layout=roku] .rk-det-bg { position: absolute; inset: -2rem calc(var(--gx) * -1) 0; width: calc(100% + var(--gx) * 2); height: calc(100% + 2rem); object-fit: cover; opacity: .25; pointer-events: none; }
+html[data-layout=roku] .rk-det-poster { position: relative; aspect-ratio: 2 / 3; overflow: hidden; border-radius: .75rem; background: #3a1660; }
+html[data-layout=roku] .rk-play { display: inline-flex; align-items: center; gap: .6rem; min-height: 3.5rem; padding: .5rem 2rem; border-radius: .75rem; background: #ffffff; color: #662d91; font-size: 1.5rem; font-weight: 800; }
+html[data-layout=roku] .rk-play svg { width: 1.75rem; height: 1.75rem; }
 html[data-layout=roku] .rk-play:disabled { opacity: .5; }
-html[data-layout=roku] .rk-play:focus-visible { outline: 5px solid var(--focus-bg) !important; outline-offset: 4px; box-shadow: none !important; }
+html[data-layout=roku] .rk-play:focus-visible { outline: 4px solid #ffffff !important; outline-offset: 3px; box-shadow: none !important; transform: scale(1.05); }

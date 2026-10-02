@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar } from "@/components/gtv"
 import { askPin } from "@/components/tv/ui"
 import { useApp } from "@/lib/store"
-import { useRoute } from "@/lib/nav"
+import { startPage, useRoute } from "@/lib/nav"
 import { useT } from "@/lib/i18n"
 
 /** "Who's watching?": big rounded-square avatars with names, Add Profile, Manage Profiles (rename / delete). */
@@ -22,7 +22,7 @@ export default function Profiles() {
     if (manage) { setForm({ id }); setName(p.name); return }
     if (p.pin && !(await askPin(p.pin))) return
     setProfile(id)
-    reset(sources.length ? "home" : "sources")
+    reset(sources.length ? startPage() : "sources")
   }
   const done = () => { setForm(null); setName(""); setPin("") }
   const save = () => {

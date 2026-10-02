@@ -312,3 +312,13 @@ html[dir=rtl] .rtl-flip { transform: scaleX(-1); } /* directional icons (chevron
 
 /* "Leen" wordmark: rounded sans (always Latin, so no Arabic fallback needed) */
 .wordmark { font-family: "Poppins", "Segoe UI", system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+
+/* Categories as a start-side sidebar (Settings > Display > Categories). Not on mobile or in layouts that already have a side menu. */
+html[data-catnav=sidebar]:not([data-mode=mobile]):not([data-layout=wall]):not([data-layout=roku]):not([data-layout=kids]) .cat-side { position: fixed; inset-inline-start: calc(var(--gx) / 2); top: calc(var(--hdr) + .5rem); bottom: .75rem; width: 14rem; z-index: 5; overflow-x: hidden; overflow-y: auto; }
+html[data-catnav=sidebar]:not([data-mode=mobile]):not([data-layout=wall]):not([data-layout=roku]):not([data-layout=kids]) .cat-side > .rail { flex-direction: column; overflow: visible; gap: .35rem !important; margin: 0 !important; padding: .25rem .5rem !important; }
+html[data-catnav=sidebar]:not([data-mode=mobile]):not([data-layout=wall]):not([data-layout=roku]):not([data-layout=kids]) .cat-side button { width: 100%; justify-content: flex-start; border-radius: 1rem; text-align: start; }
+html[data-catnav=sidebar]:not([data-mode=mobile]):not([data-layout=wall]):not([data-layout=roku]):not([data-layout=kids]) [data-page-content][data-cats] { padding-inline-start: calc(14rem + var(--gx)) !important; }
+
+/* Poster size + card details (Settings > Display). Rails zoom their tiles; grids change column width instead (VGrid). */
+.rail > [data-poster], .nf-row > .nf-tile { zoom: var(--card-k, 1); }
+html[data-cardinfo=hide] [data-card]:not([data-live]) :is(.card-info, .pv-name, .pv-sub) { display: none; }
