@@ -151,6 +151,7 @@ const d: Dict = {
   "pages.sources.kind.Plex": "سجّل دخول من plex.tv",
   "pages.sources.kind.Jellyfin": "كلمة سر أو Quick Connect",
   "pages.sources.detect": "اكتشف السيرفر",
+  "pages.sources.scanning": "بدوّر في الشبكة",
   "pages.sources.detecting": "بدوّر على سيرفرات...",
   "pages.sources.detectNone": "مفيش سيرفر Jellyfin على العناوين المعتادة. اكتب العنوان بإيدك.",
   "pages.sources.user": "اسم المستخدم",

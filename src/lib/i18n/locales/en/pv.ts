@@ -1,0 +1,31 @@
+import type { Dict } from "../../pure.ts"
+
+const d: Dict = {
+  "pv.sep": ", ",
+  "pv.tab.shows": "TV Shows",
+  "pv.home.empty": "Pick Live TV, Movies or TV Shows to start. Favorites and history show up here.",
+  "pv.home.recent": "Recently added",
+  "pv.home.top": "Top picks",
+  "pv.shell.switchProfile": "Switch profile",
+  "pv.shell.sources": "Sources",
+  "pv.source": "Source",
+  "pv.availableOn": "Available on",
+  "pv.showMore": "Show more",
+  "pv.nothing": "Nothing here",
+  "pv.live.title": "Live TV",
+  "pv.live.guide": "TV Guide",
+  "pv.live.none": "No channels",
+  "pv.live": "Live",
+  "pv.detail.episodes": "Episodes",
+  "pv.detail.related": "Related",
+  "pv.detail.details": "Details",
+  "pv.detail.season": "Season {n}",
+  "pv.detail.loading": "Loading details",
+  "pv.detail.cast": "Cast",
+  "pv.detail.genres": "Genres",
+  "pv.detail.director": "Director",
+  "pv.detail.createdBy": "Created by",
+  "pv.detail.category": "Category",
+  "pv.settings.signIn": "Sign in to sync",
+}
+export default d

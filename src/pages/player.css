@@ -32,7 +32,10 @@ html[data-layout=netflix] .pl-root { --pl-btn: rgba(255, 255, 255, .14); --pl-pr
 /* ---- buttons ---- */
 .pl-root .pl-btn { background: var(--pl-btn); color: #fff; box-shadow: inset 0 0 0 1px var(--pl-btn-edge); }
 .pl-root .pl-primary { background: var(--pl-prim); color: var(--pl-prim-fg); border-radius: var(--pl-prim-r); }
-.pl-root .pl-more-btn { background: transparent; }
+.pl-root .pl-more-btn { background: transparent; color: #fff; gap: .5rem; }
+.pl-more-ic { width: 1.4rem !important; height: 1.4rem !important; stroke-width: 2.4; opacity: .9; }
+@keyframes pl-bob-k { 50% { transform: translate3d(0, -3px, 0); } }
+html[data-motion=full] .pl-more-ic { animation: pl-bob-k 1.8s ease-in-out infinite; }
 .pl-root .pl-badge { background: var(--pl-btn); }
 /* TV focus = white pill (shared rule in index.css); keep the primary's ring readable on every skin */
 html[data-mode=tv] .pl-root .pl-primary:focus { box-shadow: 0 0 0 3px var(--accent-blue), 0 0 0 6px var(--focus-bg); }
@@ -84,7 +87,7 @@ html[data-mode=tv] .pl-tile.pl-cur:focus { box-shadow: none; }
 
 /* More page body: frosted glass over the video. The glass is a ::before so a mask can fade it in at the top without fading the text; blur is skipped on TV (weak GPUs) where it is just more opaque. */
 .pl-more-body { position: relative; isolation: isolate; }
-.pl-more-body::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: rgba(14, 15, 17, .9); -webkit-mask-image: linear-gradient(to bottom, transparent, #000 5rem); mask-image: linear-gradient(to bottom, transparent, #000 5rem); }
+.pl-more-body::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: rgba(14, 15, 17, .9); -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, .08) 3rem, rgba(0, 0, 0, .3) 7rem, rgba(0, 0, 0, .65) 11rem, #000 16rem); mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, .08) 3rem, rgba(0, 0, 0, .3) 7rem, rgba(0, 0, 0, .65) 11rem, #000 16rem); }
 html:not([data-mode=tv]) .pl-more-body::before { background: rgba(14, 15, 17, .72); -webkit-backdrop-filter: blur(28px) saturate(1.4); backdrop-filter: blur(28px) saturate(1.4); }
 
 /* subtitle size (Player sets --sub-size, percent); 5vh is the browser's default cue size */

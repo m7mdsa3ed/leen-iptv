@@ -1,0 +1,31 @@
+import type { Dict } from "../../pure.ts"
+
+const d: Dict = {
+  "pv.sep": "، ",
+  "pv.tab.shows": "مسلسلات",
+  "pv.home.empty": "اختار بث مباشر أو أفلام أو مسلسلات عشان تبدأ. المفضلة والسجل هيظهروا هنا.",
+  "pv.home.recent": "اتضاف حديثًا",
+  "pv.home.top": "أحسن الاختيارات",
+  "pv.shell.switchProfile": "بدّل الملف الشخصي",
+  "pv.shell.sources": "المصادر",
+  "pv.source": "المصدر",
+  "pv.availableOn": "متاح على",
+  "pv.showMore": "اعرض أكتر",
+  "pv.nothing": "مفيش حاجة هنا",
+  "pv.live.title": "بث مباشر",
+  "pv.live.guide": "دليل البرامج",
+  "pv.live.none": "مفيش قنوات",
+  "pv.live": "بث مباشر",
+  "pv.detail.episodes": "الحلقات",
+  "pv.detail.related": "مشابه",
+  "pv.detail.details": "التفاصيل",
+  "pv.detail.season": "الموسم {n}",
+  "pv.detail.loading": "جاري تحميل التفاصيل",
+  "pv.detail.cast": "الممثلين",
+  "pv.detail.genres": "الأنواع",
+  "pv.detail.director": "المخرج",
+  "pv.detail.createdBy": "تأليف",
+  "pv.detail.category": "القسم",
+  "pv.settings.signIn": "سجّل دخول عشان تزامن",
+}
+export default d

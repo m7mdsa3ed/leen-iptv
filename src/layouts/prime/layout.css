@@ -1,0 +1,100 @@
+/* Prime layout: deep navy + cyan accent. Everything scoped under html[data-layout=prime]. Chrome 94: plain hex / 8-digit hex / rgba only. */
+
+html[data-layout=prime] { --background: #eef2f8; --surface: #ffffff; --surface-2: #e3eaf4; --surface-3: #d6e0ee; --accent-blue: #0079a8; --accent-blue-container: #cdeaf6; --primary: #0079a8; --primary-foreground: #ffffff; --ring: #0079a8; --fade-mid: #eef2f8b3; --fade-to: #eef2f800; --pv-s: 1.04; }
+html[data-layout=prime].dark, html[data-layout=prime] .dark { --background: #0b1220; --surface: #121c30; --surface-2: #19263f; --surface-3: #22324f; --accent-blue: #25c2ff; --accent-blue-container: #0e3a57; --primary: #25c2ff; --primary-foreground: #04121c; --ring: #25c2ff; --fade-mid: #0b1220b3; --fade-to: #0b122000; --muted-foreground: rgba(190, 210, 235, .68); }
+
+/* ---------- header ---------- */
+html[data-layout=prime] .pv-hdr { position: absolute; inset-inline: 0; top: 0; z-index: 30; display: flex; align-items: center; gap: .5rem; padding-inline: var(--gx); background: var(--background); border-bottom: 1px solid var(--fg-10); }
+html[data-layout=prime] .pv-logo { font-weight: 800; font-size: 1.75rem; line-height: 1; letter-spacing: -.02em; color: var(--accent-blue); margin-inline-end: 1.25rem; }
+html[data-layout=prime] .pv-tab { position: relative; min-height: 2.75rem; padding: .25rem .75rem; font-size: .95rem; font-weight: 600; white-space: nowrap; color: var(--muted-foreground); }
+html[data-layout=prime] .pv-tab::after { content: ""; position: absolute; inset-inline: .75rem; bottom: 0; height: 3px; border-radius: 2px; background: var(--accent-blue); transform: scaleX(0); transition: transform var(--dur) var(--ease); }
+html[data-layout=prime] .pv-tab[aria-current=page], html[data-layout=prime] .pv-tab[aria-selected=true] { color: var(--foreground); }
+html[data-layout=prime] .pv-tab[aria-current=page]::after, html[data-layout=prime] .pv-tab[aria-selected=true]::after { transform: scaleX(1); }
+html[data-layout=prime] .pv-tab:hover { color: var(--foreground); }
+html[data-layout=prime] .pv-ibtn { display: grid; place-items: center; min-width: 2.75rem; min-height: 2.75rem; border-radius: 9999px; color: var(--foreground); }
+html[data-layout=prime] .pv-ibtn:hover { background: var(--fg-10); }
+html[data-layout=prime] .pv-tab[data-nav]:focus-visible, html[data-layout=prime] .pv-ibtn[data-nav]:focus-visible { box-shadow: none; transform: none; }
+html[data-layout=prime][data-mode=tv] :is(.pv-tab, .pv-ibtn)[data-nav]:focus { background: var(--focus-bg); color: var(--focus-fg); border-radius: .375rem; box-shadow: none; transform: none; }
+html[data-layout=prime][data-mode=tv] .pv-tab[data-nav]:focus::after { background: var(--focus-fg); }
+
+/* ---------- pages / headings / chips ---------- */
+html[data-layout=prime] .pv-page { height: 100%; overflow-y: auto; margin-inline: calc(var(--gx) * -1); padding-inline: var(--gx); scroll-padding-bottom: 8rem; scrollbar-width: none; }
+html[data-layout=prime] .pv-page::-webkit-scrollbar { display: none; }
+html[data-layout=prime] .pv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
+html[data-layout=prime] .pv-h1 { padding-block: 1rem .5rem; font-size: 1.6rem; font-weight: 800; letter-spacing: -.01em; }
+html[data-layout=prime] .pv-bar .pv-h1 { padding-block: 1rem .5rem; }
+html[data-layout=prime] .pv-chips { display: flex; flex-wrap: wrap; gap: .5rem; padding-block: .5rem; }
+html[data-layout=prime] .pv-chip { display: inline-flex; align-items: center; gap: .4rem; min-height: 2rem; padding: .1rem .75rem; border-radius: 9999px; font-size: .85rem; font-weight: 600; background: var(--surface-2); color: var(--foreground); }
+html[data-layout=prime] button.pv-chip { min-height: 2.5rem; }
+html[data-layout=prime] .pv-chip[aria-pressed=true] { background: var(--accent-blue-container); box-shadow: inset 0 0 0 1px var(--accent-blue); }
+html[data-layout=prime] .pv-meta { background: transparent; box-shadow: inset 0 0 0 1px var(--fg-30); min-height: 1.5rem; font-weight: 500; }
+html[data-layout=prime] .pv-rate { background: var(--accent-blue-container); color: var(--foreground); min-height: 1.5rem; }
+html[data-layout=prime] .pv-link { color: var(--accent-blue); border-radius: 2px; }
+html[data-layout=prime] .pv-link:hover { text-decoration: underline; }
+
+/* ---------- buttons ---------- */
+html[data-layout=prime] .pv-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: .3rem 1.4rem; border-radius: .375rem; font-weight: 700; font-size: 1rem; white-space: nowrap; }
+html[data-layout=prime] .pv-btn svg { width: 1.25rem; height: 1.25rem; }
+html[data-layout=prime] .pv-pri { background: var(--accent-blue); color: var(--primary-foreground); }
+html[data-layout=prime] .pv-sec { background: var(--surface-3); color: var(--foreground); }
+html[data-layout=prime] .pv-btn[data-nav]:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
+html[data-layout=prime][data-mode=tv] .pv-btn[data-nav]:focus { outline: 3px solid var(--focus-bg); outline-offset: 2px; transform: scale(1.04); box-shadow: none; }
+
+/* ---------- compact hero (home) ---------- */
+html[data-layout=prime] .pv-hero { position: relative; height: max(15rem, 40vh); margin-inline: calc(var(--gx) * -1); overflow: hidden; background: var(--surface); }
+html[data-layout=prime] .pv-hero-img { position: absolute; inset-block: 0; inset-inline-end: 0; width: 72%; height: 100%; object-fit: cover; object-position: 50% 25%; }
+html[data-layout=prime] .pv-hero-fade { position: absolute; inset: 0; background-image: linear-gradient(to right, var(--surface) 28%, var(--fade-mid) 52%, var(--fade-to) 82%), linear-gradient(to top, var(--background) 0%, var(--fade-to) 35%); }
+html[data-layout=prime] .pv-hero-body { position: absolute; inset-inline-start: var(--gx); inset-block: 0; width: min(36rem, 60%); display: flex; flex-direction: column; justify-content: center; gap: .6rem; padding-block: 1rem; }
+html[data-layout=prime][data-mode=mobile] .pv-hero-img { width: 100%; opacity: .55; }
+html[data-layout=prime][data-mode=mobile] .pv-hero-body { width: auto; inset-inline-end: var(--gx); }
+
+/* ---------- rows + tiles (dense, short) ---------- */
+html[data-layout=prime] .pv-rowsec { margin-top: .25rem; }
+html[data-layout=prime] .pv-rowtitle { font-size: 1.1rem; font-weight: 700; line-height: 1.5; padding-top: .75rem; }
+html[data-layout=prime] .pv-seeall { display: inline-flex; align-items: center; gap: .25rem; min-height: 2.5rem; margin-block: -.4rem; font-weight: 700; border-radius: .25rem; }
+html[data-layout=prime] .pv-seeall svg { color: var(--accent-blue); }
+html[data-layout=prime] .pv-rail { gap: .6rem; padding-block: .4rem .9rem; margin-block: 0 -.4rem; }
+html[data-layout=prime][data-mode=tv] .pv-rail { gap: .75rem; }
+html[data-layout=prime] .pv-tile { display: block; text-align: start; min-width: 0; width: 100%; border-radius: .375rem; }
+html[data-layout=prime] .pv-rail > .pv-tile { width: 12.5rem; flex-shrink: 0; }
+html[data-layout=prime][data-mode=tv] .pv-rail > .pv-tile { width: 13.5rem; }
+html[data-layout=prime][data-mode=mobile] .pv-rail > .pv-tile { width: 10.5rem; }
+html[data-layout=prime] .pv-media { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: .375rem; background: var(--surface-2); transition: transform var(--dur-fast) var(--ease); }
+html[data-layout=prime] .pv-live { background-image: linear-gradient(135deg, var(--surface-3), var(--surface)); }
+html[data-layout=prime] .pv-name { margin-top: .3rem; padding-inline: .1rem; font-size: .85rem; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-layout=prime] .pv-sub { padding-inline: .1rem; font-size: .75rem; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* focus: thin accent border + slight scale (replaces the base outline / TV white ring) */
+html[data-layout=prime] .pv-tile[data-nav]:focus-visible, html[data-layout=prime][data-mode=tv] .pv-tile[data-nav]:focus { outline: none; box-shadow: none; transform: none; }
+html[data-layout=prime] .pv-tile:focus-visible .pv-media, html[data-layout=prime][data-mode=tv] .pv-tile:focus .pv-media { box-shadow: 0 0 0 2px var(--accent-blue); transform: scale(var(--pv-s)); }
+html[data-layout=prime][data-mode=desktop] .pv-tile:hover .pv-media { transform: scale(var(--pv-s)); }
+html[data-layout=prime] .pv-grid { display: grid; gap: .9rem .6rem; padding: .75rem .25rem 6rem; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); }
+html[data-layout=prime][data-mode=mobile] .pv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: 0; }
+
+/* ---------- detail ---------- */
+html[data-layout=prime] .pv-dhero { position: relative; min-height: min(34rem, 62vh); display: flex; align-items: flex-end; overflow: hidden; background: var(--surface-2); }
+html[data-layout=prime] .pv-dhero-fade { position: absolute; inset: 0; background-image: linear-gradient(to top, var(--background) 8%, var(--fade-mid) 45%, var(--fade-to) 80%), linear-gradient(to right, var(--background) 0%, var(--fade-to) 55%); }
+html[data-layout=prime] .pv-dband { position: relative; width: 100%; display: flex; flex-direction: column; gap: .6rem; padding: var(--hdr) var(--gx) 1.25rem; padding-top: calc(var(--hdr) + 5rem); }
+html[data-layout=prime] .pv-tabs { display: flex; gap: .5rem; border-bottom: 1px solid var(--fg-10); }
+html[data-layout=prime] .pv-ep { display: flex; align-items: center; gap: 1rem; width: 100%; min-height: 4.5rem; padding: .6rem .75rem; text-align: start; border-bottom: 1px solid var(--fg-10); border-radius: .375rem; }
+html[data-layout=prime] .pv-ep:hover, html[data-layout=prime] .pv-ep-on { background: var(--surface-2); }
+html[data-layout=prime] .pv-ep[data-nav]:focus-visible, html[data-layout=prime][data-mode=tv] .pv-ep[data-nav]:focus { background: var(--surface-3); box-shadow: inset 0 0 0 2px var(--accent-blue); transform: none; outline: none; }
+
+/* ---------- settings ---------- */
+html[data-layout=prime] .pv-set { display: flex; height: 100%; min-height: 0; gap: 2rem; }
+html[data-layout=prime] .pv-set-list { display: flex; flex-direction: column; gap: .25rem; flex-shrink: 0; width: 19rem; padding: .5rem; overflow-y: auto; }
+html[data-layout=prime] .pv-set-account { display: flex; align-items: center; gap: 1rem; padding: .5rem .75rem 1rem; text-align: start; }
+html[data-layout=prime] .pv-set-item { display: flex; align-items: center; gap: .9rem; min-height: 3rem; padding: 0 1rem; border-radius: .375rem; font-size: 1.05rem; font-weight: 600; color: var(--muted-foreground); border-inline-start: 3px solid transparent; }
+html[data-layout=prime] .pv-set-item[aria-current=true] { background: var(--surface-2); color: var(--foreground); border-inline-start-color: var(--accent-blue); }
+html[data-layout=prime] .pv-set-item:focus-visible, html[data-layout=prime][data-mode=tv] .pv-set-item:focus { background: var(--focus-bg); color: var(--focus-fg); outline: none; box-shadow: none; transform: none; }
+html[data-layout=prime] .pv-set-body { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: .5rem .75rem 2rem .5rem; max-width: 56rem; }
+html[data-layout=prime][data-mode=mobile] .pv-set { display: block; overflow-y: auto; }
+html[data-layout=prime][data-mode=mobile] .pv-set-list { width: auto; overflow: visible; }
+html[data-layout=prime][data-mode=mobile] .pv-set-body { overflow: visible; padding: .5rem; }
+
+/* shared pages (Search, Library, Category, Genre, Profiles) keep their Google TV cards: Prime-style corners + accent ring */
+html[data-layout=prime] [data-tilewrap], html[data-layout=prime] [data-tile], html[data-layout=prime] [data-ring] { border-radius: .375rem; }
+html[data-layout=prime] [data-ring] { box-shadow: 0 0 0 2px var(--accent-blue); }
+
+/* ---------- RTL ---------- */
+html[dir=rtl][data-layout=prime] .pv-hero-fade { background-image: linear-gradient(to left, var(--surface) 28%, var(--fade-mid) 52%, var(--fade-to) 82%), linear-gradient(to top, var(--background) 0%, var(--fade-to) 35%); }
+html[dir=rtl][data-layout=prime] .pv-dhero-fade { background-image: linear-gradient(to top, var(--background) 8%, var(--fade-mid) 45%, var(--fade-to) 80%), linear-gradient(to left, var(--background) 0%, var(--fade-to) 55%); }

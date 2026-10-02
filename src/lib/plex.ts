@@ -3,10 +3,10 @@
 // No EPG / live TV for Plex in this version.
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Source } from "./types"
-import { mixed, plexFetch, px } from "./net"
+import { fetchT, mixed, plexFetch, px, scanLan } from "./net"
 import { t } from "./i18n"
 import { useApp } from "./store"
-import { allowedConns, buildUrl, connKind, identity, mapDetail, mapMeta, mapStreams, photoUrl, sortConns, type Conn, type ConnMode } from "./plex-pure"
+import { allowedConns, srtToVtt, buildUrl, connKind, identity, mapDetail, mapMeta, mapStreams, photoUrl, sortConns, type Conn, type ConnMode } from "./plex-pure"
 
 export { sortConns }
 export type PlexServer = { name: string; id: string; token: string; owned: boolean; connections: Conn[] }
@@ -191,8 +191,9 @@ export const plexStreamUrl = (s: Source, item: Item, q: StreamQ = STREAM_QS[0], 
     subtitleSize: 100, audioBoost: 100, videoResolution: q.height ? `${Math.round(q.height * 16 / 9)}x${q.height}` : "3840x2160", maxVideoBitrate: q.kbps ?? 200000,
     "X-Plex-Platform": "Chrome", "X-Plex-Session-Identifier": plexSessionId, session: plexTranscodeId(item),
     // Original: let Plex copy hevc/ac3 as-is when this device decodes them. Plex HLS is TS-only and hls.js reads hevc and ac3 in TS but not av1/eac3.
-    // picked tracks: audio switches the stream, a subtitle is burned in (ponytail: no sidecar text tracks, so every pick re-transcodes)
-    ...(tr.audio !== undefined ? { audioStreamID: tr.audio } : {}), ...(tr.sub !== undefined && tr.sub >= 0 ? { subtitleStreamID: tr.sub, subtitles: "burn" } : {}),
+    // picked tracks: audio switches the stream; only an image subtitle is burned in (text ones come as a <track>, see plexSubtitle).
+    // No burn pick = subtitles none, else Plex burns the account's default subtitle into the video.
+    ...(tr.audio !== undefined ? { audioStreamID: tr.audio } : {}), ...(tr.sub !== undefined && tr.sub >= 0 ? { subtitleStreamID: tr.sub, subtitles: "burn" } : { subtitleStreamID: 0, subtitles: "none" }),
     ...(profileExtra(q) ? { "X-Plex-Client-Profile-Extra": profileExtra(q) } : {}),
   }, s.token)
 
@@ -213,6 +214,10 @@ export function plexTimeline(s: Source, item: Item, state: "playing" | "paused" 
 /** Audio + subtitle streams to pick from. */
 export const plexTracks = async (s: Source, item: Item) => mapStreams((await get<Container>(s, proxy(), `/library/metadata/${item.sid}`)).MediaContainer?.Metadata?.[0] ?? {})
 
+/** WebVTT text of one text subtitle stream (Plex converts to SRT with format=srt; fetched, not linked, so no CORS setup on <video>). */
+export const plexSubtitle = async (s: Source, stream: number) =>
+  srtToVtt(await (await plexFetch(sUrl(s, `/library/streams/${stream}`, { encoding: "utf-8", format: "srt" }), proxy(), undefined, 20000)).text())
+
 /** Tell the server to kill the transcode. */
 export const plexStopTranscode = (s: Source, item: Item) => ping(s, "/video/:/transcode/universal/stop", { session: plexTranscodeId(item) })
 
@@ -220,7 +225,7 @@ export const plexStopTranscode = (s: Source, item: Item) => ping(s, "/video/:/tr
 export const plexScrobble = (s: Source, item: Item) => ping(s, "/:/scrobble", { key: item.sid!, identifier: "com.plexapp.plugins.library" })
 
 /** Probe likely addresses (typed host, this page's host, localhost) for a Plex server: GET /identity needs no token. */
-export async function detectPlex(typed = ""): Promise<{ server: string; name: string }[]> {
+export async function detectPlex(typed = "", onProgress?: (pct: number) => void): Promise<{ server: string; name: string }[]> {
   const raw = typed.trim().replace(/^https?:\/\//i, "").replace(/[/?#].*$/, "")
   const hosts = [...new Set([raw.replace(/:\d+$/, ""), location.hostname, "localhost"].filter(Boolean))]
   const cands = new Set<string>()
@@ -234,5 +239,10 @@ export async function detectPlex(typed = ""): Promise<{ server: string; name: st
     } catch { return null }
   }))
   const seen = new Set<string>()
-  return found.filter((x): x is { server: string; name: string } => !!x).filter((x) => !seen.has(x.name) && !!seen.add(x.name))
+  const quick = found.filter((x): x is { server: string; name: string } => !!x).filter((x) => !seen.has(x.name) && !!seen.add(x.name))
+  if (quick.length) return quick
+  return scanLan(32400, async (base) => {
+    const j = await (await fetchT(plexUrl(base, "/identity"), 800, { headers: JSON_H })).json()
+    return j?.MediaContainer?.machineIdentifier ? String(j.MediaContainer.machineIdentifier) : null
+  }, onProgress)
 }

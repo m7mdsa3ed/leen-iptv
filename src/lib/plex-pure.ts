@@ -96,8 +96,19 @@ export function mapDetail(m: J, img: (path: string, w: number, h: number) => str
 
 /** Audio / subtitle streams of the first media part (GET /library/metadata/{id}); ids are Plex stream ids. */
 export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean }
+/** Subtitle codecs Plex can hand over as SRT (the rest, PGS / VOBSUB / DVB, are images and must be burned in). */
+const TEXT_SUBS = ["srt", "subrip", "ass", "ssa", "webvtt", "vtt", "mov_text", "text"]
+
+/** SRT -> WebVTT (a <track> only reads VTT). Already-VTT text passes through; anything else (ASS, empty) gives "". */
+export function srtToVtt(txt: string): string {
+  const t = txt.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim()
+  if (/^WEBVTT/.test(t)) return t + "\n"
+  if (!t || !t.includes("-->")) return ""
+  return "WEBVTT\n\n" + t.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2") + "\n"
+}
+
 export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
   const st: J[] = m?.Media?.[0]?.Part?.[0]?.Stream ?? []
-  const pick = (type: number) => st.filter((s) => s.streamType === type).map((s) => ({ id: Number(s.id), label: String(s.displayTitle || s.extendedDisplayTitle || s.language || s.codec || s.id), def: !!(s.selected || s.default), lang: s.languageCode || undefined }))
+  const pick = (type: number) => st.filter((s) => s.streamType === type).map((s) => ({ id: Number(s.id), label: String(s.displayTitle || s.extendedDisplayTitle || s.language || s.codec || s.id), def: !!(s.selected || s.default), lang: s.languageCode || undefined, ...(type === 3 ? { text: TEXT_SUBS.includes(String(s.codec).toLowerCase()) } : {}) }))
   return { audio: pick(2), subs: pick(3) }
 }

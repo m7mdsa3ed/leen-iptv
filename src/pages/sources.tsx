@@ -85,7 +85,7 @@ export default function Sources() {
   const [found, setFound] = useState<{ server: string; name: string }[] | null>(null)
   const jfDetect = async () => {
     setErr(""); setBusy(t("pages.sources.detecting"))
-    const r = await (type === "Plex" ? detectPlex : detectJellyfin)(f.server)
+    const r = await (type === "Plex" ? detectPlex : detectJellyfin)(f.server, (p) => setBusy(`${t("pages.sources.scanning")} ${p}%`))
     setBusy(""); setFound(r)
     if (r.length === 1) setF((x) => ({ ...x, server: r[0].server }))
   }

@@ -151,6 +151,7 @@ const d: Dict = {
   "pages.sources.kind.Plex": "Sign in with plex.tv",
   "pages.sources.kind.Jellyfin": "Password or Quick Connect",
   "pages.sources.detect": "Detect server",
+  "pages.sources.scanning": "Scanning network",
   "pages.sources.detecting": "Looking for servers...",
   "pages.sources.detectNone": "No Jellyfin server found at the usual addresses. Type the address by hand.",
   "pages.sources.user": "Username",

@@ -45,5 +45,13 @@ assert.equal(connKind(conns, "http://elsewhere:1"), "Custom")
 console.log("plex ok")
 
 import { mapStreams as plexStreams } from "../src/lib/plex-pure.ts"
-assert.deepEqual(plexStreams({ Media: [{ Part: [{ Stream: [{ streamType: 1, id: 1 }, { streamType: 2, id: 2, displayTitle: "English (AC3)", selected: true }, { streamType: 3, id: 3, displayTitle: "Arabic (SRT)" }] }] }] }),
-  { audio: [{ id: 2, label: "English (AC3)", def: true, lang: undefined }], subs: [{ id: 3, label: "Arabic (SRT)", def: false, lang: undefined }] })
+assert.deepEqual(plexStreams({ Media: [{ Part: [{ Stream: [{ streamType: 1, id: 1 }, { streamType: 2, id: 2, displayTitle: "English (AC3)", selected: true }, { streamType: 3, id: 3, displayTitle: "Arabic (SRT)", codec: "srt" }] }] }] }),
+  { audio: [{ id: 2, label: "English (AC3)", def: true, lang: undefined }], subs: [{ id: 3, label: "Arabic (SRT)", def: false, lang: undefined, text: true }] })
+
+// subtitles: SRT -> VTT, text vs image streams
+import { srtToVtt, mapStreams } from "../src/lib/plex-pure.ts"
+assert.equal(srtToVtt("﻿1\r\n00:00:01,500 --> 00:00:03,000\r\nHi\r\n"), "WEBVTT\n\n1\n00:00:01.500 --> 00:00:03.000\nHi\n")
+assert.equal(srtToVtt("WEBVTT\n\n00:01.000 --> 00:02.000\nx"), "WEBVTT\n\n00:01.000 --> 00:02.000\nx\n")
+assert.equal(srtToVtt("[Script Info]\nDialogue: 0"), "")
+const ms = mapStreams({ Media: [{ Part: [{ Stream: [{ id: 5, streamType: 3, codec: "srt", languageCode: "eng" }, { id: 6, streamType: 3, codec: "pgs" }] }] }] })
+assert.deepEqual(ms.subs.map((x) => x.text), [true, false])

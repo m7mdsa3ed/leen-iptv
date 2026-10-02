@@ -1,5 +1,5 @@
 import type { RefObject } from "react"
-import { Captions, ChevronUp, Expand, Gauge, LayoutGrid, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Star, Timer, Volume1, Volume2, VolumeX } from "lucide-react"
+import { Captions, ChevronsUp, Expand, Gauge, LayoutGrid, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Star, Timer, Volume1, Volume2, VolumeX } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
 import type { StreamQ } from "@/lib/quality"
@@ -82,7 +82,7 @@ export function Controls(c: ControlsProps) {
         {c.stats && <QualityBadge s={c.stats} />}
       </div>
       <div className="pointer-events-auto mt-1 flex justify-center">
-        <Pill data-more variant="ghost" aria-label={t("player.moreOpen")} className="pl-more-btn text-white/80" onClick={c.onMore}><ChevronUp />{t("player.more")}</Pill>
+        <Pill data-more variant="ghost" aria-label={t("player.moreOpen")} className="pl-more-btn text-white/80" onClick={c.onMore}><ChevronsUp className="pl-more-ic" />{t("player.more")}</Pill>
       </div>
       {c.tv && <div className="pointer-events-none mt-1 text-center text-sm text-white/60">{t("player.remoteHint")}</div>}
     </div>

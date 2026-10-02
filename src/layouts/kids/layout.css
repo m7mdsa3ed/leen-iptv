@@ -1,0 +1,59 @@
+/* Kids layout. Everything scoped under html[data-layout=kids]. Chrome 94: plain hex / 8-digit hex / rgba only, no color-mix, no :has().
+   Deep indigo background, warm yellow/orange accent, very large rounded buttons (>= 4rem tall). Same palette in light and dark. */
+
+html[data-layout=kids] {
+  --background: #1a1550; --foreground: #ffffff; --card: #2a2275; --card-foreground: #ffffff; --popover: #352d8a; --popover-foreground: #ffffff;
+  --primary: #ffc83d; --primary-foreground: #2a1a00; --secondary: #352d8a; --secondary-foreground: #ffffff;
+  --muted: #352d8a; --muted-foreground: #cfcaff;
+  --fg-10: rgba(255, 255, 255, .12); --fg-30: rgba(255, 255, 255, .3); --fg-40: rgba(255, 255, 255, .4); --fg-70: rgba(255, 255, 255, .75); --fg-80: rgba(255, 255, 255, .85);
+  --accent: #4337a8; --accent-foreground: #ffffff; --destructive: #ff8a80; --border: rgba(255, 255, 255, .18); --input: rgba(255, 255, 255, .22); --ring: #ffc83d;
+  --float-bg: rgba(42, 34, 117, .88); --surface: #2a2275; --surface-2: #352d8a; --surface-3: #4337a8;
+  --accent-blue: #ffc83d; --accent-blue-container: #5a48d6;
+  --fade-mid: #1a1550b3; --fade-to: #1a155000; --focus-bg: #ffc83d; --focus-fg: #2a1a00; --scroll-thumb: rgba(255, 255, 255, .3);
+  --shimmer: rgba(255, 255, 255, .08);
+  --radius: 1.5rem;
+}
+html[data-layout=kids][data-mode=tv] { --hdr: 6.5rem; }
+html[data-layout=kids][data-mode=mobile] { --hdr: calc(4.5rem + env(safe-area-inset-top)); }
+
+/* ---------- header ---------- */
+html[data-layout=kids] .kd-hdr { background: #1a1550; }
+html[data-layout=kids][data-mode=mobile] .kd-hdr { padding-top: env(safe-area-inset-top); }
+html[data-layout=kids] .kd-logo { font-family: "Poppins", "Segoe UI", system-ui, sans-serif; font-weight: 800; font-size: 2.25rem; line-height: 1; color: #ffc83d; margin-inline-end: .5rem; }
+html[data-layout=kids] .kd-tab { display: inline-flex; align-items: center; gap: .6rem; min-height: 4rem; padding: 0 1.75rem; border-radius: 9999px; font-size: 1.5rem; font-weight: 800; color: #ffffff; background: #352d8a; white-space: nowrap; }
+html[data-layout=kids] .kd-tab svg { width: 1.9rem; height: 1.9rem; }
+html[data-layout=kids] .kd-tab[data-active] { background: #ffc83d; color: #2a1a00; }
+/* the tucked-away entry: small, quiet */
+html[data-layout=kids] .kd-gear { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 9999px; color: #ffffff; opacity: .45; }
+html[data-layout=kids] .kd-gear svg { width: 1.25rem; height: 1.25rem; }
+html[data-layout=kids] .kd-gear:focus-visible, html[data-layout=kids] .kd-gear:hover { opacity: 1; }
+html[data-layout=kids] :is(.kd-tab, .kd-gear, .kd-chip, .kd-btn, .kd-num, .kd-ep):focus-visible { outline: 4px solid #ffffff; outline-offset: 3px; }
+html[data-layout=kids] .float-tab { font-size: 1rem; font-weight: 700; min-height: 4rem; }
+
+/* ---------- headings, buttons, chips ---------- */
+html[data-layout=kids] .kd-h { font-size: 2rem; font-weight: 800; color: #ffffff; }
+html[data-layout=kids] .kd-title { font-size: clamp(2rem, 4vw, 3.25rem); font-weight: 800; line-height: 1.1; }
+html[data-layout=kids] .kd-chips { display: flex; flex-wrap: wrap; gap: .75rem; padding: .75rem .25rem .25rem; }
+html[data-layout=kids] .kd-chip { min-height: 4rem; padding: 0 1.75rem; border-radius: 9999px; background: #352d8a; color: #ffffff; font-size: 1.4rem; font-weight: 700; max-width: 100%; }
+html[data-layout=kids] .kd-chip[aria-pressed=true] { background: #ffc83d; color: #2a1a00; }
+html[data-layout=kids] .kd-btn { display: inline-flex; align-items: center; justify-content: center; gap: .75rem; min-height: 4rem; padding: 0 2.25rem; border-radius: 9999px; background: #4337a8; color: #ffffff; font-size: 1.5rem; font-weight: 800; white-space: nowrap; }
+html[data-layout=kids] .kd-btn svg { width: 2rem; height: 2rem; }
+html[data-layout=kids] .kd-play { background: #ffc83d; color: #2a1a00; min-height: 5rem; padding: 0 3rem; font-size: 2rem; }
+html[data-layout=kids] .kd-btn:disabled { opacity: .5; }
+html[data-layout=kids] .kd-num { min-height: 5rem; min-width: 5rem; border-radius: 1.5rem; background: #ffc83d; color: #2a1a00; font-size: 2.25rem; font-weight: 800; }
+
+/* ---------- tiles ---------- */
+html[data-layout=kids] .kd-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); padding: .75rem .25rem; }
+html[data-layout=kids] .kd-grid-wide { grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
+html[data-layout=kids][data-mode=tv] .kd-grid { grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); }
+html[data-layout=kids][data-mode=tv] .kd-grid-wide { grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); }
+html[data-layout=kids] .kd-card { width: 13rem; }
+html[data-layout=kids] [data-tilewrap] { border-radius: 1.75rem; }
+html[data-layout=kids] [data-card] .truncate { font-size: 1.25rem; font-weight: 700; }
+
+/* ---------- detail ---------- */
+html[data-layout=kids] .kd-detail { display: grid; gap: 2rem; grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr); padding-top: 1rem; align-items: start; }
+html[data-layout=kids][data-mode=mobile] .kd-detail { grid-template-columns: 1fr; }
+html[data-layout=kids][data-mode=mobile] .kd-dposter { max-width: 12rem; }
+html[data-layout=kids] .kd-ep { display: flex; align-items: center; gap: 1.25rem; min-height: 5rem; padding: .75rem 1.5rem; border-radius: 2rem; background: #2a2275; color: #ffffff; text-align: start; }
+html[data-layout=kids] .kd-ep[aria-current=true] { background: #4337a8; }

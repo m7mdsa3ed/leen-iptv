@@ -2,7 +2,7 @@
 // server has it, detail, HLS URL, progress reporting. The token rides as api_key in the query so GETs stay CORS-simple.
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Prog, Source } from "./types"
-import { mixed, plexFetch, px } from "./net"
+import { fetchT, mixed, plexFetch, px, scanLan } from "./net"
 import { t } from "./i18n"
 import { useApp } from "./store"
 import { clientId } from "./plex"
@@ -182,7 +182,7 @@ export const jellyfinStopTranscode = (s: Source, item: Item) =>
   send(s, "DELETE", "/Videos/ActiveEncodings", { deviceId: jfDeviceId(), playSessionId: jfPlaySession(item) })
 
 /** Browsers can't do Jellyfin's UDP discovery, so probe likely addresses (typed host, this page's host, localhost) for a Jellyfin server. */
-export async function detectJellyfin(typed = ""): Promise<{ server: string; name: string }[]> {
+export async function detectJellyfin(typed = "", onProgress?: (pct: number) => void): Promise<{ server: string; name: string }[]> {
   const raw = typed.trim().replace(/^https?:\/\//i, "").replace(/[/?#].*$/, "")
   const hosts = [...new Set([raw.replace(/:\d+$/, ""), location.hostname, "localhost", "jellyfin.local"].filter(Boolean))]
   const cands = new Set<string>()
@@ -196,5 +196,11 @@ export async function detectJellyfin(typed = ""): Promise<{ server: string; name
     } catch { return null }
   }))
   const seen = new Set<string>() // same server answering on several URLs: keep the first
-  return found.filter((x): x is { server: string; name: string } => !!x).filter((x) => !seen.has(x.name) && !!seen.add(x.name))
+  const quick = found.filter((x): x is { server: string; name: string } => !!x).filter((x) => !seen.has(x.name) && !!seen.add(x.name))
+  if (quick.length) return quick
+  // nothing at the usual addresses: sweep the local network
+  return scanLan(8096, async (base) => {
+    const j = await (await fetchT(jfUrl(base, "/System/Info/Public"), 800, { headers: { Accept: "application/json" } })).json()
+    return j?.Id ? String(j.ServerName || "Jellyfin") : null
+  }, onProgress)
 }

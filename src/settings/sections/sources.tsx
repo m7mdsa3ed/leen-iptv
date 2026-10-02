@@ -79,7 +79,7 @@ function EditConnection({ id }: { id: string }) {
   const [open, setOpen] = useState(false)
   const [d, setD] = useState({ server: "", user: "", pass: "", url: "", epgUrl: "", token: "" })
   const [busy, setBusy] = useState(false), [err, setErr] = useState("")
-  const [found, setFound] = useState<{ server: string; name: string }[] | null>(null), [finding, setFinding] = useState(false)
+  const [found, setFound] = useState<{ server: string; name: string }[] | null>(null), [finding, setFinding] = useState(false), [scan, setScan] = useState(0)
   const [tests, setTests] = useState<{ checks: Check[]; out: Record<string, Result> } | null>(null)
   const sync = useSync()
   const set = (k: keyof typeof d) => (v: string) => setD({ ...d, [k]: v })
@@ -108,8 +108,8 @@ function EditConnection({ id }: { id: string }) {
   }
   const detect = async () => {
     setFinding(true)
-    const r = await (s.type === "plex" ? detectPlex : detectJellyfin)(d.server)
-    setFinding(false); setFound(r)
+    const r = await (s.type === "plex" ? detectPlex : detectJellyfin)(d.server, (p) => setScan(p))
+    setFinding(false); setScan(0); setFound(r)
     if (r.length === 1) setD((x) => ({ ...x, server: r[0].server }))
   }
   const save = async () => {
@@ -138,7 +138,7 @@ function EditConnection({ id }: { id: string }) {
     <div className="flex flex-col gap-3 rounded-2xl bg-surface-2 p-4">
       <div className="text-lg font-medium">{t("settings.sources.edit")}</div>
       {(s.type === "plex" || s.type === "jellyfin") ? (<>
-        <div className="flex w-full max-w-[32rem] items-end gap-2"><Field className="min-w-0 flex-1" label={t("settings.sources.f.server")} type="url" inputMode="url" dir="ltr" value={d.server} onChange={set("server")} /><Pill className="shrink-0" disabled={finding || busy} onClick={() => void detect()}>{t("pages.sources.detect")}</Pill></div>
+        <div className="flex w-full max-w-[32rem] items-end gap-2"><Field className="min-w-0 flex-1" label={t("settings.sources.f.server")} type="url" inputMode="url" dir="ltr" value={d.server} onChange={set("server")} /><Pill className="shrink-0" disabled={finding || busy} onClick={() => void detect()}>{finding && scan ? `${scan}%` : t("pages.sources.detect")}</Pill></div>
         {found && (found.length === 0 ? <p className="text-sm text-muted-foreground">{t("pages.sources.detectNone")}</p> : found.length > 1 && <div className="flex flex-wrap gap-2">{found.map((x) => <Pill key={x.server} onClick={() => { setD((y) => ({ ...y, server: x.server })); setFound(null) }}>{s.type === "jellyfin" && <bdi>{x.name}</bdi>} <bdi dir="ltr">{x.server}</bdi></Pill>)}</div>)}
       </>) : s.type === "xtream" && <Field label={t("settings.sources.f.server")} type="url" inputMode="url" dir="ltr" value={d.server} onChange={set("server")} />}
       {s.type === "xtream" && (<>

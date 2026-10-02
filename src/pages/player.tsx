@@ -179,7 +179,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   // media server: a new audio pick / burned-in subtitle is a new stream URL and resumes where this one is (same path as a quality change);
   // a text subtitle (Jellyfin WebVTT) leaves the stream alone
   const apply = (p: Picked) => {
-    const plain = (x?: number) => x === undefined || x < 0 || !!S.tracks.subs.find((y) => y.id === x)?.text && !!S.jf
+    const plain = (x?: number) => x === undefined || x < 0 || !!S.tracks.subs.find((y) => y.id === x)?.text
     if (!((p.audio === undefined || p.audio === tr.audio) && plain(p.sub) && plain(tr.sub))) {
       const v = vref.current
       if (v && v.currentTime > 0) resume.current = v.currentTime

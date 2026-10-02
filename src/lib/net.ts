@@ -86,3 +86,24 @@ export async function plexFetch(url: string, proxy: string, init?: RequestInit, 
     return fetchT(p, ms, init)
   }
 }
+
+/** Sweep the likely home subnets (the page's own /24 first, then the usual router defaults) for a server on `port`.
+    Browsers can't do UDP discovery or read their LAN address, so this is a plain /24 probe: ~250 hosts per subnet, 80 at a time.
+    Direct requests only (an https page can't reach http hosts, and the /p proxy may sit on another network), so it returns [] there. */
+export async function scanLan(port: number, probe: (base: string) => Promise<string | null>, onProgress?: (pct: number) => void): Promise<{ server: string; name: string }[]> {
+  if (location.protocol === "https:") return []
+  const own = /^(\d+\.\d+\.\d+)\.\d+$/.exec(location.hostname)?.[1]
+  const subnets = [...new Set([own, "192.168.1", "192.168.0", "10.0.0", "192.168.68", "10.0.1", "192.168.2"].filter((x): x is string => !!x))]
+  const hosts = subnets.flatMap((s) => Array.from({ length: 254 }, (_, i) => `${s}.${i + 1}`))
+  const out: { server: string; name: string }[] = []
+  let next = 0, done = 0
+  const worker = async () => {
+    while (next < hosts.length) {
+      const h = hosts[next++], server = `http://${h}:${port}`
+      try { const name = await probe(server); if (name) out.push({ server, name }) } catch { /* closed or no route */ }
+      onProgress?.(Math.round((++done / hosts.length) * 100))
+    }
+  }
+  await Promise.all(Array.from({ length: 80 }, worker))
+  return out
+}

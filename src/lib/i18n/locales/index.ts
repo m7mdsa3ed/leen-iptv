@@ -15,6 +15,11 @@ import enSettings from "./en/settings.ts"
 import enWelcome from "./en/welcome.ts"
 import enTrailer from "./en/trailer.ts"
 import enDiag from "./en/diag.ts"
+import enLv from "./en/lv.ts"
+import enPv from "./en/pv.ts"
+import enRk from "./en/rk.ts"
+import enPw from "./en/pw.ts"
+import enKd from "./en/kd.ts"
 import arCommon from "./ar/common.ts"
 import arNav from "./ar/nav.ts"
 import arSource from "./ar/source.ts"
@@ -30,6 +35,11 @@ import arSettings from "./ar/settings.ts"
 import arWelcome from "./ar/welcome.ts"
 import arTrailer from "./ar/trailer.ts"
 import arDiag from "./ar/diag.ts"
+import arLv from "./ar/lv.ts"
+import arPv from "./ar/pv.ts"
+import arRk from "./ar/rk.ts"
+import arPw from "./ar/pw.ts"
+import arKd from "./ar/kd.ts"
 
-export const en: Dict = { ...enCommon, ...enNav, ...enSource, ...enHooks, ...enGtv, ...enAtv, ...enNf, ...enPages, ...enPlayer, ...enErrors, ...enSync, ...enSettings, ...enWelcome, ...enTrailer, ...enDiag }
-export const ar: Dict = { ...arCommon, ...arNav, ...arSource, ...arHooks, ...arGtv, ...arAtv, ...arNf, ...arPages, ...arPlayer, ...arErrors, ...arSync, ...arSettings, ...arWelcome, ...arTrailer, ...arDiag }
+export const en: Dict = { ...enCommon, ...enNav, ...enSource, ...enHooks, ...enGtv, ...enAtv, ...enNf, ...enPages, ...enPlayer, ...enErrors, ...enSync, ...enSettings, ...enWelcome, ...enTrailer, ...enDiag, ...enLv, ...enPv, ...enRk, ...enPw, ...enKd }
+export const ar: Dict = { ...arCommon, ...arNav, ...arSource, ...arHooks, ...arGtv, ...arAtv, ...arNf, ...arPages, ...arPlayer, ...arErrors, ...arSync, ...arSettings, ...arWelcome, ...arTrailer, ...arDiag, ...arLv, ...arPv, ...arRk, ...arPw, ...arKd }
