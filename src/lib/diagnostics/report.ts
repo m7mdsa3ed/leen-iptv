@@ -10,7 +10,7 @@ export function buildReport(checks: Check[], results: Record<string, Result | un
   const L: string[] = []
   const all = checks.map((c) => results[c.id]).filter(Boolean) as Result[]
   const n = (s: Result["status"]) => all.filter((r) => r.status === s).length
-  L.push(`Leen IPTV ${pkg.version} - ${t("diag.title")}`, new Date().toISOString(), `${location.protocol}//${location.host}${location.pathname}`)
+  L.push(`Leen TV ${pkg.version} - ${t("diag.title")}`, new Date().toISOString(), `${location.protocol}//${location.host}${location.pathname}`)
   L.push(`OK ${n("ok")} / WARN ${n("warn")} / FAIL ${n("fail")} / SKIP ${n("skip")} - ${(totalMs / 1000).toFixed(1)}s`, "")
   for (const g of GROUPS) {
     const list = checks.filter((c) => c.group === g)

@@ -208,5 +208,9 @@ const d: Dict = {
   "settings.homeRows.up": "فوق",
   "settings.homeRows.down": "تحت",
   "settings.homeRows.reset": "رجّع الافتراضي",
+  "settings.playback.nextBanner": "بانر الحلقة الجاية",
+  "settings.playback.nextBanner.desc": "اعرض بانر بالحلقة الجاية وعدّاد قرب نهاية الحلقة.",
+  "settings.playback.autoNext": "شغّل الحلقة الجاية تلقائي",
+  "settings.playback.autoNext.desc": "كمّل على الحلقة الجاية لما العدّاد يخلص أو الحلقة تخلص. مقفول: هيستنى لحد ما تدوس شغّل دلوقتي.",
 }
 export default d

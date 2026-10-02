@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
 import { NEXT_LEAD, NEXT_SECS } from "./util"
 
-/** "Next episode" card state: appears NEXT_LEAD seconds before the end, counts down NEXT_SECS, then calls onNext.
+/** "Next episode" card state: appears NEXT_LEAD seconds before the end and (when `auto`) counts down NEXT_SECS, then calls onNext; with auto off it just waits for Play now.
     Never shows for an item the user seeked back in, or after Cancel. `blocked` = Cancel pressed (the episode end must not auto-advance). */
-export function useNextUp(o: { vref: RefObject<HTMLVideoElement | null>; enabled: boolean; itemId: string; onNext: () => void }) {
-  const { vref, enabled, itemId } = o
+export function useNextUp(o: { vref: RefObject<HTMLVideoElement | null>; enabled: boolean; itemId: string; onNext: () => void; auto: boolean }) {
+  const { vref, enabled, itemId, auto } = o
   const [show, setShow] = useState(false)
   const [secs, setSecs] = useState(NEXT_SECS)
   const dismissed = useRef(false) // seeked back or cancelled: do not show again for this item
@@ -23,7 +23,7 @@ export function useNextUp(o: { vref: RefObject<HTMLVideoElement | null>; enabled
       if (!(d > 0) || !isFinite(d)) return
       if (c < last.current - 2) dismissed.current = true // user seeked back
       last.current = c
-      setShow(!dismissed.current && d - c <= NEXT_LEAD && d - c > 0)
+      setShow(!dismissed.current && d - c <= NEXT_LEAD && d - c >= 0)
     }
     const reset = () => { last.current = 0 } // new stream attached (quality switch): not a seek back
     v.addEventListener("timeupdate", f); v.addEventListener("emptied", reset)
@@ -31,11 +31,11 @@ export function useNextUp(o: { vref: RefObject<HTMLVideoElement | null>; enabled
   }, [vref, enabled, itemId])
 
   useEffect(() => {
-    if (!show) return setSecs(NEXT_SECS)
+    if (!show || !auto) return setSecs(NEXT_SECS)
     const t = setInterval(() => setSecs((s) => s - 1), 1000)
     return () => clearInterval(t)
-  }, [show])
-  useEffect(() => { if (show && secs <= 0) { dismissed.current = true; setShow(false); onNext.current() } }, [show, secs])
+  }, [show, auto])
+  useEffect(() => { if (show && auto && secs <= 0) { dismissed.current = true; setShow(false); onNext.current() } }, [show, secs])
 
   return {
     show, secs, blocked,

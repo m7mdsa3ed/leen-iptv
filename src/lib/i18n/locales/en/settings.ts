@@ -218,5 +218,9 @@ const d: Dict = {
   "settings.homeRows.up": "Move up",
   "settings.homeRows.down": "Move down",
   "settings.homeRows.reset": "Reset to default",
+  "settings.playback.nextBanner": "Next episode banner",
+  "settings.playback.nextBanner.desc": "Show a banner with the next episode, and a countdown, near the end of an episode.",
+  "settings.playback.autoNext": "Play next episode automatically",
+  "settings.playback.autoNext.desc": "Continue to the next episode when the countdown ends or an episode finishes. Off: it waits for you to press Play now.",
 }
 export default d

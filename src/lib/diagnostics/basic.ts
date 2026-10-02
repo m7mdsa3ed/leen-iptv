@@ -45,7 +45,7 @@ export function deviceChecks(): Check[] {
       const full = e.quota ? e.usage / e.quota : 0
       return res(full > 0.9 ? "warn" : "ok", e.quota ? t("diag.dev.storage.of", { used: mb(e.usage), total: mb(e.quota) }) : `${mb(e.usage)} MB`, full > 0.9 ? t("diag.dev.storage.hint") : undefined)
     }),
-    d("version", async () => res("ok", `Leen IPTV ${pkg.version}`)),
+    d("version", async () => res("ok", `Leen TV ${pkg.version}`)),
   ]
 }
 

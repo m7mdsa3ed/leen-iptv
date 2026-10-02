@@ -87,13 +87,34 @@ export async function plexFetch(url: string, proxy: string, init?: RequestInit, 
   }
 }
 
+/** This device's own /24 prefixes via a WebRTC host candidate (webOS and most browsers expose the LAN address; Chrome may hide it behind mDNS, then this is []). */
+function rtcSubnets(): Promise<string[]> {
+  return new Promise((res) => {
+    const out = new Set<string>()
+    let pc: RTCPeerConnection | undefined
+    const done = () => { try { pc?.close() } catch { /* closed */ } res([...out]) }
+    try {
+      pc = new RTCPeerConnection({ iceServers: [] })
+      pc.createDataChannel("")
+      pc.onicecandidate = (e) => {
+        if (!e.candidate) return done()
+        const ip = e.candidate.candidate.split(" ")[4] ?? ""
+        const m = /^(\d+\.\d+\.\d+)\.\d+$/.exec(ip)
+        if (m && !/^(0|127|169)\./.test(m[1])) out.add(m[1])
+      }
+      pc.createOffer().then((o) => pc!.setLocalDescription(o)).catch(done)
+      setTimeout(done, 800)
+    } catch { res([]) }
+  })
+}
+
 /** Sweep the likely home subnets (the page's own /24 first, then the usual router defaults) for a server on `port`.
     Browsers can't do UDP discovery or read their LAN address, so this is a plain /24 probe: ~250 hosts per subnet, 80 at a time.
     Direct requests only (an https page can't reach http hosts, and the /p proxy may sit on another network), so it returns [] there. */
 export async function scanLan(port: number, probe: (base: string) => Promise<string | null>, onProgress?: (pct: number) => void): Promise<{ server: string; name: string }[]> {
   if (location.protocol === "https:") return []
   const own = /^(\d+\.\d+\.\d+)\.\d+$/.exec(location.hostname)?.[1]
-  const subnets = [...new Set([own, "192.168.1", "192.168.0", "10.0.0", "192.168.68", "10.0.1", "192.168.2"].filter((x): x is string => !!x))]
+  const subnets = [...new Set([...(await rtcSubnets()), own, "192.168.1", "192.168.0", "10.0.0", "192.168.68", "10.0.1", "192.168.2"].filter((x): x is string => !!x))]
   const hosts = subnets.flatMap((s) => Array.from({ length: 254 }, (_, i) => `${s}.${i + 1}`))
   const out: { server: string; name: string }[] = []
   let next = 0, done = 0

@@ -29,7 +29,7 @@ export default function AboutSection() {
   return (
     <div className="flex flex-col gap-4">
       <SectionCard>
-        <div className="flex items-center gap-4"><LeenMark className="size-16" /><div><div className="text-4xl"><span className="wordmark">Leen</span> <span className="text-base text-muted-foreground">IPTV</span></div><div className="text-sm text-muted-foreground">{t("settings.about.version", { v: pkg.version })}</div></div></div>
+        <div className="flex items-center gap-4"><LeenMark className="size-16" /><div><div className="text-4xl"><span className="wordmark">Leen</span> <span className="text-base text-muted-foreground">TV</span></div><div className="text-sm text-muted-foreground">{t("settings.about.version", { v: pkg.version })}</div></div></div>
       </SectionCard>
       <SectionCard title={t("settings.about.device")}>
         <Row label={t("settings.about.screenMode")}>{t(`settings.mode.${mode}`)}</Row>

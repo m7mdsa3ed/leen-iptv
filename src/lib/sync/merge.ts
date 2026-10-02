@@ -46,7 +46,7 @@ export type AppSlice = {
   settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown } & Partial<Record<DisplayKey, unknown>>
 }
 /** Display preferences that follow the account. Only written once set (an untouched device never overwrites a customised one); "reset" stores an empty value, not undefined. */
-export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav"] as const
+export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext"] as const
 type DisplayKey = (typeof DISPLAY_KEYS)[number]
 export const RECENTS_MAX = 40
 

@@ -97,6 +97,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const E = useEngine({ vref, item, live, raw: S.raw, url: S.url, direct: S.direct, setProxied: S.setProxied })
   useTracking({ vref, item, live, src: S.src, plex: S.plex, jf: S.jf, resume, meas: E.meas, statsRef: E.statsRef })
   const hasNext = !live && isEpisode(item.id) && idx < queue.length - 1
+  const showNext = useApp((s) => s.settings.nextBanner ?? true), autoNext = useApp((s) => s.settings.autoNext ?? true)
 
   /* ---------- controls visibility ---------- */
   const poke = useCallback(() => {
@@ -117,7 +118,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   /* ---------- transport ---------- */
   const zap = useCallback((d: number) => { setIdx((i) => (i + d + queue.length) % queue.length); showBanner() }, [queue.length, showBanner])
   const advance = () => { setIdx((i) => Math.min(i + 1, qref.current.length - 1)); showBanner() }
-  const nu = useNextUp({ vref, enabled: hasNext, itemId: item.id, onNext: advance })
+  const nu = useNextUp({ vref, enabled: hasNext && showNext, itemId: item.id, onNext: advance, auto: autoNext })
   const nextOn = hasNext && nu.show
   const nextItem = queue[idx + 1]
   const next_ = () => (live ? zap(1) : idx < queue.length - 1 && setIdx(idx + 1))
@@ -424,7 +425,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
         }}
         onVolumeChange={(e) => { const v = e.currentTarget; setVol(v.volume); setMuted(v.muted); setPrefs({ vol: v.volume, muted: v.muted }) }}
         onEnded={() => {
-          if (idx < queue.length - 1) { if (!(hasNext && nu.blocked.current)) advance() } // Cancel on the next-episode card also stops the auto-advance
+          if (idx < queue.length - 1) { if (!hasNext || (autoNext && !nu.blocked.current)) advance(); else poke() } // Cancel on the next-episode card also stops the auto-advance
           else back()
         }}
         {...E.handlers}
@@ -445,7 +446,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
         />
       </div>
 
-      {nextOn && nextItem && <NextCard item={nextItem} secs={nu.secs} tv={isTv} onSkip={nu.skip} onCancel={nu.cancel} />}
+      {nextOn && nextItem && <NextCard item={nextItem} secs={nu.secs} auto={autoNext} tv={isTv} onSkip={nu.skip} onCancel={nu.cancel} />}
       {more !== "closed" && <MorePanel item={item} closing={more === "closing"} act={act} />}
       {ov === "guide" && <GuideOverlay item={item} tune={tune} close={closeOv} />}
       {ov === "strip" && <ChannelStrip item={item} tune={tune} close={closeOv} />}

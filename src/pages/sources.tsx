@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Pill } from "@/components/gtv"
 import { fmt, t, useT } from "@/lib/i18n"
@@ -83,12 +83,19 @@ export default function Sources() {
     } catch (e) { if (live()) { setErr(explain(e)); setBusy(""); setQc(null) } }
   }
   const [found, setFound] = useState<{ server: string; name: string }[] | null>(null)
-  const jfDetect = async () => {
-    setErr(""); setBusy(t("pages.sources.detecting"))
-    const r = await (type === "Plex" ? detectPlex : detectJellyfin)(f.server, (p) => setBusy(`${t("pages.sources.scanning")} ${p}%`))
-    setBusy(""); setFound(r)
-    if (r.length === 1) setF((x) => ({ ...x, server: r[0].server }))
+  const [scan, setScan] = useState("")
+  const autoRan = useRef("")
+  /** Find servers on this network (typed host first, then a LAN sweep). `auto` = run on opening the form: never overwrites what was typed meanwhile. */
+  const jfDetect = async (auto = false) => {
+    setScan(t("pages.sources.detecting"))
+    const r = await (type === "Plex" ? detectPlex : detectJellyfin)(f.server, (p) => setScan(`${t("pages.sources.scanning")} ${p}%`))
+    setScan(""); setFound(r)
+    if (r.length === 1) setF((x) => (auto && x.server ? x : { ...x, server: r[0].server }))
   }
+  useEffect(() => { // opening the Jellyfin form or Plex's manual form looks for a server by itself, once each
+    const want = type === "Jellyfin" ? "Jellyfin" : type === "Plex" && manual ? "Plex" : ""
+    if (want && autoRan.current !== want && !f.server) { autoRan.current = want; void jfDetect(true) }
+  }, [type, manual]) // eslint-disable-line react-hooks/exhaustive-deps
   const jfQuick = async () => {
     const server = normServer(f.server)
     setErr(""); setBusy(t("pages.sources.contacting"))
@@ -130,7 +137,7 @@ export default function Sources() {
       <Input data-nav dir={k === "name" ? "auto" : "ltr"} className="h-12 rounded-2xl text-base md:h-14 md:text-xl" type={type} inputMode={inputMode} autoComplete={ac} spellCheck={false} value={f[k]} onChange={set(k)} autoCapitalize="off" autoCorrect="off" />
     </label>
   )
-  const detectBtn = <Pill className="shrink-0" disabled={!!busy} onClick={() => void jfDetect()}>{tr("pages.sources.detect")}</Pill>
+  const detectBtn = <Pill className="shrink-0" disabled={!!scan} onClick={() => void jfDetect()}>{scan || tr("pages.sources.detect")}</Pill>
   const detected = found && (found.length === 0 ? <p className="text-sm text-muted-foreground">{tr("pages.sources.detectNone")}</p> : found.length > 1 && <div className="flex flex-wrap gap-2">{found.map((x) => <Pill key={x.server} onClick={() => { setF((y) => ({ ...y, server: x.server })); setFound(null) }}>{type === "Jellyfin" && <bdi>{x.name}</bdi>} <bdi dir="ltr">{x.server}</bdi></Pill>)}</div>)
   const serverRow = (ph: string) => <div className="flex items-end gap-2"><div className="min-w-0 flex-1">{field("server", ph, "url", "url")}</div>{detectBtn}</div>
   const cancel = () => useApp.getState().sources.length > 0 && <Pill variant="ghost" onClick={() => useRoute.getState().back()}>{tr("common.cancel")}</Pill>

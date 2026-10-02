@@ -6,12 +6,12 @@ export type Ident = Record<string, string>
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export const identity = (cid: string): Ident => ({
-  "X-Plex-Product": "Leen",
+  "X-Plex-Product": "Leen TV",
   "X-Plex-Client-Identifier": cid,
   "X-Plex-Version": "1.0",
   "X-Plex-Platform": "Web",
   "X-Plex-Device": "Web",
-  "X-Plex-Device-Name": "Leen",
+  "X-Plex-Device-Name": "Leen TV",
 })
 
 /** base + path + query (values URL-encoded); the token goes last, in the query string, so GETs stay CORS-simple. */

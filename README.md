@@ -1,4 +1,4 @@
-# Leen
+# Leen TV
 
 Leen: React 19 + Tailwind v4 + shadcn (Base UI) client for LG webOS 23+ (Chromium 94+), desktop and Android (PWA). Google TV style UI, light and dark themes.
 M3U, Xtream, Plex and Jellyfin sources, live TV + EPG guide, movies, series, favorites, resume, profiles with PIN and category locks.

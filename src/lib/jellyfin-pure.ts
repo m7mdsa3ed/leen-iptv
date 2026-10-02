@@ -20,7 +20,7 @@ export function jfUrl(base: string, path: string, params: Record<string, string 
 
 /** Value of the Authorization header (sign-in needs the client/device fields; the token is optional). */
 export const authHeader = (deviceId: string, token?: string, device = "Web") =>
-  `MediaBrowser Client="Leen IPTV", Device="${device}", DeviceId="${deviceId}", Version="1.0"` + (token ? `, Token="${token}"` : "")
+  `MediaBrowser Client="Leen TV", Device="${device}", DeviceId="${deviceId}", Version="1.0"` + (token ? `, Token="${token}"` : "")
 
 export const toTicks = (sec: number) => Math.round(sec * 1e7)
 export const fromTicks = (t: unknown) => (typeof t === "number" && t > 0 ? Math.round(t / 1e7) : undefined)
