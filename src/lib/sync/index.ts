@@ -5,7 +5,7 @@ import { useApp } from "../store"
 import { useHistory, flushHistory } from "../history"
 import { explain } from "../net"
 import { t } from "../i18n"
-import { api, ApiError, badKey, envConfigured, loadConfig, type Config, type Session } from "./client"
+import { api, ApiError, badKey, envConfigured, loadConfig, parseAuthHash, type Config, type Session } from "./client"
 import { canEncrypt, deriveKey, exportKey, importKey, newSalt, needsHttps, open, parseBlob, seal, WrongPassphrase, type Key } from "./crypto"
 import { applySnapshot, buildSnapshot, flatten, merge, stable, stamp, type AppSlice, type Day, type Snapshot } from "./merge"
 import { useSyncMeta } from "./meta"
@@ -16,8 +16,8 @@ export type { Config, Session }
 const SESS = "leen-sb-session", KEYS = "leen-sb-key"
 const DEBOUNCE = 5000, MIN_AUTO = 60000 // progress ticks every 10s: batch change-triggered syncs to one per minute
 
-const useS = create<{ cfg: Config; session: Session | null; status: SyncStatus; hasPass: boolean }>(() => ({
-  cfg: { url: "", anonKey: "" }, session: null, status: { state: "off", lastSyncAt: 0 }, hasPass: false,
+const useS = create<{ cfg: Config; session: Session | null; status: SyncStatus; hasPass: boolean; recovery: string | null }>(() => ({
+  cfg: { url: "", anonKey: "" }, session: null, recovery: null, status: { state: "off", lastSyncAt: 0 }, hasPass: false,
 }))
 
 let key: Key | null = null
@@ -178,8 +178,23 @@ function auto() {
   void syncNow()
 }
 
+/** Email links (confirm sign-up, magic link, password reset) come back as #access_token=...: finish them and clean the URL. */
+async function handleAuthRedirect() {
+  const h = parseAuthHash(location.hash)
+  if (!h) return
+  history.replaceState(null, "", location.pathname + location.search + "#/") // never leave tokens in the address bar / history
+  const cfg = loadConfig()
+  if (!cfg.url) return
+  try {
+    if (h.type === "recovery") return void useS.setState({ recovery: h.access })
+    const u = await api.user(cfg, h.access)
+    await signedIn({ access: h.access, refresh: h.refresh, exp: h.exp, id: u.id, email: u.email ?? "" })
+  } catch { /* an expired link: the user just signs in normally */ }
+}
+
 export function initSync() {
   useS.setState({ cfg: loadConfig() })
+  void handleAuthRedirect()
   try { const s = JSON.parse(localStorage.getItem(SESS) || "null") as Session | null; if (s?.access) useS.setState({ session: s }) } catch { /* ignore */ }
   try {
     const k = JSON.parse(localStorage.getItem(KEYS) || "null")
@@ -205,13 +220,27 @@ const signedIn = async (s: Session | null) => { if (!s) throw new Error(t("sync.
 const actions = {
   async signInOtpSend(email: string) { await api.otpSend(needCfg(), email.trim()) },
   async signInOtpVerify(email: string, code: string) { await signedIn(await api.otpVerify(needCfg(), email.trim(), code)) },
+  async sendReset(email: string) { await api.recover(needCfg(), email.trim()) },
+  /** after opening the reset link: choose a new password and sign in with it */
+  async setNewPassword(pw: string) {
+    const token = useS.getState().recovery
+    if (!token) throw new Error(t("sync.err.noSession"))
+    const cfg = needCfg()
+    await api.updatePassword(cfg, token, pw)
+    const u = await api.user(cfg, token)
+    useS.setState({ recovery: null })
+    await signedIn(await api.password(cfg, u.email ?? "", pw))
+  },
+  /** a session made elsewhere (phone link): refresh it for a full lifetime on this device, then sign in with it */
+  async adoptSession(s: Session) { await signedIn((await api.refresh(needCfg(), s)) ?? s) },
+  cancelRecovery() { useS.setState({ recovery: null }) },
   async signInPassword(email: string, pw: string) { await signedIn(await api.password(needCfg(), email.trim(), pw)) },
   /** 'confirm' = the project wants the email confirmed first */
-  async signUp(email: string, pw: string): Promise<"signed-in" | "confirm"> {
+  /** The app does not use confirmation emails: sign-up signs you in at once. If the Supabase project still has "Confirm email" on, say how to turn it off. */
+  async signUp(email: string, pw: string) {
     const s = await api.signUp(needCfg(), email.trim(), pw)
-    if (!s) return "confirm"
+    if (!s) throw new Error(t("sync.err.confirmOn"))
     await signedIn(s)
-    return "signed-in"
   },
   async signOut() {
     const { cfg, session } = useS.getState()
@@ -243,9 +272,9 @@ const actions = {
 }
 
 export function useSync() {
-  const { cfg, session, status, hasPass } = useS()
+  const { cfg, session, status, hasPass, recovery } = useS()
   return {
-    configured: cfgOk(cfg), config: cfg, fromEnv: envConfigured, canEncrypt: canEncrypt(),
+    recovering: !!recovery, configured: cfgOk(cfg), config: cfg, fromEnv: envConfigured, canEncrypt: canEncrypt(),
     session: session && { id: session.id, email: session.email }, status, hasPassphrase: hasPass, ...actions,
   }
 }

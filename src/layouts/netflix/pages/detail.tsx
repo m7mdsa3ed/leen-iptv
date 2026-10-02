@@ -1,8 +1,9 @@
-import { Check, ChevronDown, Play, Plus, X } from "lucide-react"
+import { Check, ChevronDown, Clapperboard, Play, Plus, X } from "lucide-react"
 import { Logo } from "@/components/tv/ui"
 import { SkelBar } from "@/components/gtv"
 import { isTv } from "@/lib/device"
 import { fmt, useT } from "@/lib/i18n"
+import { openTrailer } from "@/components/TrailerModal"
 import { useDetail } from "../../hooks/use-detail"
 import type { Item } from "@/lib/types"
 import { Dropdown, Pick, SourceChooser, match } from "../ui"
@@ -37,6 +38,7 @@ export default function Detail({ id }: { id: string }) {
             <div className="flex flex-wrap items-center gap-3">
               <button data-nav data-autofocus="" disabled={!D.canPlay} onClick={D.playMain} className="nf-btn nf-play disabled:opacity-50"><Play className="fill-current" />{D.resumeLabel}</button>
               <button data-nav aria-label={D.fav ? t("nf.ui.removeList") : t("nf.ui.addList")} onClick={D.toggleFav} className="nf-circle">{D.fav ? <Check className="size-6" /> : <Plus className="size-6" />}</button>
+              {D.trailer && <button data-nav onClick={() => openTrailer(D.trailer!)} className="nf-btn nf-info-btn"><Clapperboard />{t("trailer.button")}</button>}
             </div>
           </div>
         </div>

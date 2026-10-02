@@ -1,6 +1,7 @@
 export interface Person { id?: string; name: string; role?: string; photo?: string }
 export interface Rating { source: string; value: string; votes?: string }
 export interface SimilarRef { title: string; year?: string; alt?: string } // alt = original-language title
+export interface Trailer { key: string; name: string; site: "YouTube"; official?: boolean; type: string }
 export interface Ids { tmdb?: string; imdb?: string }
 
 /** Normalized info about a movie/series, whatever provider it came from. */
@@ -17,6 +18,7 @@ export interface Meta {
   directors: string[]
   similar: SimilarRef[]
   ids: Ids
+  trailers?: Trailer[]
 }
 
 export interface Query {

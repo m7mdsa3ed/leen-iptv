@@ -18,7 +18,7 @@ interface R {
 /* URL <-> stack. Each history entry carries a hash (#/live, #/detail/<id>, #/player/<id>) so a refresh lands on the same page.
    Hash routing works from file:// (webOS) and any static host. Entry d=0 is a guard (Back never leaves the app),
    entry d=n shows stack[n-1]. */
-const PAGES = ["profiles", "sources", "home", "live", "guide", "movies", "series", "search", "library", "settings", "detail", "player", "person", "category", "genre", "history", "stats", "welcome"]
+const PAGES = ["profiles", "sources", "home", "live", "guide", "movies", "series", "search", "library", "settings", "detail", "player", "person", "category", "genre", "history", "stats", "diagnostics", "welcome", "link"]
 const hashOf = (r: Route) => {
   const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "detail" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
   return `#/${r.name}${id ? "/" + encodeURIComponent(String(id)) : ""}`
@@ -27,6 +27,8 @@ const baseFor = (id: string): Route["name"] => (id.includes("|live|") ? "live" :
 
 function initialStack(): Route[] {
   const { profileId, sources } = useApp.getState()
+  // opened from a TV's QR code on a phone: the link page needs no profile
+  { const m = location.hash.match(/^#\/link(?:\/([A-Za-z0-9-]+))?$/); if (m) return [{ name: "link", p: { id: m[1] } }] }
   // first launch of a build that has cloud sync: let the user choose between an account and no account
   if (!profileId) return [{ name: envConfigured && useApp.getState().settings.accountChoice === "unset" ? "welcome" : "profiles" }]
   const [, name = "", raw = ""] = location.hash.match(/^#\/([a-z]+)(?:\/(.+))?$/) ?? []

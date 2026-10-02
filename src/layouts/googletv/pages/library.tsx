@@ -25,9 +25,9 @@ export default function Library() {
         <SourceFilter className="mb-2" />
         {status !== "ready" ? <><SkelRail variant="wide" /><SkelRail /></> : (
           <>
-            {continueWatching.length > 0 && <GRail title={t("gtv.library.continue")}>{continueWatching.map((i) => <Card key={i.id} item={i} variant="wide" pct={pct(i)} sub={left(i)} onOpen={() => open(i)} />)}</GRail>}
+            {continueWatching.length > 0 && <GRail title={t("gtv.library.continue")}>{continueWatching.map((i) => <Card key={i.id} item={i} variant={i.kind === "live" ? "wide" : "poster"} pct={pct(i)} sub={left(i)} onOpen={() => open(i)} />)}</GRail>}
             {vodFavs.length > 0 && <GRail title={t("gtv.library.watchlist")}>{vodFavs.map((i) => <Card key={i.id} item={i} onOpen={() => open(i)} />)}</GRail>}
-            {history.length > 0 && <GRail title={t("gtv.library.history")}>{history.map((i) => <Card key={i.id} item={i} variant="wide" onOpen={() => open(i)} />)}</GRail>}
+            {history.length > 0 && <GRail title={t("gtv.library.history")}>{history.map((i) => <Card key={i.id} item={i} variant={i.kind === "live" ? "wide" : "poster"} onOpen={() => open(i)} />)}</GRail>}
             {liveFavs.length > 0 && <GRail title={t("gtv.library.live")}>{liveFavs.map((i) => <Card key={i.id} item={i} variant="wide" onOpen={() => open(i)} />)}</GRail>}
             {empty && <div className="h-40"><Empty>{t("gtv.library.empty")}</Empty></div>}
           </>

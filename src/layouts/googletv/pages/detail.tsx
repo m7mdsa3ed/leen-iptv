@@ -1,9 +1,10 @@
 import { Fragment, useState } from "react"
-import { ArrowLeft, Check, ChevronDown, Play, Plus } from "lucide-react"
+import { ArrowLeft, Check, Clapperboard, ChevronDown, Play, Plus } from "lucide-react"
 import { Logo } from "@/components/tv/ui"
 import { Card, Pill, RoundButton, SkelBar } from "@/components/gtv"
 import { isTv } from "@/lib/device"
 import { fmt, useT } from "@/lib/i18n"
+import { openTrailer } from "@/components/TrailerModal"
 import { useDetail } from "@/layouts/hooks/use-detail"
 import { GRail } from "../parts"
 import { SourceBadge, SourceChooser } from "../source-ui"
@@ -44,6 +45,7 @@ export default function Detail({ id }: { id: string }) {
             <div className="-ms-1 mt-6 flex flex-wrap items-center gap-3 p-1">
               <Pill variant="primary" data-autofocus="" onClick={D.playMain} disabled={!D.canPlay}><Play className="fill-current" />{left ? fmt.plural("gtv.detail.resumeLeft", left) : D.resumeLabel === "Play" ? t("gtv.detail.watch") : t("gtv.detail.resume")}</Pill>
               <RoundButton label={fav ? t("gtv.home.removeWatchlist") : t("gtv.home.addWatchlist")} active={fav} onClick={toggleFav}>{fav ? <Check /> : <Plus />}</RoundButton>
+              {D.trailer && <Pill onClick={() => openTrailer(D.trailer!)}><Clapperboard />{t("trailer.button")}</Pill>}
             </div>
           </div>
         </div>

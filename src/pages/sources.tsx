@@ -5,7 +5,8 @@ import { fmt, t, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { explain } from "@/lib/net"
-import { checkPin, createPin, pickConnection, plexServers, type Pin, type PlexServer } from "@/lib/plex"
+import { QrCode } from "@/components/QrCode"
+import { checkPin, createPin, pickConnection, plexAuthUrl, plexServers, type Pin, type PlexServer } from "@/lib/plex"
 import type { ConnMode } from "@/lib/plex-pure"
 import { jellyfinServerInfo, jellyfinSignIn, normServer, quickConnectCheck, quickConnectEnabled, quickConnectFinish, quickConnectStart, type JfAuth } from "@/lib/jellyfin"
 
@@ -143,11 +144,24 @@ export default function Sources() {
           </div>
         )}
         {type === "Plex" && pin && (
-          <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <div className="text-muted-foreground">{tr("pages.sources.plexEnter")} <b dir="ltr" className="text-foreground">plex.tv/link</b></div>
-            <div dir="ltr" className="text-6xl font-semibold tracking-[0.3em] md:text-7xl">{pin.code}</div>
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            {pin.strong ? (
+              <>
+                <div className="text-muted-foreground">{tr("pages.sources.qrPlex")}</div>
+                <QrCode value={plexAuthUrl(pin.code)} label={tr("pages.sources.qrScan")} className="size-48 md:size-56" />
+              </>
+            ) : (
+              <>
+                <div className="text-muted-foreground">{tr("pages.sources.plexEnter")} <b dir="ltr" className="text-foreground">plex.tv/link</b></div>
+                <div dir="ltr" className="text-6xl font-semibold tracking-[0.3em] md:text-7xl">{pin.code}</div>
+                <QrCode value="https://plex.tv/link" label={tr("pages.sources.qrScan")} className="size-28" />
+              </>
+            )}
             <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy || tr("pages.sources.waitSignIn")}</div>
-            <Pill variant="ghost" onClick={() => { setPin(null); setBusy("") }}>{tr("common.cancel")}</Pill>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Pill onClick={async () => { setErr(""); try { setPin(await createPin(!pin.strong)) } catch (e) { setErr(explain(e)) } }}>{pin.strong ? tr("pages.sources.plexShort") : tr("pages.sources.plexQr")}</Pill>
+              <Pill variant="ghost" onClick={() => { setPin(null); setBusy("") }}>{tr("common.cancel")}</Pill>
+            </div>
           </div>
         )}
         {type === "Plex" && servers && servers.length > 0 && (
@@ -175,6 +189,8 @@ export default function Sources() {
         </>)}
         {type === "Jellyfin" && qc && (
           <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <div className="text-muted-foreground">{tr("pages.sources.qrJf")}</div>
+            <QrCode value={`${qc.server.replace(/\/+$/, "")}/web/#/quickconnect`} label={tr("pages.sources.qrScan")} className="size-40 md:size-48" />
             <div className="text-muted-foreground">{tr("pages.sources.qcPre")} <b dir="ltr" className="text-foreground">Settings &gt; Quick Connect</b> {tr("pages.sources.qcPost")}</div>
             <div dir="ltr" className="text-6xl font-semibold tracking-[0.3em] md:text-7xl">{qc.code}</div>
             <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy || tr("pages.sources.waitApproval")}</div>

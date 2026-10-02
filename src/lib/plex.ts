@@ -34,13 +34,18 @@ export const plexUrl = (base: string, path: string, params: Record<string, strin
   buildUrl(base, path, { ...identity(clientId()), ...params }, token)
 
 /* ---------- sign in ---------- */
-export type Pin = { id: number; code: string; expiresIn: number }
+export type Pin = { id: number; code: string; expiresIn: number; strong: boolean }
 
-export async function createPin(): Promise<Pin> {
-  const r = await plexFetch(plexUrl("https://plex.tv", "/api/v2/pins", { strong: "false" }), proxy(), { method: "POST", headers: JSON_H }, 15000)
+/** strong=true: a long code for the QR / app.plex.tv/auth flow (no typing); strong=false: the short code typed at plex.tv/link. */
+export async function createPin(strong = true): Promise<Pin> {
+  const r = await plexFetch(plexUrl("https://plex.tv", "/api/v2/pins", { strong: String(strong) }), proxy(), { method: "POST", headers: JSON_H }, 15000)
   const j = await r.json()
-  return { id: j.id, code: j.code, expiresIn: j.expiresIn ?? 900 }
+  return { id: j.id, code: j.code, expiresIn: j.expiresIn ?? 900, strong }
 }
+
+/** Page that approves a strong pin: open it (or scan its QR) on any device, sign in to Plex and approve Leen. */
+export const plexAuthUrl = (code: string) =>
+  `https://app.plex.tv/auth#?clientID=${encodeURIComponent(clientId())}&code=${encodeURIComponent(code)}&context%5Bdevice%5D%5Bproduct%5D=${encodeURIComponent("Leen")}`
 
 /** The account token once the user entered the code at plex.tv/link, else null. An expired pin throws. */
 export async function checkPin(id: number): Promise<string | null> {

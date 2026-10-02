@@ -55,7 +55,7 @@ export default function Home() {
           <div className="atv-after-hero">
             {s.upNext.length > 0 && (
               <Shelf title={t("atv.home.upNext")}>
-                {s.upNext.map((i) => <Tile key={i.id} item={i} pct={s.cont?.pct?.(i)} sub={left(i)} onOpen={() => h.open(i)} />)}
+                {s.upNext.map((i) => <Tile key={i.id} item={i} {...(i.kind === "live" ? {} : { shape: "poster" as const, size: "poster" as const })} pct={s.cont?.pct?.(i)} sub={left(i)} onOpen={() => h.open(i)} />)}
               </Shelf>
             )}
             {s.what.length > 0 && (

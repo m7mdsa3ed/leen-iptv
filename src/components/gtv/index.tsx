@@ -170,20 +170,18 @@ export function Hero({ item, onPlay, onInfo, onFav, isFav, kicker, children }: {
   )
 }
 
-/** Leen mark (same artwork as public/logo.svg): a gradient play triangle with a solid core, on a midnight tile. */
+/** Leen mark (same artwork as public/logo.svg): a soft sky-blue play button on a dark navy tile. */
 export function LeenMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 100 100" role="img" aria-label="Leen" className={cn("shrink-0", className)}>
       <defs>
-        <linearGradient id="leen-g" gradientUnits="userSpaceOnUse" x1="30" y1="24" x2="80" y2="76">
-          <stop offset="0" stopColor="#22d3ee" />
-          <stop offset=".55" stopColor="#a855f7" />
-          <stop offset="1" stopColor="#f472b6" />
+        <linearGradient id="leen-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#bae6fd" />
+          <stop offset="1" stopColor="#2f80ed" />
         </linearGradient>
       </defs>
-      <rect width="100" height="100" rx="26" fill="#0e1020" />
-      <path d="M36 28V72L76 50Z" fill="none" stroke="url(#leen-g)" strokeWidth="9" strokeLinejoin="round" />
-      <path d="M46 41V59L61 50Z" fill="#fff" stroke="#fff" strokeWidth="4" strokeLinejoin="round" />
+      <rect width="100" height="100" rx="26" fill="#101722" />
+      <path d="M38 33V67L67 50Z" fill="url(#leen-g)" stroke="url(#leen-g)" strokeWidth="14" strokeLinejoin="round" />
     </svg>
   )
 }

@@ -54,7 +54,7 @@ export default function Home() {
   const others = rest.filter((r) => r.key !== "favs")
   const railOf = (r: (typeof h.rails)[number]) => (
     <Row key={r.key} title={r.key === "favs" ? t("nf.myList") : r.title} onSeeAll={r.seeAll}>
-      {r.items.map((i) => <Tile key={i.id} item={i} variant={r.kind} pct={r.pct?.(i)} sub={r.sub?.(i)} onOpen={() => h.open(i, r.items)} onPlay={() => play(i, r.items)} />)}
+      {r.items.map((i) => <Tile key={i.id} item={i} variant={r.card ?? r.kind} pct={r.pct?.(i)} sub={r.sub?.(i)} onOpen={() => h.open(i, r.items)} onPlay={() => play(i, r.items)} />)}
     </Row>
   )
   const topRow = top.length >= 5 && <TopRow key="top10" title={t("nf.home.top10")} items={top} onOpen={(i) => h.open(i)} onPlay={(i) => play(i)} />

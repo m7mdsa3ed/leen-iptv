@@ -33,7 +33,9 @@ export class ApiError extends Error {
 }
 
 async function req(cfg: Config, path: string, o: { method?: string; body?: unknown; token?: string; headers?: Record<string, string> } = {}): Promise<unknown> {
-  const headers: Record<string, string> = { apikey: cfg.anonKey, Authorization: `Bearer ${o.token ?? cfg.anonKey}`, ...o.headers }
+  // New-style keys (sb_publishable_...) are not JWTs: they go in the apikey header only. A user's access token (a JWT) always goes in Authorization;
+  // the classic anon key (a JWT) is also sent there for signed-out calls, like the official client does.
+  const headers: Record<string, string> = { apikey: cfg.anonKey, ...(o.token || !cfg.anonKey.startsWith("sb_") ? { Authorization: `Bearer ${o.token ?? cfg.anonKey}` } : {}), ...o.headers }
   if (o.body !== undefined) headers["Content-Type"] = "application/json"
   const c = new AbortController()
   const timer = setTimeout(() => c.abort(), 30000)
@@ -70,6 +72,17 @@ const toSession = (r: AuthRes | null, email: string): Session | null =>
     ? { access: r.access_token, refresh: r.refresh_token, exp: r.expires_at ?? Math.floor(Date.now() / 1000) + (r.expires_in ?? 3600), id: r.user.id, email: r.user.email || email }
     : null
 
+/** where email links come back to: this app (hash router ignores the token fragment and we clear it right away) */
+export const redirectTo = () => location.origin + location.pathname
+
+/** #access_token=...&refresh_token=...&type=signup|recovery|magiclink (from an email link) -> parsed, or null */
+export function parseAuthHash(hash: string): { type: string; access: string; refresh: string; exp: number } | null {
+  const q = new URLSearchParams(hash.replace(/^#\/?/, ""))
+  const access = q.get("access_token"), refresh = q.get("refresh_token")
+  if (!access || !refresh) return null
+  return { type: q.get("type") ?? "magiclink", access, refresh, exp: Number(q.get("expires_at")) || Math.floor(Date.now() / 1000) + Number(q.get("expires_in") || 3600) }
+}
+
 export const api = {
   otpSend: (c: Config, email: string) => req(c, "/auth/v1/otp", { body: { email, create_user: true } }),
   otpVerify: async (c: Config, email: string, token: string) =>
@@ -78,7 +91,13 @@ export const api = {
     toSession((await req(c, "/auth/v1/token?grant_type=password", { body: { email, password } })) as AuthRes, email),
   /** null when the project needs email confirmation first */
   signUp: async (c: Config, email: string, password: string) => toSession((await req(c, "/auth/v1/signup", { body: { email, password } })) as AuthRes, email),
+  /** password reset email (the link opens this app with #access_token=...&type=recovery) */
+  recover: (c: Config, email: string) => req(c, `/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo())}`, { body: { email } }),
+  updatePassword: (c: Config, accessToken: string, password: string) => req(c, "/auth/v1/user", { method: "PUT", token: accessToken, body: { password } }),
+  user: async (c: Config, accessToken: string) => (await req(c, "/auth/v1/user", { token: accessToken })) as { id: string; email?: string },
   refresh: async (c: Config, s: Session) => toSession((await req(c, "/auth/v1/token?grant_type=refresh_token", { body: { refresh_token: s.refresh } })) as AuthRes, s.email),
+  /** call a Postgres function (see supabase/schema.sql); token = a signed-in user's access token for authenticated-only functions */
+  rpc: (c: Config, name: string, body: unknown, token?: string) => req(c, `/rest/v1/rpc/${name}`, { body, token }),
   logout: (c: Config, s: Session) => req(c, "/auth/v1/logout", { method: "POST", body: {}, token: s.access }),
 
   async pull(c: Config, s: Session): Promise<{ data: string; updated_at: string } | null> {

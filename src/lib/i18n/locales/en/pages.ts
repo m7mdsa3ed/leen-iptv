@@ -170,5 +170,10 @@ const d: Dict = {
   "pages.sources.saveLoad": "Save and load",
   "pages.sources.signIn": "Sign in",
   "pages.sources.quickConnect": "Use Quick Connect",
+  "pages.sources.qrScan": "QR code to scan with your phone",
+  "pages.sources.qrPlex": "Scan with your phone, sign in to Plex and approve Leen.",
+  "pages.sources.plexShort": "Use a short code instead",
+  "pages.sources.plexQr": "Use the QR code instead",
+  "pages.sources.qrJf": "Scan to open Quick Connect on your phone (sign in to your Jellyfin there), then enter the code below.",
 }
 export default d

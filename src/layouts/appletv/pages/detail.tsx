@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react"
-import { Play } from "lucide-react"
+import { Clapperboard, Play } from "lucide-react"
+import { openTrailer } from "@/components/TrailerModal"
 import { SkelBar } from "@/components/gtv"
 import { isTv } from "@/lib/device"
 import { fmt, useT } from "@/lib/i18n"
@@ -30,6 +31,7 @@ export default function Detail({ id }: { id: string }) {
           <div className="-m-1 mt-1 flex flex-wrap items-center gap-3 p-1">
             <Capsule primary data-autofocus="" onClick={D.playMain} disabled={!D.canPlay}><Play className="fill-current" />{D.resumeLabel}</Capsule>
             <UpNextButton on={D.fav} onClick={D.toggleFav} />
+            {D.trailer && <Capsule onClick={() => openTrailer(D.trailer!)}><Clapperboard />{t("trailer.button")}</Capsule>}
           </div>
           <SourceChooser options={D.alternatives} selectedId={D.selected?.id} onPick={D.selectSource} />
           {plot ? <p dir="auto" className="line-clamp-4 max-w-2xl text-lg text-[var(--fg-80)]">{plot}</p> : loading ? (

@@ -40,7 +40,7 @@ export default function Profiles() {
   const sq = "nf-sq size-24 text-4xl md:size-32 md:text-5xl"
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-background pb-[env(safe-area-inset-bottom)]">
-      <div className="px-[var(--gx)] pt-[max(1.25rem,env(safe-area-inset-top))]"><span aria-hidden className="nf-logo">LEEN</span></div>
+      <div className="px-[var(--gx)] pt-[max(1.25rem,env(safe-area-inset-top))]"><span aria-hidden className="nf-logo">Leen</span></div>
       <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4 py-8 md:gap-10">
         <h1 className="text-center text-3xl font-medium md:text-5xl">{manage ? t("nf.profiles.manage") : t("nf.profiles.who")}</h1>
         <div data-nav-group data-nav-wrap className="flex flex-wrap justify-center gap-4 md:gap-8">

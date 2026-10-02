@@ -6,6 +6,7 @@ import { useCatalog } from "@/lib/catalog"
 import { useMode } from "@/lib/device"
 import { fmt, t, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
+import { useRoute } from "@/lib/nav"
 import { useSources } from "@/lib/sources"
 
 const mb = (n: number) => t("settings.about.mb", { n: fmt.number(Math.round(n / 104857.6) / 10) })
@@ -20,6 +21,7 @@ export default function AboutSection() {
   const layout = useApp((s) => s.settings.layout)
   const sources = useSources()
   const stat = useCatalog((s) => s.sources)
+  const go = useRoute((s) => s.go)
   const [store, setStore] = useState("")
   useEffect(() => {
     void navigator.storage?.estimate?.().then((e) => e.usage != null && setStore(e.quota ? t("settings.about.storageOf", { used: mb(e.usage), total: mb(e.quota) }) : mb(e.usage))).catch(() => {})
@@ -27,7 +29,7 @@ export default function AboutSection() {
   return (
     <div className="flex flex-col gap-4">
       <SectionCard>
-        <div className="flex items-center gap-4"><LeenMark className="size-14" /><div><div className="text-xl font-medium">Leen IPTV</div><div className="text-sm text-muted-foreground">{t("settings.about.version", { v: pkg.version })}</div></div></div>
+        <div className="flex items-center gap-4"><LeenMark className="size-16" /><div><div className="text-4xl"><span className="wordmark">Leen</span> <span className="text-base text-muted-foreground">IPTV</span></div><div className="text-sm text-muted-foreground">{t("settings.about.version", { v: pkg.version })}</div></div></div>
       </SectionCard>
       <SectionCard title={t("settings.about.device")}>
         <Row label={t("settings.about.screenMode")}>{t(`settings.mode.${mode}`)}</Row>
@@ -46,6 +48,7 @@ export default function AboutSection() {
         })}
         {!sources.length && <div className="text-sm text-muted-foreground">{t("settings.about.noSources")}</div>}
       </SectionCard>
+      <SectionCard><Row label={t("diag.title")} description={t("diag.entry.desc")}><Pill onClick={() => go("diagnostics")}>{t("diag.entry")}</Pill></Row></SectionCard>
       <SectionCard><Row label={t("settings.about.reloadRow")}><Pill onClick={() => location.reload()}>{t("settings.about.reload")}</Pill></Row></SectionCard>
     </div>
   )

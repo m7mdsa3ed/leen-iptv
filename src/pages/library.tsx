@@ -17,9 +17,9 @@ export default function Library() {
         <SourceFilter className="pt-2" />
         {status !== "ready" ? <><SkelRail variant="wide" /><SkelRail /></> : (
           <>
-            {continueWatching.length > 0 && <Rail title={t("pages.library.continue")}>{continueWatching.map((i) => <Card key={i.id} item={i} variant="wide" pct={pct(i)} onOpen={() => open(i)} />)}</Rail>}
+            {continueWatching.length > 0 && <Rail title={t("pages.library.continue")}>{continueWatching.map((i) => <Card key={i.id} item={i} variant={i.kind === "live" ? "wide" : "poster"} pct={pct(i)} onOpen={() => open(i)} />)}</Rail>}
             {favorites.length > 0 && <Rail title={t("pages.library.watchlist")}>{favorites.map((i) => <Card key={i.id} item={i} onOpen={() => open(i)} />)}</Rail>}
-            {history.length > 0 && <Rail title={t("pages.library.history")}>{history.map((i) => <Card key={i.id} item={i} variant="wide" onOpen={() => open(i)} />)}</Rail>}
+            {history.length > 0 && <Rail title={t("pages.library.history")}>{history.map((i) => <Card key={i.id} item={i} variant={i.kind === "live" ? "wide" : "poster"} onOpen={() => open(i)} />)}</Rail>}
             {empty && <div className="h-48"><Empty>{t("pages.library.empty")}</Empty></div>}
           </>
         )}

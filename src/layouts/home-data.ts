@@ -16,6 +16,8 @@ export type HomeRail = {
   key: string
   title: string
   kind: "wide" | "poster"
+  /** card shape to draw (defaults to kind): personal rails with movies/shows use posters like every other VOD rail, channels stay wide */
+  card?: "wide" | "poster"
   items: Item[]
   /** progress percent for an item (Continue watching only) */
   pct?: (i: Item) => number | undefined
@@ -69,9 +71,10 @@ export function useHomeData() {
     const livePct = (i: Item) => { const n = nowNext(epg, i.epgId).now; return n ? progressPct(n.s, n.e) : undefined }
     const seeAll = (k: Kind, g: string) => () => go("category", { id: `${k}|${g}` })
     const rails: HomeRail[] = []
-    if (cont.length) rails.push({ key: "cont", title: t("common.continueWatching"), kind: "wide", items: cont, pct })
-    if (favs.length) rails.push({ key: "favs", title: t("common.favorites"), kind: "wide", items: favs })
-    if (recents.length) rails.push({ key: "recents", title: t("common.recents"), kind: "wide", items: recents })
+    const card = (l: Item[]) => (l.some((i) => i.kind !== "live") ? "poster" : "wide") as "wide" | "poster"
+    if (cont.length) rails.push({ key: "cont", title: t("common.continueWatching"), kind: "wide", card: card(cont), items: cont, pct })
+    if (favs.length) rails.push({ key: "favs", title: t("common.favorites"), kind: "wide", card: card(favs), items: favs })
+    if (recents.length) rails.push({ key: "recents", title: t("common.recents"), kind: "wide", card: card(recents), items: recents })
     if (live.length) rails.push({ key: "live", title: t("common.liveNow"), kind: "wide", items: live, sub, pct: livePct })
     for (const r of [...genre("movie"), ...genre("series")]) {
       const title = t(r.k === "movie" ? "common.moviesIn" : "common.showsIn", { g: r.g })

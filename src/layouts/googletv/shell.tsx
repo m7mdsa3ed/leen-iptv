@@ -53,13 +53,12 @@ export default function Shell({ page, title, children }: ShellProps) {
           </>
         )}
       </header>
-      <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6")}>{children}</main>
+      <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6", mobile && "pb-[var(--float-nav-h)]")}>{children}</main>
       {mobile && (
-        <nav data-nav-wrap aria-label={t("gtv.shell.main")} className="flex shrink-0 bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <nav data-nav-wrap aria-label={t("gtv.shell.main")} className="float-nav">
           {tabs.map(({ key: k, label, route, icon: Icon }) => (
-            <button key={k} data-nav data-pill data-nav-home={k === page ? "" : undefined} aria-current={k === page ? "page" : undefined} onClick={() => go(route)} className={cn("flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[11px] [@media(max-height:500px)]:h-12", k === page ? "text-foreground" : "text-muted-foreground")}>
-              <span className={cn("grid h-8 w-16 place-items-center rounded-full", k === page && "bg-accent-blue-container")}><Icon className="size-5" /></span>
-              {label}
+            <button key={k} data-nav data-nav-home={k === page ? "" : undefined} aria-current={k === page ? "page" : undefined} onClick={() => go(route)} className="float-tab">
+              <Icon className="size-5" />{label}
             </button>
           ))}
         </nav>

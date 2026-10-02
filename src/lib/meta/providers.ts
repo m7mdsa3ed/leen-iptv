@@ -1,5 +1,6 @@
 import { fetchT } from "@/lib/net"
 import { norm } from "./title"
+import { pickTrailers } from "./trailers"
 import type { Credit, Person, PersonInfo, PersonRef, Provider, ProviderCfg, Rating, SimilarRef } from "./types"
 
 const list = (v: unknown) => String(v ?? "").split(/\s*,\s*/).map((x) => x.trim()).filter((x) => x && x !== "N/A")
@@ -90,7 +91,7 @@ const tmdb: Provider = {
       id = hit ? String(hit.id) : undefined
     }
     if (!id) return null
-    const d = await get(`/${tv ? "tv" : "movie"}/${id}`, { append_to_response: "credits,similar,external_ids" })
+    const d = await get(`/${tv ? "tv" : "movie"}/${id}`, { append_to_response: "credits,similar,external_ids,videos", include_video_language: `${(cfg.lang || "en").slice(0, 2)},en,null` })
     const date = String(d.release_date ?? d.first_air_date ?? "")
     const cast: Person[] = (d.credits?.cast ?? []).slice(0, 14).map((c: J) => ({ id: String(c.id), name: c.name, role: c.character || undefined, photo: c.profile_path ? `${IMG}/w185${c.profile_path}` : undefined }))
     const directors: string[] = tv
@@ -108,6 +109,7 @@ const tmdb: Provider = {
       backdrop: d.backdrop_path ? `${IMG}/w1280${d.backdrop_path}` : undefined,
       cast,
       directors,
+      trailers: pickTrailers(d.videos?.results),
       similar: (d.similar?.results ?? []).slice(0, 20).map(ref),
       ids: { tmdb: id, imdb: str(d.external_ids?.imdb_id ?? d.imdb_id) },
     }

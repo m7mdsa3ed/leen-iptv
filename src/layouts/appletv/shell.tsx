@@ -22,7 +22,7 @@ export default function Shell({ page, title, children }: ShellProps) {
         {mobile ? (
           <div className="pointer-events-auto flex w-full items-center gap-1">
             <LeenMark className="size-7" />
-            <span className="atv-wordmark ms-1 min-w-0 flex-1 truncate">Leen</span>
+            <span className="atv-wordmark wordmark ms-1 min-w-0 flex-1 truncate">Leen</span>
             <h1 className="sr-only">{title}</h1>
             {searchBtn("atv-glass size-11")}
             <span className="w-1" />
@@ -44,11 +44,11 @@ export default function Shell({ page, title, children }: ShellProps) {
           </div>
         )}
       </header>
-      <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6")}>{children}</main>
+      <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6", mobile && "pb-[var(--float-nav-h)]")}>{children}</main>
       {mobile && (
-        <nav className="atv-glass atv-bar mx-2 mb-[max(0.5rem,env(safe-area-inset-bottom))] flex shrink-0 rounded-3xl">
+        <nav data-nav-wrap className="float-nav">
           {tabs.map(({ key: k, label, route, icon: Icon }) => (
-            <button key={k} data-nav data-nav-home={k === page ? "" : undefined} aria-current={k === page ? "page" : undefined} onClick={() => go(route)} className="atv-tab flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-3xl text-[11px] [@media(max-height:500px)]:h-11">
+            <button key={k} data-nav data-nav-home={k === page ? "" : undefined} aria-current={k === page ? "page" : undefined} onClick={() => go(route)} className="float-tab">
               <Icon className="size-5" />{label}
             </button>
           ))}

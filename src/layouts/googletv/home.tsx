@@ -78,7 +78,7 @@ export default function Home() {
           {h.rails.map((r) => (
             <GRail key={r.key} title={TITLES[r.key] ? t(TITLES[r.key]) : r.title} onSeeAll={r.seeAll}>
               {r.items.map((i) => (
-                <Card key={i.id} item={i} variant={r.kind} pct={r.pct?.(i)} sub={r.key === "cont" ? left(i) : r.sub?.(i)} onOpen={() => h.open(i, r.items)} />
+                <Card key={i.id} item={i} variant={r.card ?? r.kind} pct={r.pct?.(i)} sub={r.key === "cont" ? left(i) : r.sub?.(i)} onOpen={() => h.open(i, r.items)} />
               ))}
             </GRail>
           ))}

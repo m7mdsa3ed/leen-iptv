@@ -1,9 +1,10 @@
-import { ArrowLeft, Play, Star } from "lucide-react"
+import { ArrowLeft, Clapperboard, Play, Star } from "lucide-react"
 import { Chips, Logo } from "@/components/tv/ui"
 import { Card, Pill, Rail, RoundButton, SkelBar } from "@/components/gtv"
 import { SourceChooser } from "@/components/source/SourceChooser"
 import { isTv } from "@/lib/device"
 import { useT } from "@/lib/i18n"
+import { openTrailer } from "@/components/TrailerModal"
 import { useDetail } from "@/layouts/hooks/use-detail"
 
 export default function Detail({ id }: { id: string }) {
@@ -48,6 +49,7 @@ export default function Detail({ id }: { id: string }) {
               <RoundButton label={fav ? t("pages.detail.removeFav") : t("pages.detail.addFav")} active={fav} onClick={toggleFav}>
                 <Star className={fav ? "fill-yellow-400 text-yellow-400" : ""} />
               </RoundButton>
+              {D.trailer && <Pill onClick={() => openTrailer(D.trailer!)}><Clapperboard />{t("trailer.button")}</Pill>}
             </div>
           </div>
         </div>

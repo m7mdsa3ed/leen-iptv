@@ -29,6 +29,7 @@ export type DetailRating = { source: string; value: string; votes?: string }
  *  episodes, seasons (numbers), season (selected, null = none), setSeason, shown (episodes of the season),
  *  progress(x) -> {pos,dur,t}|undefined, pct(x) -> 0..100, watched(x), epLabel(e) -> "E3  ·  45m  ·  Watched",
  *  resumeIdx, resumeLabel (localised "Resume"|"Play"), resuming (true = Resume; compare this, not the label), ratingName(source) (localises the generic "Rating" source name), canPlay, play(queue|null, index) -> opens the player, playMain() (resume/play button),
+ *  trailer ({key,name}|undefined, TMDB/YouTube), trailerLoading,
  *  fav, toggleFav(), similar: Item[], open(item) (PIN-aware, live -> player), openCategory(), openGenre(g), openPerson(castMember), back()
  * }
  */
@@ -111,6 +112,7 @@ export function useDetail(id: string) {
     resumeIdx, resumeLabel: t(hasProgress ? "hooks.detail.resume" : "hooks.detail.play"), resuming: hasProgress, ratingName: (s: string) => (s === "Rating" ? t("hooks.detail.rating") : s), canPlay: !isSeries || episodes.length > 0, play,
     playMain: () => (isSeries ? episodes.length && play(episodes, resumeIdx) : play(null, 0)),
     fav: !!item && d.favs.includes(item.id), toggleFav: () => item && toggleFavStore(item.id),
+    trailer: meta?.trailers?.[0] ? { key: meta.trailers[0].key, name: meta.trailers[0].name } : undefined, trailerLoading: loading,
     similar, open: (i: Item) => open(i),
     openCategory: () => item && go("category", { id: `${item.kind}|${item.group}` }),
     openGenre: (g: string) => item && go("genre", { id: `${item.kind}|${g}` }),

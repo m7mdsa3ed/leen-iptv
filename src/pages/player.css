@@ -1,0 +1,88 @@
+/* Player (src/pages/player.tsx + src/player/**).
+   Compositor-friendly: only transform/opacity animate; visibility flips instantly (delayed on hide). Chrome 94 safe (no color-mix, :has, container queries).
+   The per-layout skin is a handful of custom properties on .pl-root, set from html[data-layout=...]. */
+
+.pl-root {
+  --pl-btn: rgba(255, 255, 255, .12);     /* round / tool buttons */
+  --pl-btn-edge: transparent;
+  --pl-prim: #fff;                        /* primary (play) button */
+  --pl-prim-fg: #1f1f1f;
+  --pl-prim-r: 999px;
+  --pl-fill: #fff;                        /* progress fill + thumb */
+  --pl-bar: 4px;
+  --pl-thumb: 14px;
+}
+/* Google TV: white pill primary, soft surface buttons */
+html[data-layout=googletv] .pl-root { --pl-btn: rgba(255, 255, 255, .12); }
+/* Apple TV: translucent capsules (plain rgba, no blur), thin bar */
+html[data-layout=appletv] .pl-root { --pl-btn: rgba(255, 255, 255, .2); --pl-btn-edge: rgba(255, 255, 255, .14); --pl-prim: rgba(255, 255, 255, .92); --pl-bar: 3px; --pl-thumb: 8px; }
+/* Netflix: red accent, rectangular-ish primary, thick bar */
+html[data-layout=netflix] .pl-root { --pl-btn: rgba(255, 255, 255, .14); --pl-prim: var(--accent-blue); --pl-prim-fg: #fff; --pl-prim-r: 12px; --pl-fill: var(--accent-blue); --pl-bar: 7px; --pl-thumb: 18px; }
+
+/* ---- overlay layers: fade + 10px slide, same timing everywhere ---- */
+.pl-layer {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur);
+}
+.pl-layer[data-on] { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.pl-top { transform: translate3d(0, -10px, 0); background: linear-gradient(to bottom, rgba(0, 0, 0, .85), rgba(0, 0, 0, 0)); }
+.pl-bottom { transform: translate3d(0, 10px, 0); background: linear-gradient(to top, rgba(0, 0, 0, .88), rgba(0, 0, 0, 0)); }
+
+/* ---- buttons ---- */
+.pl-root .pl-btn { background: var(--pl-btn); color: #fff; box-shadow: inset 0 0 0 1px var(--pl-btn-edge); }
+.pl-root .pl-primary { background: var(--pl-prim); color: var(--pl-prim-fg); border-radius: var(--pl-prim-r); }
+.pl-root .pl-more-btn { background: transparent; }
+.pl-root .pl-badge { background: var(--pl-btn); }
+/* TV focus = white pill (shared rule in index.css); keep the primary's ring readable on every skin */
+html[data-mode=tv] .pl-root .pl-primary:focus { box-shadow: 0 0 0 3px var(--accent-blue), 0 0 0 6px var(--focus-bg); }
+
+/* ---- seek bar ---- */
+.pl-track { height: var(--pl-bar); background: rgba(255, 255, 255, .25); }
+.pl-fill { background: var(--pl-fill); }
+.pl-thumb {
+  width: var(--pl-thumb); height: var(--pl-thumb);
+  margin-top: calc(var(--pl-thumb) / -2); margin-left: calc(var(--pl-thumb) / -2);
+  background: var(--pl-fill); box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+  transition: transform var(--dur-fast) var(--ease);
+}
+html .pl-root .pl-seek:focus, html[data-mode=tv] .pl-root .pl-seek:focus { transform: none; box-shadow: none; outline: none; }
+.pl-seek:focus .pl-thumb { transform: scale(1.5); }
+.pl-seek:focus .pl-track { background: rgba(255, 255, 255, .4); }
+
+/* ---- transient indicator ---- */
+@keyframes pl-flash-k { 0% { opacity: 0; transform: scale(.8); } 18% { opacity: 1; transform: scale(1); } 75% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.06); } }
+.pl-flash { animation: pl-flash-k 700ms var(--ease) both; }
+
+/* ---- next episode countdown ---- */
+.pl-count { transition: transform 1s linear; }
+
+/* ---- More sheet: slides up (transform), dims the video with opacity ---- */
+@keyframes pl-sheet-in { from { transform: translate3d(0, 100%, 0); } }
+@keyframes pl-sheet-out { to { transform: translate3d(0, 100%, 0); } }
+@keyframes pl-fade-in { from { opacity: 0; } }
+@keyframes pl-fade-out { to { opacity: 0; } }
+.pl-more-in { animation: pl-sheet-in var(--dur-slow) var(--ease) backwards; }
+.pl-more-out { animation: pl-sheet-out var(--dur) var(--ease) forwards; }
+.pl-dim-in { animation: pl-fade-in var(--dur-slow) var(--ease) backwards; }
+.pl-dim-out { animation: pl-fade-out var(--dur) var(--ease) forwards; }
+html[data-motion=reduced] .pl-more-in { animation-name: pl-fade-in; animation-duration: var(--dur); }
+html[data-motion=reduced] .pl-more-out { animation-name: pl-fade-out; }
+html[data-motion=off] .pl-more-out, html[data-motion=off] .pl-dim-out { display: none; }
+
+/* current episode / channel */
+.pl-cur [data-tile] { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
+
+/* ---- live: full-screen guide + bottom channel strip (plain rgba, no blur) ---- */
+.pl-guide { background: rgba(0, 0, 0, .82); }
+.pl-strip { background: linear-gradient(to top, rgba(0, 0, 0, .92) 60%, rgba(0, 0, 0, 0)); }
+@keyframes pl-strip-k { from { opacity: 0; transform: translate3d(0, 24px, 0); } }
+.pl-strip-in { animation: pl-strip-k var(--dur) var(--ease) backwards; }
+html[data-motion=reduced] .pl-strip-in { animation-name: pl-fade-in; }
+.pl-tile.pl-cur { box-shadow: inset 0 0 0 2px var(--accent-blue); }
+html[data-mode=tv] .pl-tile.pl-cur:focus { box-shadow: none; }
+
+/* More page body: frosted glass over the video. The glass is a ::before so a mask can fade it in at the top without fading the text; blur is skipped on TV (weak GPUs) where it is just more opaque. */
+.pl-more-body { position: relative; isolation: isolate; }
+.pl-more-body::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: rgba(14, 15, 17, .8); -webkit-mask-image: linear-gradient(to bottom, transparent, #000 5rem); mask-image: linear-gradient(to bottom, transparent, #000 5rem); }
+html:not([data-mode=tv]) .pl-more-body::before { background: rgba(14, 15, 17, .5); -webkit-backdrop-filter: blur(28px) saturate(1.4); backdrop-filter: blur(28px) saturate(1.4); }

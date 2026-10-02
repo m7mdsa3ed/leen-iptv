@@ -18,10 +18,10 @@ export default function Library() {
             <button data-nav onClick={L.openStats} className="rounded bg-white/10 px-4 py-2 text-sm font-semibold">{t("nf.library.stats")}</button>
           </div>
           <SourceBar />
-          {L.continueWatching.length > 0 && <Row title={t("nf.library.continue")}>{L.continueWatching.map((i) => tile(i, "wide"))}</Row>}
+          {L.continueWatching.length > 0 && <Row title={t("nf.library.continue")}>{L.continueWatching.map((i) => tile(i, i.kind === "live" ? "wide" : "poster"))}</Row>}
           {L.favorites.length ? <Grid variant={variantOf(L.favorites)}>{L.favorites.map((i) => tile(i, variantOf(L.favorites), true))}</Grid>
             : <div className="h-40"><Empty>{t("nf.library.empty")}</Empty></div>}
-          {L.history.length > 0 && <Row title={t("nf.library.recent")}>{L.history.map((i) => tile(i, "wide"))}</Row>}
+          {L.history.length > 0 && <Row title={t("nf.library.recent")}>{L.history.map((i) => tile(i, i.kind === "live" ? "wide" : "poster"))}</Row>}
         </div>
       )}
     </Shell>

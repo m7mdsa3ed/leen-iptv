@@ -7,6 +7,8 @@ import { useLayoutAttr, useLayoutDef } from "@/layouts"
 import { useMotion } from "@/lib/motion"
 import { useTheme } from "@/lib/theme"
 import { useLanguageAttr, useT } from "@/lib/i18n"
+import { TrailerModal, closeTrailer, useTrailer } from "@/components/TrailerModal"
+import { RecoveryGate } from "@/settings/AccountSync"
 import { ExitConfirm, askExit, closeExit, useExitAsk } from "@/components/tv/exit-confirm"
 import { installNav, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
@@ -16,6 +18,7 @@ import Detail from "@/pages/detail"
 import GenrePage from "@/pages/genre"
 import HistoryPage from "@/pages/history"
 import StatsPage from "@/pages/stats"
+import DiagnosticsPage from "@/pages/diagnostics"
 import Guide from "@/pages/guide"
 import Home from "@/pages/home"
 import Library from "@/pages/library"
@@ -23,6 +26,7 @@ import Live from "@/pages/live"
 import PersonPage from "@/pages/person"
 import Player from "@/pages/player"
 import Profiles from "@/pages/profiles"
+import LinkPage from "@/pages/link"
 import Welcome from "@/pages/welcome"
 import Search from "@/pages/search"
 import Settings from "@/pages/settings"
@@ -41,11 +45,11 @@ function RestorePlayer({ id }: { id: string }) {
 }
 
 // pages rendered inside a layout Shell: their top bar stays put and only [data-page-content] (the Shell's <main>) animates
-const SHELL_PAGES = new Set(["home", "live", "guide", "movies", "series", "search", "library", "settings", "category", "genre", "history", "stats"])
+const SHELL_PAGES = new Set(["home", "live", "guide", "movies", "series", "search", "library", "settings", "category", "genre", "history", "stats", "diagnostics"])
 
 /** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
 const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-  profiles: Profiles, welcome: Welcome, live: Live, guide: Guide, movies: Browse, series: Browse, search: Search, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, person: PersonPage, detail: Detail, history: HistoryPage, stats: StatsPage,
+  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, guide: Guide, movies: Browse, series: Browse, search: Search, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, person: PersonPage, detail: Detail, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage,
 }
 
 function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
@@ -81,6 +85,7 @@ export default function App() {
     installNav(() => {
       const ask = usePinAsk.getState().ask
       if (ask) return ask.resolve(false), usePinAsk.setState({ ask: null })
+      if (useTrailer.getState().cur) return closeTrailer()
       if (useExitAsk.getState().open) return closeExit()
       if (!useRoute.getState().back() && isTv) askExit()
     }), [])
@@ -121,6 +126,8 @@ export default function App() {
       ))}
       <PinModal />
       <ExitConfirm />
+      <RecoveryGate />
+      <TrailerModal />
     </>
   )
 }

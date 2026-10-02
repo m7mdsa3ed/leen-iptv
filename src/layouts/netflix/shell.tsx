@@ -50,7 +50,7 @@ export default function Shell({ page, title, children }: ShellProps) {
         <div aria-hidden className="nf-bg hdr-fade" data-on={solid ? undefined : ""} />
         <div aria-hidden className="nf-bg bg-background" data-on={solid ? "" : undefined} />
         <h1 className="sr-only">{title}</h1>
-        <span aria-hidden className="nf-logo relative">LEEN</span>
+        <span aria-hidden className="nf-logo relative">Leen</span>
         {!mobile && (
           <nav className="relative flex min-w-0 items-center gap-2">
             {tabs.map(({ key: k, label, route }) => (
@@ -60,13 +60,12 @@ export default function Shell({ page, title, children }: ShellProps) {
         )}
         <div className="relative ms-auto flex items-center gap-1">{search}{avatar}</div>
       </header>
-      <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden" : "overflow-y-auto")}>{children}</main>
+      <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden" : "overflow-y-auto", mobile && "pb-[var(--float-nav-h)]")}>{children}</main>
       {mobile && (
-        <nav data-nav-wrap className="flex shrink-0 border-t border-[var(--fg-10)] bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <nav data-nav-wrap className="float-nav">
           {tabs.map(({ key: k, label, route, icon: Icon }) => (
-            <button key={k} data-nav data-nav-home={k === page ? "" : undefined} onClick={() => go(route)} className={cn("flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] [@media(max-height:500px)]:h-12", k === page ? "font-bold text-foreground" : "text-muted-foreground")}>
-              <Icon className="size-6" />
-              {label}
+            <button key={k} data-nav data-nav-home={k === page ? "" : undefined} aria-current={k === page ? "page" : undefined} onClick={() => go(route)} className="float-tab">
+              <Icon className="size-5" />{label}
             </button>
           ))}
         </nav>

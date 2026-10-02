@@ -72,6 +72,7 @@
   --border: rgba(0, 0, 0, 0.12);
   --input: rgba(0, 0, 0, 0.18);
   --ring: #1a73e8;
+  --float-bg: rgba(255, 255, 255, 0.72);
   --surface: #ffffff;
   --surface-2: #eceef2;
   --surface-3: #e1e4ea;
@@ -97,6 +98,7 @@
 }
 
 .dark {
+  --float-bg: rgba(44, 45, 50, 0.62);
   --surface: #1b1c1f;
   --surface-2: #25262a;
   --surface-3: #2f3135;
@@ -295,3 +297,13 @@ html[data-motion=off] *, html[data-motion=off] *::before, html[data-motion=off] 
 html[lang^=ar] { --font-sans: "Noto Sans Arabic", "Segoe UI", Tahoma, "Arial", sans-serif; } /* system fonts only; font-size / --tv-scale rules above are untouched */
 html[dir=rtl] .rtl-flip { transform: scaleX(-1); } /* directional icons (chevrons, back arrows); do not combine with another transform on the same element */
 [data-ltr] { direction: ltr; unicode-bidi: isolate; } /* media transport, seek bars, timelines, EPG grid stay left-to-right (also use dir="ltr") */
+
+/* Mobile floating glass tab bar (all layouts): a capsule over the content, selected tab = capsule highlight. Shells pad <main> by --float-nav-h. */
+:root { --float-nav-h: calc(5.75rem + env(safe-area-inset-bottom)); }
+.float-nav { position: absolute; z-index: 30; inset-inline: max(.75rem, env(safe-area-inset-left)); bottom: max(.5rem, env(safe-area-inset-bottom)); max-width: 28rem; margin-inline: auto; display: flex; padding: .25rem; border-radius: 9999px; background: var(--float-bg); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 0 0 1px var(--fg-10), 0 8px 28px rgba(0, 0, 0, .28); }
+.float-tab { display: flex; flex: 1 1 0; min-width: 0; height: 3.5rem; flex-direction: column; align-items: center; justify-content: center; gap: .125rem; border-radius: 9999px; font-size: 11px; color: var(--foreground); opacity: .7; }
+.float-tab[aria-current=page] { background: var(--fg-10); opacity: 1; font-weight: 600; }
+@media (max-height: 500px) { .float-tab { height: 2.75rem; } :root { --float-nav-h: calc(4.5rem + env(safe-area-inset-bottom)); } }
+
+/* "Leen" wordmark: fancy italic serif (always Latin, so no Arabic fallback needed) */
+.wordmark { font-family: "Playfair Display", Georgia, serif; font-style: italic; font-weight: 700; letter-spacing: 0; }

@@ -170,5 +170,10 @@ const d: Dict = {
   "pages.sources.saveLoad": "احفظ وحمّل",
   "pages.sources.signIn": "سجّل دخول",
   "pages.sources.quickConnect": "استخدم Quick Connect",
+  "pages.sources.qrScan": "كود QR تمسحه بموبايلك",
+  "pages.sources.qrPlex": "امسح الكود بموبايلك، سجّل دخول في Plex ووافق على Leen.",
+  "pages.sources.plexShort": "استخدم كود قصير بدل كده",
+  "pages.sources.plexQr": "استخدم كود QR بدل كده",
+  "pages.sources.qrJf": "امسح الكود عشان تفتح Quick Connect على موبايلك (سجّل دخول على Jellyfin هناك)، وبعدين اكتب الكود اللي تحت.",
 }
 export default d

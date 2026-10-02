@@ -1,0 +1,116 @@
+import { useEffect } from "react"
+import { isTv } from "@/lib/device"
+import { KEY, navState } from "@/lib/nav"
+import { usePinAsk } from "@/components/tv/ui"
+import { useTrailer } from "@/components/TrailerModal"
+import type { MenuKind } from "./menus"
+import { fsEl } from "./util"
+
+export type KeyCtx = {
+  live: boolean; show: boolean; menu: MenuKind | null; err: string; help: boolean; more: "closed" | "open" | "closing"; nextShow: boolean; canPip: boolean; overlay: "none" | "guide" | "strip"
+  back: () => void; hide: () => void; closeMenu: () => void; closeHelp: () => void; toggleHelp: () => void
+  closeMore: () => void; openMore: () => void; cancelNext: () => void
+  closeOverlay: () => void; openGuide: () => void; openStrip: () => void
+  play: () => void; pause: () => void; toggle: () => void; seek: (d: number) => void; zap: (d: number) => void
+  toggleFav: () => void; openMenu: (m: MenuKind) => void; cycleFit: () => void; poke: () => void
+  toggleFs: () => void; togglePip: () => void; toggleMute: () => void; setVolume: (delta: number) => void; digit: (d: number) => void
+}
+
+/** Focus is on the lowest control row (the More button): nothing focusable below it inside the controls. */
+function inBottomRow() {
+  const a = document.activeElement as HTMLElement | null
+  const box = a?.closest("[data-controls]")
+  if (!a || !box) return false
+  const r = a.getBoundingClientRect()
+  return !Array.from(box.querySelectorAll<HTMLElement>("[data-nav]")).some((el) => el !== a && el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().top >= r.bottom - 2)
+}
+
+/** Focus is in the panel's first row (its header) and the panel is scrolled to the top: Up closes it. */
+function panelAtTop() {
+  const p = document.querySelector<HTMLElement>("[data-more-panel]")
+  const a = document.activeElement as HTMLElement | null
+  if (!p || !a || !p.contains(a)) return false
+  const sc = p.querySelector<HTMLElement>("[data-more-scroll]")
+  const first = p.querySelector<HTMLElement>("[data-nav]")
+  return (sc?.scrollTop ?? 0) <= 8 && !!first && a.getBoundingClientRect().top <= first.getBoundingClientRect().top + 8
+}
+
+/** Remote / keyboard handling in the capture phase (before the app's spatial nav). Re-registered every render so it always sees fresh state. */
+export function useKeys(c: KeyCtx) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (usePinAsk.getState().ask || useTrailer.getState().cur) return // those dialogs own the keys (App's Back handler closes them)
+      const k = e.keyCode
+      const stop = () => (e.preventDefault(), e.stopPropagation())
+      const locked = navState.lock
+      if (k === KEY.back || k === KEY.esc || (k === KEY.bksp && isTv)) {
+        stop()
+        if (c.overlay !== "none") c.closeOverlay() // topmost layer first (one overlay at a time)
+        else if (!isTv && fsEl()) c.toggleFs()
+        else if (c.help) c.closeHelp()
+        else if (c.menu) c.closeMenu()
+        else if (c.more !== "closed") c.closeMore()
+        else if (c.err) c.back()
+        else if (c.nextShow) c.cancelNext()
+        else if (c.show && (isTv || k !== KEY.esc)) c.hide()
+        else c.back()
+        return
+      }
+      if (k === KEY.play) return stop(), c.play()
+      if (k === KEY.pause) return stop(), c.pause()
+      if (k === KEY.stop) return stop(), void c.back()
+      if (k === KEY.ff) return stop(), c.seek(30), c.poke()
+      if (k === KEY.rw) return stop(), c.seek(-10), c.poke()
+      if (c.overlay !== "none") {
+        // guide / strip own the keys: arrows, OK, CH+/CH- go to the D-pad nav (or the strip's own handler), never to zapping. Only the desktop switches leak in.
+        if (!isTv && c.live && !(e.target instanceof HTMLInputElement)) {
+          if (k === 71 && !e.ctrlKey && !e.metaKey && !e.altKey) return stop(), c.openGuide()
+          if (k === 67 && !e.ctrlKey && !e.metaKey && !e.altKey) return stop(), c.openStrip()
+        }
+        return
+      }
+      if (k === KEY.chUp || (locked && c.live && k === KEY.up)) return stop(), c.zap(1)
+      if (k === KEY.chDown || (locked && c.live && k === KEY.down)) return stop(), c.zap(-1)
+      if (k === KEY.red) return stop(), c.toggleFav()
+      if (k === KEY.green) return stop(), c.openMenu("audio")
+      if (k === KEY.yellow) return stop(), c.cycleFit(), c.poke()
+      if (k === KEY.blue) return stop(), isTv && c.live && locked ? c.poke() : c.openMenu("subs") // live TV, controls hidden: Blue = Info (show the controls)
+      if (k === KEY.info) return stop(), c.poke()
+      if (k >= 48 && k <= 57 && c.live) return stop(), c.digit(k - 48)
+      if (c.more !== "closed") {
+        // the panel is a [data-modal]: arrows are spatial nav; Up from its first row closes it
+        if (k === KEY.up && panelAtTop()) { stop(); c.closeMore() }
+        return
+      }
+      // Down on the bottom row of the open controls pulls the More panel up (with the controls hidden Down only shows them: see `locked` below)
+      if (k === KEY.down && c.show && !c.menu && inBottomRow()) return stop(), c.openMore()
+      if (!isTv && !c.menu && !(e.target instanceof HTMLInputElement)) {
+        const up = k === KEY.up ? 1 : k === KEY.down ? -1 : 0
+        if (k === 32) return stop(), c.toggle(), c.poke()
+        if (k === 70) return stop(), c.toggleFs()
+        if (c.live && k === 71 && !e.ctrlKey && !e.metaKey && !e.altKey) return stop(), c.openGuide()
+        if (c.live && k === 67 && !e.ctrlKey && !e.metaKey && !e.altKey) return stop(), c.openStrip()
+        if (k === 80 && c.canPip) return stop(), c.togglePip()
+        if (k === 77) return stop(), c.toggleMute()
+        if (e.key === "?") return stop(), c.toggleHelp()
+        if (!c.live && (k === KEY.left || k === KEY.right)) return stop(), c.seek(k === KEY.left ? -10 : 10), c.poke()
+        if (up) return stop(), c.live ? c.zap(up) : c.setVolume(up * 0.1), c.poke()
+      }
+      if (locked) {
+        stop()
+        if (isTv && c.live && k === KEY.enter) return c.openGuide() // TV live: OK = guide, Left/Right = channel strip, Info/Blue/other = controls
+        if (isTv && c.live && (k === KEY.left || k === KEY.right)) return c.openStrip()
+        if (!c.live && k === KEY.left) c.seek(-10)
+        else if (!c.live && k === KEY.right) c.seek(30)
+        else if (k === KEY.enter && !c.live) c.toggle()
+        c.poke()
+        return
+      }
+      c.poke()
+      // while controls are up, the seek bar eats left/right
+      if ((document.activeElement as HTMLElement)?.dataset.seek !== undefined && (k === KEY.left || k === KEY.right)) { stop(); c.seek(k === KEY.left ? -10 : 30) }
+    }
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+  })
+}
