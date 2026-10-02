@@ -283,6 +283,11 @@ html[data-motion=reduced] { --dur-fast: 100ms; --dur: 150ms; --dur-slow: 150ms; 
   animation: m-shimmer-k 1.4s linear infinite;
 }
 
+/* detail backdrop: fade in, then a slow Ken Burns drift (full motion only; reduced = fade, off = still) */
+@keyframes bg-drift-k { from { transform: scale(1.03) translate3d(0, 0, 0); } to { transform: scale(1.13) translate3d(-1.5%, -1%, 0); } }
+.bg-drift { animation: m-fade-k 700ms var(--ease) backwards; }
+html[data-motion=full] .bg-drift { animation: m-fade-k 700ms var(--ease) backwards, bg-drift-k 30s ease-in-out 0s infinite alternate; will-change: transform; }
+
 html[data-mode=tv] .skel::after { animation: none; }
 
 /* reduced: opacity fades only (<=150ms); focus scale stays */
@@ -305,5 +310,5 @@ html[dir=rtl] .rtl-flip { transform: scaleX(-1); } /* directional icons (chevron
 .float-tab[aria-current=page] { background: var(--fg-10); opacity: 1; font-weight: 600; }
 @media (max-height: 500px) { .float-tab { height: 2.75rem; } :root { --float-nav-h: calc(4.5rem + env(safe-area-inset-bottom)); } }
 
-/* "Leen" wordmark: fancy italic serif (always Latin, so no Arabic fallback needed) */
-.wordmark { font-family: "Playfair Display", Georgia, serif; font-style: italic; font-weight: 700; letter-spacing: 0; }
+/* "Leen" wordmark: rounded sans (always Latin, so no Arabic fallback needed) */
+.wordmark { font-family: "Poppins", "Segoe UI", system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }

@@ -6,7 +6,7 @@ import type { Episode, Item, Source } from "./types"
 import { mixed, plexFetch, px } from "./net"
 import { t } from "./i18n"
 import { useApp } from "./store"
-import { allowedConns, buildUrl, connKind, identity, mapDetail, mapMeta, photoUrl, sortConns, type Conn, type ConnMode } from "./plex-pure"
+import { allowedConns, buildUrl, connKind, identity, mapDetail, mapMeta, mapStreams, photoUrl, sortConns, type Conn, type ConnMode } from "./plex-pure"
 
 export { sortConns }
 export type PlexServer = { name: string; id: string; token: string; owned: boolean; connections: Conn[] }
@@ -185,12 +185,14 @@ const profileExtra = (q: StreamQ) => q.kbps ? "" : [
   VIDEO_CODECS.includes("hevc") && "append-transcode-target-codec(type=videoProfile&context=streaming&protocol=hls&videoCodec=hevc)",
   AUDIO_CODECS.includes("ac3") && "append-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=ac3)",
 ].filter(Boolean).join("+")
-export const plexStreamUrl = (s: Source, item: Item, q: StreamQ = STREAM_QS[0]) =>
+export const plexStreamUrl = (s: Source, item: Item, q: StreamQ = STREAM_QS[0], tr: { audio?: number; sub?: number } = {}) =>
   plexUrl(base(s), "/video/:/transcode/universal/start.m3u8", {
     path: `/library/metadata/${item.sid}`, mediaIndex: 0, partIndex: 0, protocol: "hls", offset: 0, fastSeek: 1, directPlay: 0, directStream: 1,
     subtitleSize: 100, audioBoost: 100, videoResolution: q.height ? `${Math.round(q.height * 16 / 9)}x${q.height}` : "3840x2160", maxVideoBitrate: q.kbps ?? 200000,
     "X-Plex-Platform": "Chrome", "X-Plex-Session-Identifier": plexSessionId, session: plexTranscodeId(item),
     // Original: let Plex copy hevc/ac3 as-is when this device decodes them. Plex HLS is TS-only and hls.js reads hevc and ac3 in TS but not av1/eac3.
+    // picked tracks: audio switches the stream, a subtitle is burned in (ponytail: no sidecar text tracks, so every pick re-transcodes)
+    ...(tr.audio !== undefined ? { audioStreamID: tr.audio } : {}), ...(tr.sub !== undefined && tr.sub >= 0 ? { subtitleStreamID: tr.sub, subtitles: "burn" } : {}),
     ...(profileExtra(q) ? { "X-Plex-Client-Profile-Extra": profileExtra(q) } : {}),
   }, s.token)
 
@@ -208,8 +210,29 @@ export function plexTimeline(s: Source, item: Item, state: "playing" | "paused" 
   })
 }
 
+/** Audio + subtitle streams to pick from. */
+export const plexTracks = async (s: Source, item: Item) => mapStreams((await get<Container>(s, proxy(), `/library/metadata/${item.sid}`)).MediaContainer?.Metadata?.[0] ?? {})
+
 /** Tell the server to kill the transcode. */
 export const plexStopTranscode = (s: Source, item: Item) => ping(s, "/video/:/transcode/universal/stop", { session: plexTranscodeId(item) })
 
 /** Mark as watched. */
 export const plexScrobble = (s: Source, item: Item) => ping(s, "/:/scrobble", { key: item.sid!, identifier: "com.plexapp.plugins.library" })
+
+/** Probe likely addresses (typed host, this page's host, localhost) for a Plex server: GET /identity needs no token. */
+export async function detectPlex(typed = ""): Promise<{ server: string; name: string }[]> {
+  const raw = typed.trim().replace(/^https?:\/\//i, "").replace(/[/?#].*$/, "")
+  const hosts = [...new Set([raw.replace(/:\d+$/, ""), location.hostname, "localhost"].filter(Boolean))]
+  const cands = new Set<string>()
+  if (/^https?:\/\//i.test(typed.trim()) || /:\d+$/.test(raw)) cands.add(`${/^https?:\/\//i.test(typed.trim()) ? "" : "http://"}${typed.trim().replace(/\/+$/, "")}`)
+  for (const h of hosts) { cands.add(`http://${h}:32400`); cands.add(`https://${h}:32400`) }
+  const found = await Promise.all([...cands].map(async (server) => {
+    try {
+      const j = await (await plexFetch(plexUrl(server, "/identity"), proxy(), { headers: JSON_H }, 2500)).json()
+      const id = j?.MediaContainer?.machineIdentifier
+      return id ? { server, name: String(id) } : null
+    } catch { return null }
+  }))
+  const seen = new Set<string>()
+  return found.filter((x): x is { server: string; name: string } => !!x).filter((x) => !seen.has(x.name) && !!seen.add(x.name))
+}

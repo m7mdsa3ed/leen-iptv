@@ -30,6 +30,7 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[]): Promise<Meta> {
     if (!r) continue
     for (const k of ["title", "year", "plot", "poster", "backdrop"] as const) m[k] ||= r[k]
     m.runtime ||= r.runtime
+    if (!m.backdrops?.length && r.backdrops?.length) m.backdrops = r.backdrops
     if (!m.trailers?.length && r.trailers?.length) m.trailers = r.trailers
     for (const k of ["genres", "directors", "similar"] as const) if (!m[k].length && r[k]?.length) (m[k] as unknown[]) = r[k]!
     // cast: names-only lists (Xtream, OMDb) give way to a list that has photos
@@ -48,6 +49,7 @@ function withBase(m: Meta, b?: Partial<Meta>): Meta {
   const r = { ...m }
   for (const k of ["title", "year", "plot", "poster", "backdrop"] as const) r[k] = b[k] || m[k]
   r.runtime = b.runtime || m.runtime
+  r.backdrops = b.backdrops?.length ? b.backdrops : m.backdrops
   r.trailers = b.trailers?.length ? b.trailers : m.trailers
   for (const k of ["genres", "directors", "similar"] as const) (r[k] as unknown[]) = b[k]?.length ? b[k]! : m[k]
   r.cast = b.cast?.length && (b.cast.some((c) => c.photo) || !m.cast.some((c) => c.photo)) ? b.cast : m.cast

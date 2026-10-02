@@ -6,9 +6,9 @@ import { useApp } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { explain } from "@/lib/net"
 import { QrCode } from "@/components/QrCode"
-import { checkPin, createPin, pickConnection, plexAuthUrl, plexServers, type Pin, type PlexServer } from "@/lib/plex"
+import { checkPin, createPin, detectPlex, pickConnection, plexAuthUrl, plexServers, type Pin, type PlexServer } from "@/lib/plex"
 import type { ConnMode } from "@/lib/plex-pure"
-import { jellyfinServerInfo, jellyfinSignIn, normServer, quickConnectCheck, quickConnectEnabled, quickConnectFinish, quickConnectStart, type JfAuth } from "@/lib/jellyfin"
+import { detectJellyfin, jellyfinServerInfo, jellyfinSignIn, normServer, quickConnectCheck, quickConnectEnabled, quickConnectFinish, quickConnectStart, type JfAuth } from "@/lib/jellyfin"
 
 type Type = "M3U" | "Xtream" | "Plex" | "Jellyfin"
 
@@ -82,6 +82,13 @@ export default function Sources() {
       reset("home")
     } catch (e) { if (live()) { setErr(explain(e)); setBusy(""); setQc(null) } }
   }
+  const [found, setFound] = useState<{ server: string; name: string }[] | null>(null)
+  const jfDetect = async () => {
+    setErr(""); setBusy(t("pages.sources.detecting"))
+    const r = await (type === "Plex" ? detectPlex : detectJellyfin)(f.server)
+    setBusy(""); setFound(r)
+    if (r.length === 1) setF((x) => ({ ...x, server: r[0].server }))
+  }
   const jfQuick = async () => {
     const server = normServer(f.server)
     setErr(""); setBusy(t("pages.sources.contacting"))
@@ -118,8 +125,14 @@ export default function Sources() {
     reset("home") // App loads the new active source
   }
   const field = (k: keyof typeof f, ph: string, type = "text", inputMode?: "url", ac = "off") => (
-    <Input data-nav dir={k === "name" ? "auto" : "ltr"} className="h-12 rounded-2xl text-base md:h-14 md:text-xl" type={type} inputMode={inputMode} autoComplete={ac} spellCheck={false} placeholder={ph} value={f[k]} onChange={set(k)} autoCapitalize="off" autoCorrect="off" />
+    <label className="flex flex-col gap-1.5">
+      <span className="ps-1 text-sm font-medium text-muted-foreground">{ph}</span>
+      <Input data-nav dir={k === "name" ? "auto" : "ltr"} className="h-12 rounded-2xl text-base md:h-14 md:text-xl" type={type} inputMode={inputMode} autoComplete={ac} spellCheck={false} value={f[k]} onChange={set(k)} autoCapitalize="off" autoCorrect="off" />
+    </label>
   )
+  const detectBtn = <Pill className="shrink-0" disabled={!!busy} onClick={() => void jfDetect()}>{tr("pages.sources.detect")}</Pill>
+  const detected = found && (found.length === 0 ? <p className="text-sm text-muted-foreground">{tr("pages.sources.detectNone")}</p> : found.length > 1 && <div className="flex flex-wrap gap-2">{found.map((x) => <Pill key={x.server} onClick={() => { setF((y) => ({ ...y, server: x.server })); setFound(null) }}>{type === "Jellyfin" && <bdi>{x.name}</bdi>} <bdi dir="ltr">{x.server}</bdi></Pill>)}</div>)
+  const serverRow = (ph: string) => <div className="flex items-end gap-2"><div className="min-w-0 flex-1">{field("server", ph, "url", "url")}</div>{detectBtn}</div>
   const cancel = () => useApp.getState().sources.length > 0 && <Pill variant="ghost" onClick={() => useRoute.getState().back()}>{tr("common.cancel")}</Pill>
   const conn = (s: PlexServer) => fmt.plural(s.owned ? "pages.sources.connOwned" : "pages.sources.connShared", s.connections.length)
 
@@ -127,9 +140,13 @@ export default function Sources() {
     <div className="flex h-full flex-col items-center gap-6 overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] md:justify-center">
       <div className="flex w-full max-w-[40rem] flex-col gap-3 rounded-[28px] bg-surface p-6">
         <h1 className="text-3xl font-medium tracking-tight md:text-4xl">{tr("pages.sources.title")}</h1>
-        <div className="flex flex-wrap gap-2 py-2">
-          {(["Xtream", "M3U", "Plex", "Jellyfin"] as const).map((t) => (
-            <Pill key={t} variant="tonal" className={type === t ? "bg-accent-blue-container text-foreground" : ""} onClick={() => { setType(t); setErr(""); setQc(null); setBusy("") }}>{t}</Pill>
+        <p className="text-muted-foreground">{tr("pages.sources.pick")}</p>
+        <div role="radiogroup" aria-label={tr("pages.sources.title")} data-nav-group className="grid grid-cols-2 gap-2 pb-2">
+          {(["Xtream", "M3U", "Plex", "Jellyfin"] as const).map((k) => (
+            <button key={k} type="button" role="radio" aria-checked={type === k} data-nav data-pill className={`flex min-h-16 flex-col items-start justify-center gap-0.5 rounded-2xl px-4 py-2 text-start transition-colors ${type === k ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground"}`} onClick={() => { setType(k); setErr(""); setQc(null); setBusy(""); setFound(null) }}>
+              <span className="text-lg font-medium">{k}</span>
+              <span className="text-sm opacity-70">{tr(`pages.sources.kind.${k}`)}</span>
+            </button>
           ))}
         </div>
         {type !== "Plex" && type !== "Jellyfin" && field("name", tr("pages.sources.name"))}
@@ -182,10 +199,11 @@ export default function Sources() {
             {busy && <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy}</div>}
           </div>
         )}
-        {type === "Plex" && manual && (<>{field("server", tr("pages.sources.serverPlex"), "url", "url")}{field("token", tr("pages.sources.plexToken"), "password")}{field("name", tr("pages.sources.nameOpt"))}</>)}
+        {type === "Plex" && manual && (<>{serverRow(tr("pages.sources.serverPlex"))}{detected}{field("token", tr("pages.sources.plexToken"), "password")}{field("name", tr("pages.sources.nameOpt"))}</>)}
         {type === "Jellyfin" && !qc && (<>
           <p className="text-muted-foreground">{tr("pages.sources.jfInfo")}</p>
-          {field("server", tr("pages.sources.serverJf"), "url", "url")}{field("user", tr("pages.sources.user"), "text", undefined, "username")}{field("pass", tr("pages.sources.pass"), "password", undefined, "current-password")}
+          {serverRow(tr("pages.sources.serverJf"))}{detected}
+          {field("user", tr("pages.sources.user"), "text", undefined, "username")}{field("pass", tr("pages.sources.pass"), "password", undefined, "current-password")}
         </>)}
         {type === "Jellyfin" && qc && (
           <div className="flex flex-col items-center gap-3 py-4 text-center">

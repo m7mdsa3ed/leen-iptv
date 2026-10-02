@@ -21,6 +21,8 @@ const d: Dict = {
   "player.pause": "إيقاف مؤقت",
   "player.close": "اقفل",
   "player.off": "إيقاف",
+  "player.subSize": "الحجم",
+  "player.subOffset": "التأخير",
   "player.original": "الأصلية",
   "player.fit.contain": "على قد الشاشة",
   "player.fit.cover": "تكبير",

@@ -104,6 +104,7 @@ export function useDetail(id: string) {
 
   return {
     item, selected, alternatives, selectSource: (i: Item) => setPickId(i.id), isSeries, meta, loading, error, plot, chips, genres, ratings, poster, backdrop: meta?.backdrop || item?.logo,
+    backdrops: [...new Set([meta?.backdrop || item?.logo, ...(meta?.backdrops ?? [])].filter((x): x is string => !!x))].slice(0, 6),
     cast: meta?.cast ?? [], directors: meta?.directors ?? [], castText: text("cast"),
     episodes, seasons, season, setSeason, shown: episodes.filter((e) => e.season === season),
     progress, pct, watched,

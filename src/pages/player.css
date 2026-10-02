@@ -84,5 +84,8 @@ html[data-mode=tv] .pl-tile.pl-cur:focus { box-shadow: none; }
 
 /* More page body: frosted glass over the video. The glass is a ::before so a mask can fade it in at the top without fading the text; blur is skipped on TV (weak GPUs) where it is just more opaque. */
 .pl-more-body { position: relative; isolation: isolate; }
-.pl-more-body::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: rgba(14, 15, 17, .8); -webkit-mask-image: linear-gradient(to bottom, transparent, #000 5rem); mask-image: linear-gradient(to bottom, transparent, #000 5rem); }
-html:not([data-mode=tv]) .pl-more-body::before { background: rgba(14, 15, 17, .5); -webkit-backdrop-filter: blur(28px) saturate(1.4); backdrop-filter: blur(28px) saturate(1.4); }
+.pl-more-body::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: rgba(14, 15, 17, .9); -webkit-mask-image: linear-gradient(to bottom, transparent, #000 5rem); mask-image: linear-gradient(to bottom, transparent, #000 5rem); }
+html:not([data-mode=tv]) .pl-more-body::before { background: rgba(14, 15, 17, .72); -webkit-backdrop-filter: blur(28px) saturate(1.4); backdrop-filter: blur(28px) saturate(1.4); }
+
+/* subtitle size (Player sets --sub-size, percent); 5vh is the browser's default cue size */
+.pl-root video::cue { font-size: calc(var(--sub-size, 100) * 0.05vh); }

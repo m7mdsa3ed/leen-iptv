@@ -26,6 +26,7 @@ const xtream: Provider = {
       ratings: rating,
       poster: str(i.movie_image ?? i.cover),
       backdrop: str(bd),
+      backdrops: Array.isArray(i.backdrop_path) ? i.backdrop_path.map(str).filter((x): x is string => !!x) : undefined,
       cast: list(i.cast ?? i.actors).map((name) => ({ name })),
       directors: list(i.director),
       ids: { tmdb: str(i.tmdb_id ?? i.tmdb), imdb: str(i.imdb_id) },
@@ -91,7 +92,7 @@ const tmdb: Provider = {
       id = hit ? String(hit.id) : undefined
     }
     if (!id) return null
-    const d = await get(`/${tv ? "tv" : "movie"}/${id}`, { append_to_response: "credits,similar,external_ids,videos", include_video_language: `${(cfg.lang || "en").slice(0, 2)},en,null` })
+    const d = await get(`/${tv ? "tv" : "movie"}/${id}`, { append_to_response: "credits,similar,external_ids,videos,images", include_video_language: `${(cfg.lang || "en").slice(0, 2)},en,null`, include_image_language: "null" })
     const date = String(d.release_date ?? d.first_air_date ?? "")
     const cast: Person[] = (d.credits?.cast ?? []).slice(0, 14).map((c: J) => ({ id: String(c.id), name: c.name, role: c.character || undefined, photo: c.profile_path ? `${IMG}/w185${c.profile_path}` : undefined }))
     const directors: string[] = tv
@@ -107,6 +108,7 @@ const tmdb: Provider = {
       ratings: d.vote_count ? [{ source: "TMDB", value: Number(d.vote_average).toFixed(1), votes: String(d.vote_count) }] : [],
       poster: d.poster_path ? `${IMG}/w500${d.poster_path}` : undefined,
       backdrop: d.backdrop_path ? `${IMG}/w1280${d.backdrop_path}` : undefined,
+      backdrops: ((d.images?.backdrops ?? []) as J[]).slice(0, 6).map((b) => `${IMG}/w1280${b.file_path}`), // textless stills
       cast,
       directors,
       trailers: pickTrailers(d.videos?.results),

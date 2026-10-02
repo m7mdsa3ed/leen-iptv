@@ -1,3 +1,4 @@
+import { Backdrop } from "@/components/Backdrop"
 import { ArrowLeft, Clapperboard, Play, Star } from "lucide-react"
 import { Chips, Logo } from "@/components/tv/ui"
 import { Card, Pill, Rail, RoundButton, SkelBar } from "@/components/gtv"
@@ -10,12 +11,12 @@ import { useDetail } from "@/layouts/hooks/use-detail"
 export default function Detail({ id }: { id: string }) {
   const D = useDetail(id)
   const t = useT()
-  const { item, isSeries, loading, error: err, plot, chips, ratings, poster, backdrop, episodes: eps, seasons, season, setSeason, shown, pct, epLabel, play, fav, toggleFav, similar, open, back } = D
+  const { item, isSeries, loading, error: err, plot, chips, ratings, poster, backdrops, episodes: eps, seasons, season, setSeason, shown, pct, epLabel, play, fav, toggleFav, similar, open, back } = D
   const genreList = D.genres
   if (!item) return null
   return (
     <div className="relative h-full overflow-y-auto bg-background px-[var(--gx)] pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
-      {backdrop && <img src={backdrop} alt="" aria-hidden decoding="async" className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] w-full object-cover opacity-30" />}
+      {backdrops.length > 0 && <Backdrop srcs={backdrops} className="absolute inset-x-0 top-0 h-[34rem] opacity-30" />}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-r rtl:bg-gradient-to-l from-background via-background/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-t from-background via-transparent to-transparent" />
       <div className="relative">

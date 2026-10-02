@@ -21,6 +21,8 @@ const d: Dict = {
   "player.pause": "Pause",
   "player.close": "Close",
   "player.off": "Off",
+  "player.subSize": "Size",
+  "player.subOffset": "Delay",
   "player.original": "Original",
   "player.fit.contain": "Fit",
   "player.fit.cover": "Zoom",

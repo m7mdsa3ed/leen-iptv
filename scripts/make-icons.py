@@ -45,7 +45,7 @@ bg = Image.new("RGB", (1920, 1080), (0x0E, 0x0F, 0x11))
 m = mark(260)
 bg.paste(m, ((1920 - 260) // 2, 330), m)
 font = None
-for f in ("node_modules/@fontsource/playfair-display/files/playfair-display-latin-700-italic.woff", "/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Medium.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "DejaVuSans-Bold.ttf"):
+for f in ("node_modules/@fontsource/poppins/files/poppins-latin-700-normal.woff", "/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Medium.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "DejaVuSans-Bold.ttf"):
     try:
         font = ImageFont.truetype(f, 110)
         break

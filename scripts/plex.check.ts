@@ -43,3 +43,7 @@ assert.equal(connKind(conns, "http://192.168.1.5:32400/"), "Local")
 assert.equal(connKind(conns, conns[2].uri), "Relay")
 assert.equal(connKind(conns, "http://elsewhere:1"), "Custom")
 console.log("plex ok")
+
+import { mapStreams as plexStreams } from "../src/lib/plex-pure.ts"
+assert.deepEqual(plexStreams({ Media: [{ Part: [{ Stream: [{ streamType: 1, id: 1 }, { streamType: 2, id: 2, displayTitle: "English (AC3)", selected: true }, { streamType: 3, id: 3, displayTitle: "Arabic (SRT)" }] }] }] }),
+  { audio: [{ id: 2, label: "English (AC3)", def: true, lang: undefined }], subs: [{ id: 3, label: "Arabic (SRT)", def: false, lang: undefined }] })

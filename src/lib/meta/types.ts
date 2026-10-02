@@ -14,6 +14,7 @@ export interface Meta {
   ratings: Rating[]
   poster?: string
   backdrop?: string
+  backdrops?: string[] // extra stills (the first is usually `backdrop`)
   cast: Person[]
   directors: string[]
   similar: SimilarRef[]

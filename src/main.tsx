@@ -1,4 +1,4 @@
-import "@fontsource/playfair-display/latin-700-italic.css" // brand wordmark font, bundled (TVs load from file://)
+import "@fontsource/poppins/latin-700.css" // brand wordmark font, bundled (TVs load from file://)
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

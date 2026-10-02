@@ -6,7 +6,7 @@ import { mixed, plexFetch, px } from "./net"
 import { t } from "./i18n"
 import { useApp } from "./store"
 import { clientId } from "./plex"
-import { authHeader, imageUrl, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapPrograms, normServer, toTicks, type Img } from "./jellyfin-pure"
+import { authHeader, imageUrl, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapPrograms, mapStreams, normServer, toTicks, type Img } from "./jellyfin-pure"
 
 export { normServer }
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -145,13 +145,14 @@ export const jfPlaySession = (item: Item) => `${jfSessionId}${item.sid}`
 /** HLS (h264/aac: plays on Chrome 94 / webOS). Direct URL; the Player wraps it with px/pxStream on mixed content. */
 // ponytail: live uses the channel id as MediaSourceId (the server falls back to the channel's first source); tuners that
 // need an opened live stream would need POST /Items/{id}/PlaybackInfo with AutoOpenLiveStream and its LiveStreamId.
-export const jellyfinStreamUrl = (s: Source, item: Item, q: StreamQ = STREAM_QS[0]) => {
+export const jellyfinStreamUrl = (s: Source, item: Item, q: StreamQ = STREAM_QS[0], tr: { audio?: number; sub?: number } = {}) => {
   const codecs = q.kbps ? ["h264"] : VIDEO_CODECS // original: copy hevc/av1 untouched when this device decodes them
   const audio = q.kbps ? ["aac"] : AUDIO_CODECS // and ac3/eac3
   return jfUrl(base(s), `/Videos/${item.sid}/master.m3u8`, {
     MediaSourceId: item.sid, PlaySessionId: jfPlaySession(item), DeviceId: jfDeviceId(), VideoCodec: codecs.join(","), AudioCodec: audio.join(","),
     MaxStreamingBitrate: (q.kbps ?? 200000) * 1000, MaxHeight: q.height, TranscodingMaxAudioChannels: q.kbps ? 2 : 6,
-    SegmentContainer: codecs.length > 1 || audio.includes("eac3") ? "mp4" : "ts", BreakOnNonKeyFrames: "true", // hevc/av1/eac3 need fMP4 segments (hls.js rejects eac3 in TS)
+    SegmentContainer: codecs.length > 1 || audio.includes("eac3") ? "mp4" : "ts", AudioStreamIndex: tr.audio, ...(tr.sub !== undefined && tr.sub >= 0 ? { SubtitleStreamIndex: tr.sub, SubtitleMethod: "Encode" } : {}), // ponytail: subtitles are burned in, so every pick re-transcodes
+    BreakOnNonKeyFrames: "true", // hevc/av1/eac3 need fMP4 segments (hls.js rejects eac3 in TS)
   }, s.token)
 }
 
@@ -169,6 +170,31 @@ export function jellyfinReport(s: Source, item: Item, state: "start" | "progress
 /** Mark as watched. */
 export const jellyfinMarkPlayed = (s: Source, item: Item) => send(s, "POST", `/Users/${s.userId}/PlayedItems/${item.sid}`)
 
+/** Audio + subtitle streams to pick from. */
+export const jellyfinTracks = async (s: Source, item: Item) => mapStreams(await get<J>(s, proxy(), `/Users/${s.userId}/Items/${item.sid}`))
+
+/** WebVTT text of one subtitle stream (the server converts text subtitles on the fly; fetched, not linked, so no CORS setup on <video>). */
+export const jellyfinSubtitle = async (s: Source, item: Item, index: number) =>
+  (await plexFetch(jfUrl(base(s), `/Videos/${item.sid}/${item.sid}/Subtitles/${index}/0/Stream.vtt`, {}, s.token), proxy(), undefined, 20000)).text()
+
 /** Tell the server to kill this item's transcode. */
 export const jellyfinStopTranscode = (s: Source, item: Item) =>
   send(s, "DELETE", "/Videos/ActiveEncodings", { deviceId: jfDeviceId(), playSessionId: jfPlaySession(item) })
+
+/** Browsers can't do Jellyfin's UDP discovery, so probe likely addresses (typed host, this page's host, localhost) for a Jellyfin server. */
+export async function detectJellyfin(typed = ""): Promise<{ server: string; name: string }[]> {
+  const raw = typed.trim().replace(/^https?:\/\//i, "").replace(/[/?#].*$/, "")
+  const hosts = [...new Set([raw.replace(/:\d+$/, ""), location.hostname, "localhost", "jellyfin.local"].filter(Boolean))]
+  const cands = new Set<string>()
+  if (/^https?:\/\//i.test(typed.trim()) || /:\d+$/.test(raw)) cands.add(normServer(typed))
+  for (const h of hosts) for (const u of [`http://${h}:8096`, `https://${h}:8920`, `http://${h}`, `https://${h}`]) cands.add(u)
+  const found = await Promise.all([...cands].map(async (server) => {
+    try {
+      const r = await plexFetch(jfUrl(server, "/System/Info/Public"), proxy(), { headers: { Accept: "application/json" } }, 2500)
+      const j = await r.json()
+      return j?.Id ? { server, name: String(j.ServerName || "Jellyfin") } : null
+    } catch { return null }
+  }))
+  const seen = new Set<string>() // same server answering on several URLs: keep the first
+  return found.filter((x): x is { server: string; name: string } => !!x).filter((x) => !seen.has(x.name) && !!seen.add(x.name))
+}

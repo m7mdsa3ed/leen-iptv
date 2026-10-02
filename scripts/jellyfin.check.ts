@@ -58,3 +58,11 @@ assert.equal(d.meta.poster, "IMG/42/Primary/600/p")
 assert.equal(d.meta.runtime, 7200)
 assert.equal(d.info.releasedate, "1995-12-15")
 console.log("jellyfin ok")
+
+import { mapStreams as jfStreams } from "../src/lib/jellyfin-pure.ts"
+assert.deepEqual(jfStreams({ MediaSources: [{ MediaStreams: [{ Type: "Video", Index: 0 }, { Type: "Audio", Index: 1, DisplayTitle: "English", IsDefault: true }, { Type: "Subtitle", Index: 2, Language: "ara", IsTextSubtitleStream: true }] }] }),
+  { audio: [{ id: 1, label: "English", def: true, lang: undefined, text: undefined }], subs: [{ id: 2, label: "ara", def: false, lang: "ara", text: true }] })
+
+import { shiftVtt } from "../src/lib/jellyfin-pure.ts"
+assert.equal(shiftVtt("WEBVTT\n\n00:00:01.000 --> 01:00:02.500 align:start\nhi 00:00:09.000", 1.5), "WEBVTT\n\n00:00:02.500 --> 01:00:04.000 align:start\nhi 00:00:09.000")
+assert.equal(shiftVtt("00:00:01.000 --> 00:00:02.000", -5), "00:00:00.000 --> 00:00:00.000")

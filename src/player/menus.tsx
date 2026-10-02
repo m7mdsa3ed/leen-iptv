@@ -36,10 +36,23 @@ export type MenuProps = {
   menu: MenuKind
   audio: Track[]; audioSel: number; onAudio: (i: number) => void
   subs: Track[]; subSel: number; onSub: (i: number) => void
+  subSize: number; onSubSize: (d: number) => void
+  subOffset: number | null; onSubOffset: (d: number) => void // null: this subtitle cannot be shifted (burned in / stream track)
   sq: StreamQ; onQuality: (q: StreamQ) => void
   speed: number; onSpeed: (n: number) => void
   fit: number; onFit: (i: number) => void
   onClose: () => void
+}
+
+function Step({ label, value, onStep }: { label: string; value: string; onStep: (d: number) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-1" dir="ltr">
+      <span className="me-auto">{label}</span>
+      <Pill onClick={() => onStep(-1)} aria-label={`${label} -`}>-</Pill>
+      <span className="w-16 text-center tabular-nums">{value}</span>
+      <Pill onClick={() => onStep(1)} aria-label={`${label} +`}>+</Pill>
+    </div>
+  )
 }
 
 export function PlayerMenu(p: MenuProps) {
@@ -53,6 +66,8 @@ export function PlayerMenu(p: MenuProps) {
           <Item active={p.subSel < 0} onClick={() => p.onSub(-1)}>{t("player.off")}</Item>
           {p.subs.map((x) => <Item key={x.id} active={x.id === p.subSel} onClick={() => p.onSub(x.id)}><bdi>{x.label}</bdi></Item>)}
           {!p.subs.length && <div className="px-1 text-muted-foreground">{t("player.noSubtitleTracks")}</div>}
+          <Step label={t("player.subSize")} value={`${p.subSize}%`} onStep={p.onSubSize} />
+          {p.subOffset !== null && <Step label={t("player.subOffset")} value={`${p.subOffset > 0 ? "+" : ""}${p.subOffset}s`} onStep={p.onSubOffset} />}
         </>
       )}
       {p.menu === "quality" && STREAM_QS.map((q) => <Item key={q.id} active={q.id === p.sq.id} onClick={() => p.onQuality(q)}><bdi dir="ltr">{q.id === "original" ? t("player.original") : q.label}</bdi></Item>)}

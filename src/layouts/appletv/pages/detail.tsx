@@ -1,3 +1,4 @@
+import { Backdrop } from "@/components/Backdrop"
 import { ArrowLeft } from "lucide-react"
 import { Clapperboard, Play } from "lucide-react"
 import { openTrailer } from "@/components/TrailerModal"
@@ -15,12 +16,12 @@ const Col = ({ title, children }: { title: string; children: React.ReactNode }) 
 export default function Detail({ id }: { id: string }) {
   const t = useT()
   const D = useDetail(id)
-  const { item, isSeries, loading, plot, chips, ratings, backdrop, episodes, seasons, season, setSeason, shown } = D
+  const { item, isSeries, loading, plot, chips, ratings, backdrops, episodes, seasons, season, setSeason, shown } = D
   if (!item) return null
   const line = [D.genres.slice(0, 3).join(", "), ...chips.map(fmt.digits), D.ratings[0] && `${D.ratings[0].source === "Rating" ? "★" : D.ratings[0].source} ${fmt.digits(D.ratings[0].value)}`].filter(Boolean)
   return (
     <div className="atv-root relative h-full overflow-hidden text-foreground">
-      {backdrop && <img src={backdrop} alt="" aria-hidden decoding="async" className="absolute inset-0 size-full object-cover" />}
+      {backdrops.length > 0 && <Backdrop srcs={backdrops} className="absolute inset-0" />}
       <div className="atv-hero-shade absolute inset-0" />
       {!isTv && <Circle label={t("common.back")} onClick={D.back} className="absolute start-[max(1rem,var(--gx))] top-[max(1rem,env(safe-area-inset-top))] z-20"><ArrowLeft className="rtl-flip" /></Circle>}
       <div data-nav-group className="no-scrollbar absolute inset-0 overflow-y-auto px-[var(--gx)] pb-[max(2.5rem,env(safe-area-inset-bottom))]">

@@ -20,12 +20,13 @@ import { useGuard } from "@/player/more/hooks"
 import { ChannelStrip } from "@/player/overlays/channel-strip"
 import { GuideOverlay } from "@/player/overlays/guide-overlay"
 import type { MoreActions } from "@/player/more/actions"
-import { FITS, prefs, setPrefs } from "@/player/prefs"
+import { FITS, prefs, setPrefs, SUB_SIZES } from "@/player/prefs"
 import { TopBar } from "@/player/top-bar"
 import { useEngine } from "@/player/use-engine"
 import { useKeys } from "@/player/use-keys"
 import { useNextUp } from "@/player/use-next-up"
-import { useStream } from "@/player/use-stream"
+import { useSidecar } from "@/player/use-sidecar"
+import { useStream, type Picked } from "@/player/use-stream"
 import { useTracking } from "@/player/use-tracking"
 import { BANNER_MS, fsEl, HIDE_MS, isEpisode } from "@/player/util"
 import "./player.css"
@@ -68,6 +69,11 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const [speed, setSpeed] = useState(() => prefs().speed)
   const [audioSel, setAudioSel] = useState(0)
   const [subSel, setSubSel] = useState(-1)
+  const [picked, setPicked] = useState<Picked & { id: string }>({ id: "" }) // media-server track picks, tagged with their item
+  const tr: Picked = picked.id === item.id ? picked : {}
+  const [subSize, setSubSize] = useState(() => prefs().subSize)
+  const [off, setOff] = useState({ id: "", sec: 0 }) // subtitle delay is per title, so it resets on the next one
+  const subOffset = off.id === item.id ? off.sec : 0
   const [num, setNum] = useState("")
   const [vol, setVol] = useState(() => prefs().vol)
   const [muted, setMuted] = useState(() => prefs().muted)
@@ -85,8 +91,9 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const opener = useRef<HTMLElement | null>(null) // control that opened a menu: focus returns to it
   const returnMore = useRef(false) // focus returns to the More button after the panel closes
 
-  const S = useStream(item, sq)
+  const S = useStream(item, sq, tr)
   const { live } = S
+  useSidecar(vref, S.sidecar, subOffset)
   const E = useEngine({ vref, item, live, raw: S.raw, url: S.url, direct: S.direct, setProxied: S.setProxied })
   useTracking({ vref, item, live, src: S.src, plex: S.plex, jf: S.jf, resume, meas: E.meas, statsRef: E.statsRef })
   const hasNext = !live && isEpisode(item.id) && idx < queue.length - 1
@@ -154,25 +161,63 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   }
 
   /* ---------- menus ---------- */
+  const srvAudio = S.mediaServer && S.tracks.audio.length > 0
+  const srvSubs = S.mediaServer && S.tracks.subs.length > 0
   const openMenu = (m: MenuKind) => {
     const v = vref.current!, h = E.hls.current
     const a = document.activeElement as HTMLElement | null
     opener.current = a?.closest("[data-controls]") ? a : null
-    if (m === "audio") setAudioSel(Math.max(0, h?.audioTrack ?? 0))
-    if (m === "subs") {
+    if (m === "audio") setAudioSel(srvAudio ? tr.audio ?? S.tracks.audio.find((x) => x.def)?.id ?? S.tracks.audio[0].id : Math.max(0, h?.audioTrack ?? 0))
+    if (m === "subs" && srvSubs) setSubSel(tr.sub ?? -1)
+    else if (m === "subs") {
       if (!h) E.setSubs(Array.from(v.textTracks).map((x, i) => ({ id: i, label: x.label || x.language || t("player.subtitleTrack", { n: i + 1 }) })))
       setSubSel(h ? (h.subtitleDisplay ? h.subtitleTrack : -1) : Array.from(v.textTracks).findIndex((x) => x.mode === "showing"))
     }
     setMenu(m)
     poke()
   }
+  // media server: a new audio pick / burned-in subtitle is a new stream URL and resumes where this one is (same path as a quality change);
+  // a text subtitle (Jellyfin WebVTT) leaves the stream alone
+  const apply = (p: Picked) => {
+    const plain = (x?: number) => x === undefined || x < 0 || !!S.tracks.subs.find((y) => y.id === x)?.text && !!S.jf
+    if (!((p.audio === undefined || p.audio === tr.audio) && plain(p.sub) && plain(tr.sub))) {
+      const v = vref.current
+      if (v && v.currentTime > 0) resume.current = v.currentTime
+      if (S.plex) plexStopTranscode(S.plex, item)
+      if (S.jf) jellyfinStopTranscode(S.jf, item)
+    }
+    setPicked({ ...tr, ...p, id: item.id })
+  }
+  // apply the remembered language once per title, when its track lists arrive (default audio stays unless a matching track exists)
+  const autoFor = useRef("")
+  useEffect(() => {
+    const { audio, subs } = S.tracks
+    if ((!audio.length && !subs.length) || autoFor.current === item.id) return
+    autoFor.current = item.id
+    const p = prefs(), next: Picked = {}
+    const a = p.audioLang ? audio.find((x) => x.lang === p.audioLang) : undefined
+    if (a && a.id !== (audio.find((x) => x.def) ?? audio[0]).id) next.audio = a.id
+    const s = p.subLang && p.subLang !== "off" ? subs.find((x) => x.lang === p.subLang) : undefined
+    if (s) next.sub = s.id
+    if (next.audio !== undefined || next.sub !== undefined) apply(next)
+  }, [S.tracks, item.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const pickSub = (i: number) => {
+    if (srvSubs) {
+      if (i !== subSel) { apply({ sub: i }); setPrefs({ subLang: i < 0 ? "off" : S.tracks.subs.find((x) => x.id === i)?.lang ?? "" }) }
+      setSubSel(i); setMenu(null); return
+    }
     const h = E.hls.current
     if (h) { h.subtitleTrack = i; h.subtitleDisplay = i >= 0 }
     else Array.from(vref.current!.textTracks).forEach((x, j) => (x.mode = j === i ? "showing" : "disabled"))
     setSubSel(i); setMenu(null)
   }
-  const pickAudio = (i: number) => { if (E.hls.current) E.hls.current.audioTrack = i; setAudioSel(i); setMenu(null) }
+  const pickAudio = (i: number) => {
+    if (srvAudio) {
+      if (i !== audioSel) { apply({ audio: i }); setPrefs({ audioLang: S.tracks.audio.find((x) => x.id === i)?.lang ?? "" }) }
+      setAudioSel(i); setMenu(null); return
+    }
+    if (E.hls.current) E.hls.current.audioTrack = i; setAudioSel(i); setMenu(null)
+  }
   const pickQ = (q: StreamQ) => {
     setMenu(null)
     if (q.id === sq.id) return
@@ -182,6 +227,11 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
     if (S.jf) jellyfinStopTranscode(S.jf, item)
     setSq((lastQ = q))
   }
+  const stepSubSize = (d: number) => {
+    const n = SUB_SIZES[Math.min(SUB_SIZES.length - 1, Math.max(0, SUB_SIZES.indexOf(subSize as (typeof SUB_SIZES)[number]) + d))]
+    setSubSize(n); setPrefs({ subSize: n })
+  }
+  const stepSubOffset = (d: number) => setOff({ id: item.id, sec: Math.round((subOffset + d * 0.5) * 10) / 10 })
   const pickSpeed = (n: number) => {
     const v = vref.current!
     v.defaultPlaybackRate = n; v.playbackRate = n
@@ -345,6 +395,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   return (
     <div
       ref={root}
+      style={{ "--sub-size": subSize } as React.CSSProperties}
       className={`dark pl-root fixed inset-0 bg-black text-white${!show && more === "closed" && !isTv ? " cursor-none" : ""}`}
       onMouseMove={poke}
       // desktop: wheel down pulls the More panel up; touch: swipe up (not from the seek bar or inside the panel)
@@ -401,7 +452,8 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
       {help && <KeysHelp live={live} onClose={() => setHelp(false)} />}
       {menu && (
         <PlayerMenu
-          menu={menu} audio={E.audio} audioSel={audioSel} onAudio={pickAudio} subs={E.subs} subSel={subSel} onSub={pickSub}
+          menu={menu} audio={srvAudio ? S.tracks.audio : E.audio} audioSel={audioSel} onAudio={pickAudio} subs={srvSubs ? S.tracks.subs : E.subs} subSel={subSel} onSub={pickSub}
+          subSize={subSize} onSubSize={stepSubSize} subOffset={S.sidecar !== null ? subOffset : null} onSubOffset={stepSubOffset}
           sq={sq} onQuality={pickQ} speed={speed} onSpeed={pickSpeed} fit={fit} onFit={pickFit} onClose={() => setMenu(null)}
         />
       )}

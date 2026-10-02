@@ -3,6 +3,8 @@ import { ChevronsUpDown } from "lucide-react"
 import { groupLabel, Logo } from "@/components/tv/ui"
 import { nowNext, useCatalog } from "@/lib/catalog"
 import { fmt, useT } from "@/lib/i18n"
+import { usePData } from "@/lib/store"
+import { FAV } from "@/components/tv/groups"
 import type { Item } from "@/lib/types"
 import { useTick } from "../more/hooks"
 
@@ -16,7 +18,10 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
   useTick(30000)
   const epg = useCatalog((s) => s.epg)
   const live = useCatalog((s) => s.byKind.live)
-  const groups = useCatalog((s) => s.groups.live)
+  const realGroups = useCatalog((s) => s.groups.live)
+  const favs = usePData().favs
+  const hasFav = useMemo(() => live.some((c) => favs.includes(c.id)), [live, favs])
+  const groups = useMemo(() => (hasFav ? [FAV, ...realGroups] : realGroups), [hasFav, realGroups])
   const [g, setG] = useState(item.group)
   const ref = useRef<HTMLElement>(null)
   const idle = useRef(0)
@@ -25,7 +30,7 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
   const bump = () => { clearTimeout(idle.current); idle.current = window.setTimeout(() => closeRef.current(), IDLE_MS) }
   useEffect(() => { bump(); return () => clearTimeout(idle.current) }, [])
 
-  const cat = useMemo(() => live.filter((c) => c.group === g), [live, g])
+  const cat = useMemo(() => live.filter((c) => (g === FAV ? favs.includes(c.id) : c.group === g)), [live, g, favs])
   const shown = useMemo(() => {
     const ci = Math.max(0, cat.findIndex((c) => c.id === item.id))
     const a = Math.max(0, Math.min(ci - CAP / 2, cat.length - CAP))

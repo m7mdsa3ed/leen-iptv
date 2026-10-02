@@ -93,3 +93,11 @@ export function mapDetail(m: J, img: (path: string, w: number, h: number) => str
     meta: { plot: m.summary || undefined, genres, runtime, year, ratings, poster: m.thumb ? img(m.thumb, 600, 900) : undefined, backdrop: m.art ? img(m.art, 1280, 720) : undefined, cast, directors },
   }
 }
+
+/** Audio / subtitle streams of the first media part (GET /library/metadata/{id}); ids are Plex stream ids. */
+export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean }
+export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
+  const st: J[] = m?.Media?.[0]?.Part?.[0]?.Stream ?? []
+  const pick = (type: number) => st.filter((s) => s.streamType === type).map((s) => ({ id: Number(s.id), label: String(s.displayTitle || s.extendedDisplayTitle || s.language || s.codec || s.id), def: !!(s.selected || s.default), lang: s.languageCode || undefined }))
+  return { audio: pick(2), subs: pick(3) }
+}

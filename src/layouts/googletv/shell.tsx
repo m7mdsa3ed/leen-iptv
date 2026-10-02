@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Mic, Search } from "lucide-react"
+import { Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
 import { LeenMark, RoundButton } from "@/components/gtv"
@@ -17,7 +17,7 @@ export default function Shell({ page, title, children }: ShellProps) {
     </RoundButton>
   ) : (
     <button data-nav data-pill aria-label={t("gtv.shell.search")} data-autofocus={page === "search" ? "" : undefined} onClick={() => go("search")} className={cn("flex min-h-11 items-center gap-3 rounded-full px-4 text-base text-muted-foreground", page === "search" ? "bg-surface-3" : "bg-surface-2")}>
-      <Search className="size-5" /><span className="hidden pe-6 lg:inline">{t("gtv.shell.search")}</span><Mic className="size-5" />
+      <Search className="size-5" /><span className="hidden pe-6 lg:inline">{t("gtv.shell.search")}</span>
     </button>
   )
   const avatar = <ProfileButton page={page} go={go} />

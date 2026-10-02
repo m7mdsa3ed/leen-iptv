@@ -133,3 +133,21 @@ export function mapDetail(m: J, img: Img) {
     meta: { plot: m.Overview || undefined, genres, runtime: sec || undefined, year, ratings, poster: poster(m, img, 600), backdrop: backdrop(m, img), cast, directors, ids },
   }
 }
+
+/** WebVTT cue times moved by `sec` (negative = earlier; clamped at 0). Only timing lines (`-->`) are touched. */
+export const shiftVtt = (txt: string, sec: number) => {
+  if (!sec) return txt
+  const p = (n: number, w = 2) => String(n).padStart(w, "0")
+  return txt.split("\n").map((l) => (!l.includes("-->") ? l : l.replace(/(?:(\d+):)?(\d{2}):(\d{2})\.(\d{3})/g, (_, h, m, s, ms) => {
+    const t = Math.max(0, ((+(h || 0)) * 3600 + +m * 60 + +s) * 1000 + +ms + Math.round(sec * 1000))
+    return `${p(Math.floor(t / 3600000))}:${p(Math.floor(t / 60000) % 60)}:${p(Math.floor(t / 1000) % 60)}.${p(t % 1000, 3)}`
+  }))).join("\n")
+}
+
+/** Audio / subtitle streams (MediaStreams of the item); ids are the stream Index the server expects back. */
+export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean }
+export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
+  const st: J[] = m?.MediaSources?.[0]?.MediaStreams ?? m?.MediaStreams ?? []
+  const pick = (type: string) => st.filter((s) => s.Type === type).map((s) => ({ id: Number(s.Index), label: String(s.DisplayTitle || s.Language || s.Codec || s.Index), def: !!s.IsDefault, lang: s.Language || undefined, text: type === "Subtitle" ? !!s.IsTextSubtitleStream : undefined }))
+  return { audio: pick("Audio"), subs: pick("Subtitle") }
+}

@@ -1,3 +1,4 @@
+import { Backdrop } from "@/components/Backdrop"
 import { Check, ChevronDown, Clapperboard, Play, Plus, X } from "lucide-react"
 import { Logo } from "@/components/tv/ui"
 import { SkelBar } from "@/components/gtv"
@@ -23,14 +24,13 @@ export default function Detail({ id }: { id: string }) {
   const { item, isSeries, plot, chips, ratings, genres, cast, directors, loading } = D
   if (!item) return null
   const m = match(item)
-  const art = D.backdrop
   const castNames = cast.length ? cast.slice(0, 12) : []
   const poster = (i: Item) => ({ ...i, logo: i.backdrop ?? i.logo })
   return (
     <div className="h-full overflow-y-auto bg-background pb-[env(safe-area-inset-bottom)] md:px-[var(--gx)] md:py-8">
       <div className="nf-modal">
         <div className="relative aspect-video bg-surface-2">
-          {art && <img src={art} alt="" aria-hidden decoding="async" className="absolute inset-0 size-full object-cover" />}
+          {D.backdrops.length > 0 && <Backdrop srcs={D.backdrops} className="absolute inset-0" />}
           <div aria-hidden className="absolute inset-0 nf-fade-s" />
           {!isTv && <button data-nav aria-label={t("nf.detail.close")} onClick={D.back} className="nf-circle absolute end-3 top-3 !size-10 !bg-[rgba(24,24,24,.8)]"><X className="size-5" /></button>}
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-4 px-[clamp(1rem,3vw,3rem)] pb-4 md:pb-6">

@@ -1,3 +1,4 @@
+import { Backdrop } from "@/components/Backdrop"
 import { Fragment, useState } from "react"
 import { ArrowLeft, Check, Clapperboard, ChevronDown, Play, Plus } from "lucide-react"
 import { Logo } from "@/components/tv/ui"
@@ -11,11 +12,11 @@ import { SourceBadge, SourceChooser } from "../source-ui"
 
 const chip = "rounded-full bg-surface-2 px-3 py-1 text-sm text-foreground/80"
 
-/** Google TV details: full-bleed backdrop, poster left, Watch + watchlist, then Episodes / Cast & crew / More like this / Details rails. */
+/** Google TV details: full-bleed backdrops, poster left, Watch + watchlist, then Episodes / Cast & crew / More like this / Details rails. */
 export default function Detail({ id }: { id: string }) {
   const t = useT()
   const D = useDetail(id)
-  const { item, isSeries, loading, plot, chips, ratings, poster, backdrop, episodes: eps, seasons, season, setSeason, shown, pct, epLabel, play, fav, toggleFav, similar, open } = D
+  const { item, isSeries, loading, plot, chips, ratings, poster, backdrops, episodes: eps, seasons, season, setSeason, shown, pct, epLabel, play, fav, toggleFav, similar, open } = D
   const [menu, setMenu] = useState(false)
   const rp = item && (isSeries ? D.episodes[D.resumeIdx]?.item : item)
   const pr = rp ? D.progress(rp) : undefined
@@ -23,7 +24,7 @@ export default function Detail({ id }: { id: string }) {
   if (!item) return null
   return (
     <div className="relative h-full bg-background">
-      {backdrop && <img src={backdrop} alt="" aria-hidden decoding="async" className="pointer-events-none absolute inset-0 size-full object-cover opacity-60" />}
+      {backdrops.length > 0 && <Backdrop srcs={backdrops} className="absolute inset-0 opacity-60" />}
       <div aria-hidden className="gtv-hero-fade pointer-events-none absolute inset-0" />
       <div aria-hidden className="gtv-hero-fade-b pointer-events-none absolute inset-x-0 bottom-0 h-1/2" />
       <div className="relative h-full overflow-y-auto px-[var(--gx)] pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
