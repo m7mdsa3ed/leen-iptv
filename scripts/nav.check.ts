@@ -66,3 +66,23 @@ assert.equal(pickIndex(side[0], [side[1], ...pane], "down"), 0)
 assert.deepEqual(unreachable([...side, ...pane]), [])
 
 console.log("nav.check ok")
+
+// lineStart: Up/Down into a new row lands on that row's first item (leftmost; rightmost in RTL), not the one under the cursor
+{
+  const { lineStart } = await import("../src/lib/nav-pure.ts")
+  const row2 = Array.from({ length: 6 }, (_, i) => B(-300 + i * 220, 800, 200, 300)) // scrolled rail: item 0 off-screen left
+  const other = B(0, 300, 200, 300) // a different line
+  assert.equal(lineStart([other, ...row2], row2[3]), 1)
+  assert.equal(lineStart([other, ...row2], row2[3], true), 6)
+  assert.equal(lineStart([other], row2[0]), -1)
+}
+
+// Back pops exactly one page: system/browser Back that skipped history entries (d far below the stack) still drops one level
+{
+  const { popLen } = await import("../src/lib/nav-pure.ts")
+  assert.equal(popLen(2, 3, false), 2) // episode -> detail
+  assert.equal(popLen(1, 3, false), 2) // browser skipped the detail entry: still detail, not Shows
+  assert.equal(popLen(0, 3, false), 2) // landed on the guard
+  assert.equal(popLen(0, 1, false), 1) // root page: stay in the app
+  assert.equal(popLen(1, 2, true), 2)  // back() already trimmed the stack
+}

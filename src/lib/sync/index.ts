@@ -1,11 +1,11 @@
-// Supabase sync: GoTrue + PostgREST over fetch, merged with src/lib/sync/merge.ts, optionally AES-GCM encrypted.
+// Cloud sync: GoTrue + PostgREST over fetch, merged with src/lib/sync/merge.ts, optionally AES-GCM encrypted.
 import { create } from "zustand"
 import { get as idbGet, set as idbSet } from "idb-keyval"
 import { useApp } from "../store"
 import { useHistory, flushHistory } from "../history"
 import { explain } from "../net"
 import { t } from "../i18n"
-import { api, ApiError, badKey, envConfigured, loadConfig, parseAuthHash, type Config, type Session } from "./client"
+import { ApiError, badKey, envConfigured, loadConfig, parseAuthHash, syncBackend as api, type Config, type Session } from "@/lib/api"
 import { canEncrypt, deriveKey, exportKey, importKey, newSalt, needsHttps, open, parseBlob, seal, WrongPassphrase, type Key } from "./crypto"
 import { applySnapshot, buildSnapshot, flatten, merge, stable, stamp, type AppSlice, type Day, type Snapshot } from "./merge"
 import { useSyncMeta } from "./meta"
@@ -92,6 +92,13 @@ async function fresh(): Promise<Session> {
     if (e instanceof ApiError && [400, 401, 403].includes(e.status)) { setSession(null); throw new Error(t("sync.err.expired")) }
     throw e
   }
+}
+
+/** Config + a valid session for the shared metadata cache, or null when sync is off / signed out. Never throws. */
+export async function sharedAuth(): Promise<{ cfg: Config; session: Session } | null> {
+  const { cfg, session } = useS.getState()
+  if (!cfgOk(cfg) || !session) return null
+  try { return { cfg, session: await fresh() } } catch { return null }
 }
 
 async function cycle() {
@@ -236,7 +243,7 @@ const actions = {
   cancelRecovery() { useS.setState({ recovery: null }) },
   async signInPassword(email: string, pw: string) { await signedIn(await api.password(needCfg(), email.trim(), pw)) },
   /** 'confirm' = the project wants the email confirmed first */
-  /** The app does not use confirmation emails: sign-up signs you in at once. If the Supabase project still has "Confirm email" on, say how to turn it off. */
+  /** The app does not use confirmation emails: sign-up signs you in at once. If the server still has "Confirm email" on, say how to turn it off. */
   async signUp(email: string, pw: string) {
     const s = await api.signUp(needCfg(), email.trim(), pw)
     if (!s) throw new Error(t("sync.err.confirmOn"))

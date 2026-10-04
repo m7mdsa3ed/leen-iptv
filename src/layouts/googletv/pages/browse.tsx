@@ -18,17 +18,25 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
   return (
     <Shell page={page} title={kindLabel}>
       {status !== "ready" ? <Pending shape="grid" /> : (
-        <div className="flex h-full flex-col">
-          <SourceFilter />
-          {/* one pill row: All, Favorites, genres (open the TMDB genre page), then categories (filter in place; locked ones go through their PIN-gated page) */}
-          <Chips cat items={[ALL, FAV, ...genres.filter((x) => !groups.includes(x)), ...groups]} active={g} locked={isLocked}
-            onPick={(c) => (c === ALL || c === FAV || (groups.includes(c) && !isLocked(c)) ? setG(c) : groups.includes(c) ? openCategory(c) : openGenre(c))}
-            onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
-            onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
-          <div className="min-h-0 flex-1">
-            {list.length ? <VGrid items={list} minW={mode === "tv" ? 270 : mode === "mobile" ? 105 : 190} label={56} render={(i: Item) => <Card key={i.id} fluid item={i} pct={pct(i)} onOpen={() => open(i)} />} /> : <Empty>{t("gtv.browse.empty")}</Empty>}
-          </div>
-        </div>
+        (() => {
+          const filters = (<>
+            <SourceFilter />
+            {/* one pill row: All, Favorites, genres (open the TMDB genre page), then categories (filter in place; locked ones go through their PIN-gated page) */}
+            <Chips cat items={[ALL, FAV, ...genres.filter((x) => !groups.includes(x)), ...groups]} active={g} locked={isLocked}
+              onPick={(c) => (c === ALL || c === FAV || (groups.includes(c) && !isLocked(c)) ? setG(c) : groups.includes(c) ? openCategory(c) : openGenre(c))}
+              onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
+              onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
+          </>)
+          const grid = (head?: React.ReactNode, cls?: string) => <VGrid items={list} head={head} className={cls} minW={mode === "tv" ? 270 : mode === "mobile" ? 105 : 190} label={56} render={(i: Item) => <Card key={i.id} fluid item={i} pct={pct(i)} onOpen={() => open(i)} />} />
+          // mobile: filters + grid scroll together and start under the top bar, so content fades under its gradient instead of stopping below it
+          if (list.length) return grid(filters, "-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]")
+          return (
+            <div className="flex h-full flex-col">
+              {filters}
+              <div className="min-h-0 flex-1">{list.length ? grid() : <Empty>{t("gtv.browse.empty")}</Empty>}</div>
+            </div>
+          )
+        })()
       )}
     </Shell>
   )

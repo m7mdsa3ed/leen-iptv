@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react"
+import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import { create } from "zustand"
-import { ArrowBigUp, ChevronLeft, ChevronRight, CornerDownLeft, Delete, Globe } from "lucide-react"
+import { ArrowBigUp, ChevronLeft, Clock, ChevronRight, CornerDownLeft, Delete, Globe } from "lucide-react"
 import { isTv } from "@/lib/device"
-import { useLang, useT } from "@/lib/i18n"
+import { useCatalogView } from "@/layouts/hooks/use-source-filter"
+import { fold, useLang, useT } from "@/lib/i18n"
 import { navHooks } from "@/lib/nav"
+import { useSearchHistory } from "@/lib/search-history"
 import { useApp } from "@/lib/store"
 
 type El = HTMLInputElement | HTMLTextAreaElement
@@ -25,10 +27,10 @@ const NUMS = "1234567890".split("")
 const MARKS = ["َ", "ً", "ُ", "ٌ", "ِ", "ٍ", "ّ", "ْ"] // fatha .. sukun
 const L = {
   en: { low: ["qwertyuiop", "asdfghjkl", "zxcvbnm"], up: ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"] },
-  ar: { low: ["ضصثقفغعهخحجد", "شسيبلاتنمكط", "ئءؤرلاىةوزظ"], up: [["َ", "ً", "ُ", "ٌ", "ِ", "ٍ", "ّ", "ْ", "؟", "؛", "،", "ـ"], "أإآؤئءڤپچژگ", "!\":؟،؛.-/()"] },
+  ar: { low: ["ضصثقفغعهخحجدذ", "شسيبلاتنمكط", ["ئ", "ء", "ؤ", "ر", "لا", "ى", "ة", "و", "ز", "ظ"]], up: [["َ", "ً", "ُ", "ٌ", "ِ", "ٍ", "ّ", "ْ", "؟", "؛", "،", "ـ"], "أإآؤئءڤپچژگ", "!\":؟،؛.-/()"] },
 } as const
 const SYM = ["@#$%&*-+()", "!\"':;/?_=~", ",.<>[]{}\\|"]
-const cells = (r: string | readonly string[]) => (typeof r === "string" ? Array.from(r.replace(/لا/, "\u0000")).map((c) => (c === "\u0000" ? "لا" : c)) : [...r])
+const cells = (r: string | readonly string[]) => (typeof r === "string" ? Array.from(r) : [...r]) // "لا" is its own key (array rows), ل and ا stay separate letters
 
 function write(el: El, v: string) {
   const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
@@ -36,9 +38,10 @@ function write(el: El, v: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }))
 }
 
-const Key = ({ children, onClick, label, wide, on, auto }: { children: React.ReactNode; onClick: () => void; label?: string; wide?: number; on?: boolean; auto?: boolean }) => (
+/** letter keys are quiet (surface-2), function keys one step darker, the Enter key carries the accent so the way out is obvious */
+const Key = ({ children, onClick, label, wide, on, auto, kind }: { children: React.ReactNode; onClick: () => void; label?: string; wide?: number; on?: boolean; auto?: boolean; kind?: "fn" | "go" }) => (
   <button type="button" data-nav data-pill data-autofocus={auto ? "" : undefined} aria-label={label} aria-pressed={on} style={{ flex: wide ?? 1 }}
-    className={`flex h-12 min-w-0 items-center justify-center rounded-xl text-xl font-medium md:h-14 ${on ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground"} [&_svg]:size-6`}
+    className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-2xl px-0 text-base font-medium sm:h-12 sm:text-xl md:h-14 ${kind === "go" ? "bg-primary text-primary-foreground" : on ? "bg-accent-blue-container text-foreground" : kind === "fn" ? "bg-surface-3 text-foreground" : "bg-surface-2 text-foreground"} [&_svg]:size-5 sm:[&_svg]:size-6`}
     onClick={onClick}>{children}</button>
 )
 
@@ -58,6 +61,21 @@ export function OnScreenKeyboard() {
     return () => cancelAnimationFrame(id)
   }, [el])
 
+  const { items } = useCatalogView()
+  const history = useSearchHistory((s) => s.list)
+  const isSearch = el instanceof HTMLInputElement && el.type === "search"
+  const q = fold(useDeferredValue(text).trim())
+  // search boxes: recent searches when empty, else up to 6 catalog titles (prefix matches first); one pass, stops early
+  const suggestions = useMemo(() => {
+    if (!isSearch) return []
+    if (q.length < 2) return history.slice(0, 6)
+    const starts = new Set<string>(), has = new Set<string>()
+    for (const i of items) {
+      const n = fold(i.name)
+      if (n.startsWith(q)) { starts.add(i.name); if (starts.size >= 6) break } else if (has.size < 6 && n.includes(q)) has.add(i.name)
+    }
+    return [...starts, ...has].slice(0, 6)
+  }, [isSearch, q, items, history])
   if (!el) return null
   const apply = (v: string, p: number) => { setText(v); setPos(p); write(el, v) }
   const type = (s: string) => { apply(text.slice(0, pos) + s + text.slice(pos), pos + s.length); if (layer === "up" && lang === "en") setLayer("low") }
@@ -76,32 +94,42 @@ export function OnScreenKeyboard() {
   const lit = (s: string) => <span>{s}</span>
 
   return (
-    <div data-modal data-kbd role="dialog" aria-modal="true" aria-label={t("kb.title")} className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60" onClick={closeKeyboard}>
-      <div dir="ltr" className="mx-auto flex w-full max-w-[68rem] flex-col gap-2 rounded-t-[28px] bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:p-6" onClick={(e) => e.stopPropagation()}>
-        <div dir="auto" className="mb-1 flex min-h-12 items-center rounded-2xl bg-surface-2 px-4 text-xl md:text-2xl">
+    <div data-modal data-kbd role="dialog" aria-modal="true" aria-label={t("kb.title")} className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/50 sm:items-center sm:pb-6" onClick={closeKeyboard}>
+      <div dir="ltr" className="flex w-full max-w-[64rem] flex-col gap-1.5 rounded-t-[28px] bg-surface p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:gap-2 sm:rounded-[28px] sm:p-4 md:p-6" onClick={(e) => e.stopPropagation()}>
+        <div dir="auto" className="mb-1 flex min-h-12 min-w-0 items-center overflow-hidden rounded-2xl bg-surface-2 px-4 text-xl ring-2 ring-primary/60 md:min-h-14 md:text-2xl">
           {lit(shownText.slice(0, pos))}<span aria-hidden className="mx-px inline-block h-7 w-0.5 animate-pulse bg-foreground" />{lit(shownText.slice(pos))}
           {!text && <span className="text-muted-foreground">{el.placeholder || el.getAttribute("aria-label") || ""}</span>}
         </div>
-        <div className="flex gap-2">{NUMS.map((c) => <Key key={c} onClick={() => type(c)}>{c}</Key>)}</div>
+        {suggestions.length > 0 && (
+          <div className="no-scrollbar flex gap-2 overflow-x-auto py-1">
+            {suggestions.map((sg) => (
+              <button key={sg} type="button" data-nav data-pill onClick={() => apply(sg, sg.length)} dir="auto"
+                className="flex h-10 max-w-[60%] shrink-0 items-center gap-2 rounded-full bg-surface-2 px-4 text-base text-foreground sm:text-lg">
+                {q.length < 2 && <Clock className="size-4 shrink-0 text-muted-foreground" />}<span className="truncate">{sg}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-1 sm:gap-2">{NUMS.map((c) => <Key key={c} onClick={() => type(c)}>{c}</Key>)}</div>
         {rows.map((r, i) => {
           const cs = cells(r)
           return (
-            <div key={i} className="flex gap-2">
-              {i === 2 && layer !== "sym" && <Key wide={1.6} on={layer === "up"} label={t("kb.shift")} onClick={() => setLayer(layer === "up" ? "low" : "up")}><ArrowBigUp /></Key>}
+            <div key={i} className={`flex gap-1 sm:gap-2 ${i === 1 ? "px-[3%]" : ""}`}>
+              {i === 2 && layer !== "sym" && <Key kind="fn" wide={1.6} on={layer === "up"} label={t("kb.shift")} onClick={() => setLayer(layer === "up" ? "low" : "up")}><ArrowBigUp /></Key>}
               {cs.map((c, k) => <Key key={c + k} auto={i === 1 && k === 3} onClick={() => type(c)}>{shown(c)}</Key>)}
-              {i === 2 && <Key wide={1.6} label={t("kb.backspace")} onClick={back}><Delete /></Key>}
+              {i === 2 && <Key kind="fn" wide={1.6} label={t("kb.backspace")} onClick={back}><Delete /></Key>}
             </div>
           )
         })}
-        <div className="flex gap-2">
-          <Key wide={1.6} on={layer === "sym"} onClick={() => setLayer(layer === "sym" ? "low" : "sym")}>{layer === "sym" ? "ABC" : "?123"}</Key>
-          <Key wide={1.6} label={t("kb.language")} onClick={() => { const n = lang === "en" ? "ar" : "en"; lastLang = n; setLang(n); setLayer("low") }}><Globe className="me-1" />{lang === "en" ? "EN" : "ع"}</Key>
-          <Key label={t("kb.left")} onClick={() => setPos(Math.max(0, pos - 1))}><ChevronLeft /></Key>
+        <div className="flex gap-1 sm:gap-2">
+          <Key kind="fn" wide={1.6} on={layer === "sym"} onClick={() => setLayer(layer === "sym" ? "low" : "sym")}>{layer === "sym" ? "ABC" : "?123"}</Key>
+          <Key kind="fn" wide={1.6} label={t("kb.language")} onClick={() => { const n = lang === "en" ? "ar" : "en"; lastLang = n; setLang(n); setLayer("low") }}><Globe className="me-1" />{lang === "en" ? "EN" : "ع"}</Key>
+          <Key kind="fn" label={t("kb.left")} onClick={() => setPos(Math.max(0, pos - 1))}><ChevronLeft /></Key>
           <Key wide={4} label={t("kb.space")} onClick={() => type(" ")}><span className="text-base text-muted-foreground">{t("kb.space")}</span></Key>
-          <Key label={t("kb.right")} onClick={() => setPos(Math.min(text.length, pos + 1))}><ChevronRight /></Key>
+          <Key kind="fn" label={t("kb.right")} onClick={() => setPos(Math.min(text.length, pos + 1))}><ChevronRight /></Key>
           <Key onClick={() => type(lang === "ar" ? "،" : ",")}>{lang === "ar" ? "،" : ","}</Key>
           <Key onClick={() => type(".")}>.</Key>
-          <Key wide={1.6} label={t("kb.done")} onClick={enter}><CornerDownLeft /></Key>
+          <Key kind="go" wide={2} label={t("kb.done")} onClick={enter}><CornerDownLeft /><span className="hidden sm:inline">{t("kb.done")}</span></Key>
         </div>
       </div>
     </div>

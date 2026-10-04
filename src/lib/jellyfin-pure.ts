@@ -1,5 +1,7 @@
 // Pure Jellyfin helpers (no '@/' imports, no DOM) so `node scripts/jellyfin.check.ts` can run them.
-import type { Episode, Item, Prog } from "./types"
+import type { Episode, Item } from "./types"
+import { isLanHost } from "./plex-pure.ts"
+import { jfStream } from "./meta/facts-pure.ts"
 
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 /** (item id, image type, max width, tag) -> image URL. */
@@ -72,6 +74,7 @@ export function mapEpisode(e: J, series: Item, sourceId: string, img: Img): Epis
       sid: String(e.Id),
       name: `${series.name} S${season}E${num}`,
       group: series.name,
+      series: series.id,
       logo: poster(e, img, 400) ?? series.logo,
       plot: e.Overview || undefined,
       resume: fromTicks(e.UserData?.PlaybackPositionTicks),
@@ -80,7 +83,7 @@ export function mapEpisode(e: J, series: Item, sourceId: string, img: Img): Epis
   }
 }
 
-/** One /LiveTv/Channels entry -> live Item; epgId = channel id so the guide lines up with jellyfin programs. */
+/** One /LiveTv/Channels entry -> live Item. */
 export const mapChannel = (c: J, sourceId: string, img: Img): Item => ({
   id: `${sourceId}|live|${c.Id}`,
   kind: "live",
@@ -91,20 +94,6 @@ export const mapChannel = (c: J, sourceId: string, img: Img): Item => ({
   epgId: String(c.Id),
   num: c.ChannelNumber && !isNaN(Number(c.ChannelNumber)) ? Number(c.ChannelNumber) : undefined,
 })
-
-/** /LiveTv/Programs entries -> the app's guide map (channel id -> programmes sorted by start, ms epoch). */
-export function mapPrograms(list: J[]): Map<string, Prog[]> {
-  const out = new Map<string, Prog[]>()
-  for (const p of list) {
-    const s = Date.parse(p.StartDate), e = Date.parse(p.EndDate)
-    if (!p.ChannelId || isNaN(s) || isNaN(e)) continue
-    const k = String(p.ChannelId)
-    if (!out.has(k)) out.set(k, [])
-    out.get(k)!.push({ s, e, t: String(p.EpisodeTitle ? `${p.Name}: ${p.EpisodeTitle}` : p.Name ?? ""), d: p.Overview || undefined })
-  }
-  for (const l of out.values()) l.sort((a, b) => a.s - b.s)
-  return out
-}
 
 /** GET /Users/{uid}/Items/{id} -> Xtream-like `info` + normalized meta fields (same shape as plex mapDetail). */
 export function mapDetail(m: J, img: Img) {
@@ -129,6 +118,7 @@ export function mapDetail(m: J, img: Img) {
       releasedate: (m.PremiereDate ? String(m.PremiereDate).slice(0, 10) : "") || year || "",
       duration: "",
       rating: m.CommunityRating ?? "",
+      stream: jfStream(m),
     } as Record<string, unknown>,
     meta: { plot: m.Overview || undefined, genres, runtime: sec || undefined, year, ratings, poster: poster(m, img, 600), backdrop: backdrop(m, img), cast, directors, ids },
   }
@@ -146,8 +136,30 @@ export const shiftVtt = (txt: string, sec: number) => {
 
 /** Audio / subtitle streams (MediaStreams of the item); ids are the stream Index the server expects back. */
 export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean }
+/** Skippable stretch of an episode, in seconds. */
+export type Seg = { kind: "intro" | "recap" | "credits"; start: number; end: number }
+const SEG_KIND: Record<string, Seg["kind"]> = { Intro: "intro", Recap: "recap", Outro: "credits" }
+/** Jellyfin 10.10+ GET /MediaSegments/{id}: Items with Type + StartTicks/EndTicks. */
+export const mapSegments = (j: J): Seg[] =>
+  ((j?.Items ?? []) as J[]).filter((x) => SEG_KIND[x.Type] && x.EndTicks > x.StartTicks).map((x) => ({ kind: SEG_KIND[x.Type], start: x.StartTicks / 1e7, end: x.EndTicks / 1e7 }))
+/** Intro Skipper plugin (older servers): GET /Episode/{id}/IntroTimestamps/v1 -> {Valid, IntroStart, IntroEnd} in seconds. */
+export const mapIntroSkipper = (j: J): Seg[] => (j?.Valid && j.IntroEnd > j.IntroStart ? [{ kind: "intro", start: j.IntroStart, end: j.IntroEnd }] : [])
+
 export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
   const st: J[] = m?.MediaSources?.[0]?.MediaStreams ?? m?.MediaStreams ?? []
   const pick = (type: string) => st.filter((s) => s.Type === type).map((s) => ({ id: Number(s.Index), label: String(s.DisplayTitle || s.Language || s.Codec || s.Index), def: !!s.IsDefault, lang: s.Language || undefined, text: type === "Subtitle" ? !!s.IsTextSubtitleStream : undefined }))
   return { audio: pick("Audio"), subs: pick("Subtitle") }
 }
+
+/* ---------- local / remote addresses ---------- */
+export type JfCand = { uri: string; kind: "local" | "remote" }
+type JfConn = { server?: string; localServer?: string; remoteServer?: string; connMode?: string }
+/** Addresses to try, in order (auto: local first, then remote). The connection mode filters them unless `all`. A source with only `server` is one address, local or remote by its host. */
+export function jfCands(s: JfConn, all = false): JfCand[] {
+  const L = s.localServer?.trim() ? normServer(s.localServer) : "", R = s.remoteServer?.trim() ? normServer(s.remoteServer) : ""
+  if (!L && !R) return s.server?.trim() ? [{ uri: normServer(s.server), kind: isLanHost(s.server) ? "local" : "remote" }] : []
+  const m = all ? "auto" : s.connMode
+  return [...(L && m !== "remote" ? [{ uri: L, kind: "local" as const }] : []), ...(R && m !== "local" ? [{ uri: R, kind: "remote" as const }] : [])]
+}
+/** Is the active `server` the local or the remote address? */
+export const jfActiveKind = (s: JfConn): "local" | "remote" => jfCands(s, true).find((c) => c.uri === normServer(s.server ?? ""))?.kind ?? (isLanHost(s.server ?? "") ? "local" : "remote")

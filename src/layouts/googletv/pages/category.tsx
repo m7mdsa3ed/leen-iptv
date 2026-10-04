@@ -14,7 +14,8 @@ export default function CategoryPage({ id }: { id: string }) {
   return (
     <Shell page={kind === "movie" ? "movies" : "series"} title={group}>
       {status !== "ready" ? <Pending /> : !ok ? null : (
-        <div className="flex h-full flex-col">
+        (() => {
+          const head = (<>
           <div className="m-rise flex flex-wrap items-center gap-3 pb-2">
             {!isTv && <RoundButton label={t("gtv.back")} onClick={back}><ArrowLeft className="rtl-flip" /></RoundButton>}
             <div className="me-auto min-w-0">
@@ -27,10 +28,17 @@ export default function CategoryPage({ id }: { id: string }) {
             <Input data-nav aria-label={t("gtv.category.filter")} dir="auto" className="h-11 w-48 rounded-full text-base focus-visible:ring-0 md:w-64 [html[data-mode=mobile]_&]:text-[16px]" type="search" autoComplete="off" placeholder={t("gtv.category.filter")} value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <SourceFilter />
-          <div className="m-fade min-h-0 flex-1" style={{ "--i": 1 } as React.CSSProperties}>
-            {items.length ? <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => open(i)} />} /> : <Empty>{t("gtv.category.noMatch")}</Empty>}
-          </div>
-        </div>
+          </>)
+          if (items.length) return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => open(i)} />} head={head} className="-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]" />
+          return (
+            <div className="flex h-full flex-col">
+              {head}
+              <div className="m-fade min-h-0 flex-1" style={{ "--i": 1 } as React.CSSProperties}>
+            <Empty>{t("gtv.category.noMatch")}</Empty>
+              </div>
+            </div>
+          )
+        })()
       )}
     </Shell>
   )

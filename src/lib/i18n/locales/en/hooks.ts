@@ -9,7 +9,12 @@ const d: Dict = {
   "hooks.detail.resume": "Resume",
   "hooks.detail.play": "Play",
   "hooks.detail.watched": "Watched",
+  "hooks.detail.markWatched": "Mark watched",
+  "hooks.detail.markUnwatched": "Mark unwatched",
+  "hooks.detail.removeContinue": "Remove from Continue watching",
+  "hooks.detail.match": "Match metadata",
   "hooks.detail.ep": "E{n}",
   "hooks.detail.rating": "Rating",
+  "hooks.detail.refreshMeta": "Refresh metadata",
 }
 export default d

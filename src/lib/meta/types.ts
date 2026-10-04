@@ -20,7 +20,21 @@ export interface Meta {
   similar: SimilarRef[]
   ids: Ids
   trailers?: Trailer[]
+  logo?: string // transparent title art (TMDB images.logos)
+  cert?: string // age rating / certification, e.g. "PG-13", "+16"
+  awards?: string // OMDb, e.g. "Won 2 Oscars. 40 wins & 90 nominations total"
+  tagline?: string // TMDB
+  original?: string // original-language title, only when it differs from `title`
+  status?: string // TMDB: "Returning Series", "Ended", "Released", ...
+  languages?: string[] // ISO 639-1 codes, original language first
+  countries?: string[] // ISO 3166-1 codes
+  studios?: string[] // production companies (movies) / networks (series)
+  next?: { air: string; s: number; e: number } // series: next episode to air
+  crew?: Person[] // creators, directors, writers, producers, composer, cinematographer (role = job)
 }
+
+/** One episode as a provider knows it (TMDB /tv/{id}/season/{n}); fills gaps in the panel's episode list. */
+export interface EpisodeMeta { num: number; title?: string; plot?: string; still?: string; air?: string; runtime?: number; rating?: string; guests: Person[]; directors: string[]; writers: string[] }
 
 export interface Query {
   kind: "movie" | "series"
@@ -62,6 +76,8 @@ export interface Provider {
   genres?(kind: "movie" | "series", cfg: ProviderCfg): Promise<string[] | null>
   /** Optional: popular titles of a genre, one page at a time (matched against the user's catalog by the caller). */
   discover?(kind: "movie" | "series", genre: string, page: number, cfg: ProviderCfg): Promise<{ refs: SimilarRef[]; pages: number } | null>
+  /** Optional: the episodes of one season of a series (by the provider's own id). */
+  season?(id: string, season: number, cfg: ProviderCfg): Promise<EpisodeMeta[] | null>
   /** Optional: full profile of a cast/crew member. */
   person?(ref: PersonRef, cfg: ProviderCfg): Promise<PersonInfo | null>
 }

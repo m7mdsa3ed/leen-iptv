@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from "react"
-import { TvButton } from "./ui"
+import { Pill } from "@/components/gtv"
 import { t } from "@/lib/i18n"
 import { useRoute } from "@/lib/nav"
 
@@ -14,8 +14,8 @@ export class Boundary extends Component<{ children: ReactNode }, { err: Error | 
         <div className="text-2xl font-semibold">{t("common.error")}</div>
         <div dir="auto" className="max-w-xl text-muted-foreground">{this.state.err.message}</div>
         <div className="flex gap-3">
-          <TvButton data-autofocus="" onClick={() => (this.setState({ err: null }), useRoute.getState().back())}>{t("common.goBack")}</TvButton>
-          <TvButton variant="secondary" onClick={() => location.reload()}>{t("common.reload")}</TvButton>
+          <Pill variant="primary" data-autofocus="" onClick={() => (this.setState({ err: null }), useRoute.getState().back())}>{t("common.goBack")}</Pill>
+          <Pill onClick={() => location.reload()}>{t("common.reload")}</Pill>
         </div>
       </div>
     )

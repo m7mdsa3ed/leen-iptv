@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Trash2 } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
+import { ConfirmButton } from "@/settings/controls"
 import { Empty, Shell, useOpen } from "@/components/tv/ui"
 import { useCatalog } from "@/lib/catalog"
 import { useHistory } from "@/lib/history"
@@ -34,7 +35,6 @@ export default function HistoryPage() {
   const open = useOpen()
   const go = useRoute((s) => s.go)
   const [filter, setFilter] = useState<Filter>("all")
-  const [confirm, setConfirm] = useState(false)
   const [shown, setShown] = useState(PAGE)
 
   useEffect(() => { if (profileId) void useHistory.getState().load(profileId) }, [profileId])
@@ -67,9 +67,7 @@ export default function HistoryPage() {
           {FILTERS.map(([f, label]) => <Pill key={f} variant={filter === f ? "primary" : "tonal"} onClick={() => { setFilter(f); setShown(PAGE) }}>{t(label)}</Pill>)}
           <Pill onClick={() => go("stats")}>{t("pages.history.stats")}</Pill>
           {sessions.length > 0 && (
-            <Pill variant={confirm ? "primary" : "ghost"} onClick={() => (confirm ? (useHistory.getState().clear(), setConfirm(false)) : setConfirm(true))} onBlur={() => setConfirm(false)}>
-              {confirm ? t("pages.history.pressAgain") : t("pages.history.clear")}
-            </Pill>
+            <ConfirmButton confirmLabel={t("pages.history.pressAgain")} onConfirm={() => useHistory.getState().clear()}>{t("pages.history.clear")}</ConfirmButton>
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto pb-6 [--s:1.02]">
@@ -86,10 +84,10 @@ export default function HistoryPage() {
                     const pct = r.s.dur && r.s.pos ? Math.min(100, (r.s.pos / r.s.dur) * 100) : 0
                     return (
                       <div key={r.key} className="flex items-center gap-3 rounded-2xl bg-surface p-2 pe-3">
-                        <button data-nav disabled={!tg} onClick={() => tg && void open(tg, [tg])} className="flex min-w-0 flex-1 items-center gap-4 rounded-xl p-1 text-start disabled:opacity-60">
-                          <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-xl bg-surface-2 md:w-40">
+                        <button data-nav disabled={!tg} onClick={() => tg && void open(tg, [tg])} className="flex min-w-0 flex-1 items-center gap-4 rounded-2xl p-1 text-start disabled:opacity-60">
+                          <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-2xl bg-surface-2 md:w-40">
                             {r.s.logo && <img src={r.s.logo} alt="" loading="lazy" decoding="async" className={r.s.kind === "live" ? "size-full object-contain p-3" : "size-full object-cover"} />}
-                            {pct > 0 && pct < 97 && <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-black/40"><div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} /></div>}
+                            {pct > 0 && pct < 97 && <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} /></div>}
                           </div>
                           <div className="min-w-0">
                             <div dir="auto" className="truncate text-lg font-medium">{r.s.name}</div>

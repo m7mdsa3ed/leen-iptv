@@ -5,6 +5,7 @@ import { useProfile } from "@/lib/store"
 import { useCatalog } from "@/lib/catalog"
 import { Avatar } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
+import { openPalette } from "@/components/tv/search-palette"
 import { useLayoutDef } from "./index"
 
 /** Common Shell state: tabs = the active layout's def.tabs; go(route) resets the stack (no-op on the current page); search is route "search", profile/settings is route "settings". */
@@ -16,7 +17,7 @@ export function useShellNav(page: string) {
   const t = useT()
   const def = useLayoutDef()
   const tabs = useMemo(() => def.tabs.map((x) => ({ ...x, label: t(x.labelKey) })), [def, t]) // localised labels
-  return { tabs, go: (k: string) => k !== page && reset(k), status, profile, mode, mobile: mode === "mobile", tv: mode === "tv" }
+  return { tabs, go: (k: string) => (k === "search" ? openPalette() : k !== page && reset(k)), status, profile, mode, mobile: mode === "mobile", tv: mode === "tv" }
 }
 
 /** Profile avatar button (opens Settings). Marks itself data-autofocus on the settings page. */

@@ -16,8 +16,8 @@ export function ExitConfirm() {
   useEffect(() => { if (open) requestAnimationFrame(focusFirst) }, [open])
   if (!open) return null
   return (
-    <div data-modal role="alertdialog" aria-modal="true" aria-label={t("nav.exit.title")} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="flex w-full max-w-[26rem] flex-col items-center gap-5 rounded-[28px] bg-surface p-8 text-center shadow-2xl">
+    <div data-modal role="alertdialog" aria-modal="true" aria-label={t("nav.exit.title")} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
+      <div className="my-auto flex w-full max-w-[26rem] flex-col items-center gap-5 rounded-[28px] bg-surface p-8 text-center shadow-2xl">
         <LeenMark className="size-16" />
         <div>
           <div className="text-2xl font-semibold">{t("nav.exit.title")}</div>

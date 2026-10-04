@@ -3,6 +3,7 @@ import type { Dict } from "../../pure.ts"
 const d: Dict = {
   "common.ok": "OK",
   "common.cancel": "Cancel",
+  "common.removeContinue": "Remove from Continue watching",
   "common.back": "Back",
   "common.save": "Save",
   "common.close": "Close",
@@ -46,5 +47,14 @@ const d: Dict = {
   "kb.right": "Move right",
   "kb.space": "Space",
   "kb.done": "Enter",
+  "search.live": "Live",
+  "search.movie": "Movie",
+  "search.series": "Show",
+  "search.recent": "Recent searches",
+  "search.clear": "Clear",
+  "search.remove": "Remove",
+  "search.hint": "Type to search channels, movies and shows",
+  "search.none": "No matches",
+  "common.moreOptions": "More options",
 }
 export default d

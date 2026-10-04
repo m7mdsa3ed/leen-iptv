@@ -6,7 +6,7 @@ export type ShellProps = { page: string; title?: string; children: ReactNode }
 /** A navigation item a layout shows: `key` = the Shell `page` it is active on, `route` = what reset(route) opens. */
 export type LayoutTab = { key: string; label: string; labelKey: string; route: string; icon: LucideIcon }
 /** Pages a layout may replace; an override gets the SAME props as the default page (Detail {id}, Browse {kind}, Category {id}, Genre {id}, Person {id?, name?}). */
-export type PageKey = "movies" | "series" | "live" | "guide" | "detail" | "search" | "library" | "profiles" | "settings" | "category" | "genre" | "person"
+export type PageKey = "movies" | "series" | "live" | "detail" | "library" | "profiles" | "settings" | "category" | "genre" | "person" | "episode" | "team" | "sports"
 export type LayoutDef = {
   id: LayoutId
   Shell: ComponentType<ShellProps>

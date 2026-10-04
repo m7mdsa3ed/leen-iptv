@@ -21,7 +21,7 @@ export function redact(input: string): string {
   s = s.replace(/(live|movie|series)%2F[^%\s&]+%2F[^%\s&]+%2F(?=\d)/gi, `$1%2F${R}%2F${R}%2F`)
   // user:pass@host
   s = s.replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+(?::[^/\s@]*)?@/gi, `$1${R}@`)
-  // JWTs (Supabase anon keys, TMDB v4 tokens, GoTrue sessions) and new-style Supabase keys
+  // JWTs (anon keys, TMDB v4 tokens, GoTrue sessions) and new-style sb_ keys
   s = s.replace(/\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g, "[jwt]")
   s = s.replace(/\bsb_(?:publishable|secret)_[\w-]+/g, R)
   // emails

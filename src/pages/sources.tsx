@@ -1,3 +1,4 @@
+import { SourceMark } from "@/components/source/SourceMark"
 import { useEffect, useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Pill } from "@/components/gtv"
@@ -7,7 +8,7 @@ import { useRoute } from "@/lib/nav"
 import { explain } from "@/lib/net"
 import { QrCode } from "@/components/QrCode"
 import { checkPin, createPin, detectPlex, pickConnection, plexAuthUrl, plexServers, type Pin, type PlexServer } from "@/lib/plex"
-import type { ConnMode } from "@/lib/plex-pure"
+import { withRemote, type ConnMode } from "@/lib/plex-pure"
 import { detectJellyfin, jellyfinServerInfo, jellyfinSignIn, normServer, quickConnectCheck, quickConnectEnabled, quickConnectFinish, quickConnectStart, type JfAuth } from "@/lib/jellyfin"
 
 type Type = "M3U" | "Xtream" | "Plex" | "Jellyfin"
@@ -17,7 +18,7 @@ export default function Sources() {
   const addSource = useApp((s) => s.addSource)
   const reset = useRoute((s) => s.reset)
   const [type, setType] = useState<Type>("Xtream")
-  const [f, setF] = useState({ name: "", url: "", epgUrl: "", server: "", user: "", pass: "", token: "" })
+  const [f, setF] = useState({ name: "", url: "", server: "", remote: "", user: "", pass: "", token: "" })
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === "name" ? e.target.value : e.target.value.trim() })
   // Plex sign-in: pin (waiting for the code at plex.tv/link) -> servers -> test connections -> save
   const [pin, setPin] = useState<Pin | null>(null)
@@ -78,7 +79,8 @@ export default function Sources() {
       const info = await jellyfinServerInfo(server)
       const a = await auth()
       if (!live()) return
-      addSource({ name: info.name, type: "jellyfin", server, token: a.token, userId: a.userId, serverId: info.id })
+      const remote = f.remote ? normServer(f.remote) : ""
+      addSource({ name: info.name, type: "jellyfin", server, token: a.token, userId: a.userId, serverId: info.id, ...(remote && remote !== server ? { localServer: server, remoteServer: remote } : {}) })
       reset("home")
     } catch (e) { if (live()) { setErr(explain(e)); setBusy(""); setQc(null) } }
   }
@@ -122,12 +124,13 @@ export default function Sources() {
   }
 
   const save = () => {
+    const server = f.server.replace(/\/+$/, ""), remote = f.remote.replace(/\/+$/, "")
     addSource(
       type === "Plex"
-        ? { name: f.name || "Plex", type: "plex", server: f.server.replace(/\/+$/, ""), token: f.token }
+        ? { name: f.name || "Plex", type: "plex", server, token: f.token, ...(/^https?:\/\//.test(remote) ? { remoteServer: remote, conns: withRemote(undefined, server, remote) } : {}) }
         : type === "M3U"
-          ? { name: f.name, type: "m3u", url: f.url, epgUrl: f.epgUrl || undefined }
-          : { name: f.name, type: "xtream", server: f.server, user: f.user, pass: f.pass, epgUrl: f.epgUrl || undefined },
+          ? { name: f.name, type: "m3u", url: f.url }
+          : { name: f.name, type: "xtream", server: f.server, user: f.user, pass: f.pass },
     )
     reset("home") // App loads the new active source
   }
@@ -146,12 +149,12 @@ export default function Sources() {
   return (
     <div className="flex h-full flex-col items-center gap-6 overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] md:justify-center">
       <div className="flex w-full max-w-[40rem] flex-col gap-3 rounded-[28px] bg-surface p-6">
-        <h1 className="text-3xl font-medium tracking-tight md:text-4xl">{tr("pages.sources.title")}</h1>
+        <h1 className="text-3xl font-medium tracking-tight md:text-5xl">{tr("pages.sources.title")}</h1>
         <p className="text-muted-foreground">{tr("pages.sources.pick")}</p>
         <div role="radiogroup" aria-label={tr("pages.sources.title")} data-nav-group className="grid grid-cols-2 gap-2 pb-2">
           {(["Xtream", "M3U", "Plex", "Jellyfin"] as const).map((k) => (
             <button key={k} type="button" role="radio" aria-checked={type === k} data-nav data-pill className={`flex min-h-16 flex-col items-start justify-center gap-0.5 rounded-2xl px-4 py-2 text-start transition-colors ${type === k ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground"}`} onClick={() => { setType(k); setErr(""); setQc(null); setBusy(""); setFound(null) }}>
-              <span className="text-lg font-medium">{k}</span>
+              <span className="flex items-center gap-2 text-lg font-medium">{(k === "Plex" || k === "Jellyfin") && <SourceMark type={k === "Plex" ? "plex" : "jellyfin"} color={k === "Plex" ? "#e5a00d" : "#aa5cc3"} className="size-5" />}{k}</span>
               <span className="text-sm opacity-70">{tr(`pages.sources.kind.${k}`)}</span>
             </button>
           ))}
@@ -159,7 +162,6 @@ export default function Sources() {
         {type !== "Plex" && type !== "Jellyfin" && field("name", tr("pages.sources.name"))}
         {type === "M3U" && field("url", tr("pages.sources.playlistUrl"), "url", "url")}
         {type === "Xtream" && (<>{field("server", tr("pages.sources.server"), "url", "url")}{field("user", tr("pages.sources.user"), "text", undefined, "username")}{field("pass", tr("pages.sources.pass"), "password", undefined, "current-password")}</>)}
-        {type !== "Plex" && type !== "Jellyfin" && field("epgUrl", tr("pages.sources.epg"), "url", "url")}
 
         {type === "Plex" && !manual && !pin && !servers && (
           <div className="flex flex-col gap-3">
@@ -206,10 +208,11 @@ export default function Sources() {
             {busy && <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{busy}</div>}
           </div>
         )}
-        {type === "Plex" && manual && (<>{serverRow(tr("pages.sources.serverPlex"))}{detected}{field("token", tr("pages.sources.plexToken"), "password")}{field("name", tr("pages.sources.nameOpt"))}</>)}
+        {type === "Plex" && manual && (<>{serverRow(tr("pages.sources.serverPlex"))}{detected}{field("remote", tr("source.conn.remote.label"), "url", "url")}<p className="-mt-2 ps-1 text-sm text-muted-foreground">{tr("source.conn.remote.hintPlex")}</p>{field("token", tr("pages.sources.plexToken"), "password")}{field("name", tr("pages.sources.nameOpt"))}</>)}
         {type === "Jellyfin" && !qc && (<>
           <p className="text-muted-foreground">{tr("pages.sources.jfInfo")}</p>
-          {serverRow(tr("pages.sources.serverJf"))}{detected}
+          {serverRow(tr("source.conn.localJf"))}{detected}
+          {field("remote", tr("source.conn.remote.label"), "url", "url")}<p className="-mt-2 ps-1 text-sm text-muted-foreground">{tr("source.conn.remote.hint")}</p>
           {field("user", tr("pages.sources.user"), "text", undefined, "username")}{field("pass", tr("pages.sources.pass"), "password", undefined, "current-password")}
         </>)}
         {type === "Jellyfin" && qc && (
@@ -222,7 +225,7 @@ export default function Sources() {
             <Pill variant="ghost" onClick={() => { setQc(null); setBusy("") }}>{tr("common.cancel")}</Pill>
           </div>
         )}
-        {err && <p role="alert" className="text-destructive">{err}</p>}
+        {err && <p role="alert" className="text-sm text-destructive">{err}</p>}
 
         <div className="flex flex-wrap gap-3 pt-2">
           {type !== "Plex" && type !== "Jellyfin" && <Pill variant="primary" disabled={!ok} onClick={save}>{tr("pages.sources.saveLoad")}</Pill>}

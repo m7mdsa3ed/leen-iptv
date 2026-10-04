@@ -1,9 +1,9 @@
 import { t } from "../i18n"
-import { api, loadConfig, type Config, type Session } from "./client"
+import { loadConfig, syncBackend as api, type Config, type Session } from "@/lib/api"
 
 // Sign a TV in with a phone. The TV shows a QR code + short code. The phone page signs in with its OWN session and sends it to the TV
-// encrypted (ECDH P-256 -> AES-GCM-256) for the TV's one-time public key, through the user-link functions in supabase/schema.sql.
-// Only the TV holds the private key, so Supabase (and anyone reading the table) cannot read the session. The phone then forgets it
+// encrypted (ECDH P-256 -> AES-GCM-256) for the TV's one-time public key, through the user-link functions in the schema file.
+// Only the TV holds the private key, so the server (and anyone reading the table) cannot read the session. The phone then forgets it
 // WITHOUT calling logout, so the session continues on the TV (refresh tokens are single-use: two devices cannot share one chain).
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789" // no 0/O/1/I/L: easy to read and type

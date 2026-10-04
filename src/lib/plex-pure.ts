@@ -1,5 +1,6 @@
 // Pure Plex helpers (no '@/' imports, no DOM) so `node scripts/plex.check.ts` can run them.
 import type { Item } from "./types"
+import { plexStream } from "./meta/facts-pure.ts"
 
 export type Conn = { uri: string; local?: boolean; relay?: boolean; protocol?: string }
 export type Ident = Record<string, string>
@@ -22,6 +23,31 @@ export function buildUrl(base: string, path: string, params: Record<string, stri
 }
 
 export type ConnMode = "auto" | "norelay" | "local"
+/** Source.connMode is shared with Jellyfin ("remote" is Jellyfin-only): anything Plex does not know means auto. */
+export const plexMode = (m?: string): ConnMode => (m === "norelay" || m === "local" ? m : "auto")
+
+const bare = (u: string) => u.trim().replace(/\/+$/, "")
+/** True for hosts that only exist on a home network (private IPv4, localhost, *.local, single-label names). */
+export const isLanHost = (uri: string): boolean => {
+  const h = (/^(?:https?:\/\/)?([^/:?#]+)/i.exec(uri.trim())?.[1] ?? "").toLowerCase()
+  return !!h && (h === "localhost" || h.endsWith(".local") || !h.includes(".") || /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h))
+}
+/** Connection list with the user's own REMOTE address (public domain, Tailscale...) added as a "remote" entry; `prev` = the remote added last time (replaced).
+    A hand-typed server becomes a plain entry (local when it is a LAN address). No remote and no plex.tv list = undefined (manual source, nothing to fall back to). */
+export function withRemote(conns: Conn[] | undefined, server: string | undefined, remote: string | undefined, prev?: string): Conn[] | undefined {
+  const r = remote ? bare(remote) : ""
+  const base = (conns?.length ? conns : server ? [{ uri: bare(server), local: isLanHost(server) }] : []).filter((c) => !(prev && bare(c.uri) === bare(prev)) && bare(c.uri) !== r)
+  if (!r) return base.length > 1 || (conns?.length && !prev) ? base : undefined
+  return [...base, { uri: r, local: false, relay: false, protocol: r.startsWith("https:") ? "https" : "http" }]
+}
+/** First candidate whose probe resolves, in the given order; every failure is kept so the caller can tell "unreachable" from "rejected". */
+export async function firstReachable<T>(cands: T[], probe: (c: T) => Promise<unknown>): Promise<{ cand?: T; errs: unknown[] }> {
+  const errs: unknown[] = []
+  for (const c of cands) {
+    try { await probe(c); return { cand: c, errs } } catch (e) { errs.push(e) }
+  }
+  return { errs }
+}
 /** Which addresses a mode allows: local = LAN only (nothing leaves the network), norelay = LAN + direct remote, auto = all. */
 export const allowedConns = (conns: Conn[], mode: ConnMode = "auto"): Conn[] =>
   conns.filter((c) => (mode === "local" ? !!c.local && !c.relay : mode === "norelay" ? !c.relay : true))
@@ -89,6 +115,7 @@ export function mapDetail(m: J, img: (path: string, w: number, h: number) => str
       releasedate: m.originallyAvailableAt || year || "",
       duration: "",
       rating: m.rating ?? m.audienceRating ?? "",
+      stream: plexStream(m),
     } as Record<string, unknown>,
     meta: { plot: m.summary || undefined, genres, runtime, year, ratings, poster: m.thumb ? img(m.thumb, 600, 900) : undefined, backdrop: m.art ? img(m.art, 1280, 720) : undefined, cast, directors },
   }
@@ -106,6 +133,13 @@ export function srtToVtt(txt: string): string {
   if (!t || !t.includes("-->")) return ""
   return "WEBVTT\n\n" + t.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2") + "\n"
 }
+
+/** Skippable stretch of an episode, in seconds. */
+export type Seg = { kind: "intro" | "recap" | "credits"; start: number; end: number }
+/** Plex markers (?includeMarkers=1): type intro | credits, offsets in ms. */
+export const mapSegments = (m: J): Seg[] =>
+  ((m?.Marker ?? []) as J[]).filter((x) => (x.type === "intro" || x.type === "credits") && x.endTimeOffset > x.startTimeOffset)
+    .map((x) => ({ kind: x.type as Seg["kind"], start: x.startTimeOffset / 1000, end: x.endTimeOffset / 1000 }))
 
 export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
   const st: J[] = m?.Media?.[0]?.Part?.[0]?.Stream ?? []

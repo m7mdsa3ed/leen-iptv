@@ -1,5 +1,6 @@
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { SourceMark } from "./SourceMark"
 import type { SourceMeta } from "@/lib/sources"
 import type { Item } from "@/lib/types"
 
@@ -18,7 +19,7 @@ export function SourceChooser({ alternatives, selected, onSelect, className }: {
         return (
           <button key={item.id} data-nav data-pill aria-pressed={on} onClick={() => onSelect(item)} style={on ? { boxShadow: `inset 0 0 0 2px ${source.color}` } : undefined}
             className={cn("flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-base", on ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground/80")}>
-            <span style={{ background: source.color }} className="size-2.5 shrink-0 rounded-full" />
+            <SourceMark type={source.type} color={source.color} />
             <span dir="auto" className="max-w-[12rem] truncate">{source.name}</span>
           </button>
         )

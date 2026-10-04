@@ -1,8 +1,8 @@
 import { create } from "zustand"
 import { isTv } from "@/lib/device"
 import { useApp } from "@/lib/store"
-import { envConfigured } from "@/lib/sync/client"
-import { pickIndex, scoreMove, type Box, type Dir } from "@/lib/nav-pure"
+import { envConfigured } from "@/lib/api"
+import { lineStart, pickIndex, popLen, scoreMove, type Box, type Dir } from "@/lib/nav-pure"
 
 export { scoreMove }
 
@@ -18,9 +18,9 @@ interface R {
 /* URL <-> stack. Each history entry carries a hash (#/live, #/detail/<id>, #/player/<id>) so a refresh lands on the same page.
    Hash routing works from file:// (webOS) and any static host. Entry d=0 is a guard (Back never leaves the app),
    entry d=n shows stack[n-1]. */
-const PAGES = ["profiles", "sources", "home", "live", "guide", "movies", "series", "search", "library", "settings", "detail", "player", "person", "category", "genre", "history", "stats", "diagnostics", "welcome", "link"]
+const PAGES = ["profiles", "sources", "home", "live", "movies", "series", "library", "settings", "detail", "player", "person", "team", "sports", "category", "genre", "history", "stats", "diagnostics", "welcome", "link", "episode"]
 const hashOf = (r: Route) => {
-  const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "detail" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
+  const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "team" ? r.p?.id : r.name === "detail" || r.name === "episode" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
   return `#/${r.name}${id ? "/" + encodeURIComponent(String(id)) : ""}`
 }
 const baseFor = (id: string): Route["name"] => (id.includes("|live|") ? "live" : id.includes("|movie|") ? "movies" : id.includes("|series|") ? "series" : "home")
@@ -42,10 +42,12 @@ function initialStack(): Route[] {
   if ((name === "detail" || name === "player") && id) return [{ name: baseFor(id) }, { name, p: { id } }]
   if ((name === "category" || name === "genre") && id) return [{ name: id.startsWith("series|") ? "series" : "movies" }, { name, p: { id } }]
   if (name === "person" && id) return [{ name: "home" }, { name, p: { id } }]
+  if (name === "team" && id) return [{ name: "home" }, { name, p: { id } }]
+  if (name === "episode" && id.includes("~")) { const sid = id.slice(0, id.indexOf("~")); return [{ name: baseFor(sid) }, { name: "detail", p: { id: sid } }, { name, p: { id } }] } // <seriesId>~<episodeItemId>
   return [{ name }]
 }
 
-let skip = false
+let skip = 0 // popstates caused by back()/reset(): the stack is already trimmed
 const url = () => hashOf(useRoute.getState().stack.slice(-1)[0])
 export const useRoute = create<R>((set, get) => ({
   stack: initialStack(),
@@ -58,14 +60,18 @@ export const useRoute = create<R>((set, get) => ({
     history.replaceState(history.state, "", url())
   },
   back: () => {
-    if (get().stack.length <= 1) return false
-    history.back() // popstate pops the stack
+    const st = get().stack
+    if (st.length <= 1) return false
+    // our stack decides (exactly one page), the browser follows: it may skip entries pushed without a user gesture
+    set({ stack: st.slice(0, -1) })
+    skip++
+    history.back()
     return true
   },
   reset: (name) => {
     const n = get().stack.length
     set({ stack: [{ name }] })
-    if (n > 1) (skip = true, history.go(1 - n))
+    if (n > 1) (skip++, history.go(1 - n))
     else history.replaceState(history.state, "", url())
   },
 }))
@@ -75,12 +81,16 @@ export const useRoute = create<R>((set, get) => ({
   st.forEach((r, i) => history.pushState({ d: i + 1 }, "", hashOf(r)))
 }
 window.addEventListener("popstate", (e) => {
-  if (skip) return void ((skip = false), history.replaceState(history.state, "", url()))
+  const ours = skip > 0
+  if (ours) skip--
   const d = (e.state?.d as number | undefined) ?? 0
-  const n = useRoute.getState().stack.length
-  if (d < 1) history.pushState({ d: 1 }, "", hashOf(useRoute.getState().stack[0])) // hit the guard: stay
-  if (d < n) useRoute.setState((s) => ({ stack: s.stack.slice(0, Math.max(1, d)) }))
-  else if (d > n) history.go(n - d) // forward button: not supported
+  const st = useRoute.getState().stack
+  if (!ours && d > st.length) return void history.go(st.length - d) // forward button: not supported
+  const n = popLen(d, st.length, ours)
+  if (n < st.length) useRoute.setState({ stack: st.slice(0, n) })
+  // re-stamp the entry we landed on to match the stack; landing on the guard (d=0) pushes a page entry back so Back never leaves the app
+  if (d < 1) history.pushState({ d: n }, "", url())
+  else history.replaceState({ d: n }, "", url())
 })
 export const useCur = () => useRoute((s) => s.stack[s.stack.length - 1])
 
@@ -133,14 +143,27 @@ function pick(from: HTMLElement, dir: Dir) {
 // focus memory: every [data-nav-group] ancestor remembers its last focused child
 const memory = new WeakMap<Element, HTMLElement>()
 const groupOf = (el: Element | null) => el?.closest("[data-nav-group]") ?? null
+// a "row scope" is the nearest group, virtual list/grid, page content or top bar: Up/Down into a different scope starts at its row's first item
+const SCOPE = "[data-nav-group],[data-vscroll],[data-page-content],header,[data-modal]"
+const scopeOf = (el: Element) => el.parentElement?.closest(SCOPE) ?? document.body
 function viaMemory(cur: HTMLElement, next: HTMLElement, dir: Dir) {
-  const g = groupOf(next)
-  if (!g || g === groupOf(cur) || g.contains(cur)) return next
-  const m = memory.get(g)
   const vert = dir === "up" || dir === "down"
-  // vertical entry keeps the x position unless the group asks for strict memory (data-nav-group="memory")
-  if (m && m.isConnected && visible(m) && (!vert || g.getAttribute("data-nav-group") === "memory")) return m
-  return next
+  const g = groupOf(next)
+  const m = g && memory.get(g)
+  // strict memory (data-nav-group="memory") restores the last child on any entry; other groups only on Left/Right entry
+  if (g && g !== groupOf(cur) && !g.contains(cur) && m && m.isConnected && visible(m) && (!vert || g.getAttribute("data-nav-group") === "memory")) return m
+  if (!vert) return next
+  const sc = scopeOf(next)
+  if (sc === scopeOf(cur)) return next // same grid/list: keep the column
+  // new row: its active tab (top bar) or else its first item, by position so RTL starts at the right
+  const els = focusables(sc).filter((el) => scopeOf(el) === sc) // direct members only: not a side list sharing the line
+  const home = els.find((el) => el.hasAttribute("data-nav-home"))
+  const nb = next.getBoundingClientRect()
+  const cy = (nb.top + nb.bottom) / 2
+  if (home) { const h = home.getBoundingClientRect(); if (h.top <= cy && h.bottom >= cy) return (anchorX = null), home }
+  const i = lineStart(els.map((el) => el.getBoundingClientRect()), nb, document.documentElement.dir === "rtl")
+  if (i >= 0) anchorX = null
+  return i >= 0 ? els[i] : next
 }
 
 function wrap(cur: HTMLElement, next: HTMLElement | null, dir: Dir) {
@@ -154,11 +177,26 @@ function wrap(cur: HTMLElement, next: HTMLElement | null, dir: Dir) {
 
 const textField = (e: Element) => e instanceof HTMLTextAreaElement || (e instanceof HTMLInputElement && TEXT.test(e.type))
 const TEXT = /^(text|search|email|password|url|tel|number)$/
+let autoWait = 0
 export function focusFirst() {
+  clearInterval(autoWait)
   const all = focusables()
   // never pop the on-screen keyboard by itself: text fields only with data-autofocus
-  const el = all.find((e) => e.dataset.autofocus !== undefined) ?? all.find((e) => !textField(e)) ?? all[0]
+  // a new page lands on its own first control (Play, first rail card...), not the top bar that precedes it in the DOM
+  const page = all.filter((e) => e.closest("[data-page-content]"))
+  const auto = all.find((e) => e.dataset.autofocus !== undefined)
+  const el = auto ?? page.find((e) => !textField(e)) ?? all.find((e) => !textField(e)) ?? all[0]
   if (el) focusTo(el, true)
+  if (auto) return
+  // the main action ([data-autofocus], e.g. Play) may still be loading or disabled (series episodes): move to it once it is
+  // ready, unless the user has moved focus in the meantime. ponytail: 200ms poll for up to 10s, a MutationObserver if it ever costs
+  const held = el ?? document.body
+  let n = 0
+  autoWait = window.setInterval(() => {
+    if (document.activeElement !== held && !(held === document.body && !document.activeElement) || ++n > 50) return clearInterval(autoWait)
+    const a = focusables().find((e) => e.dataset.autofocus !== undefined)
+    if (a) (clearInterval(autoWait), focusTo(a, true))
+  }, 200)
 }
 
 function scroller(el: HTMLElement) {
@@ -183,7 +221,7 @@ function focusTo(el: HTMLElement, fast: boolean) {
   el.scrollIntoView({ block: "nearest", inline: clipped ? "center" : "nearest", behavior })
 }
 
-/* Virtualized lists ([data-vscroll] = VList / VGrid / Guide): only the rows near the viewport are mounted, so at the edge of the mounted
+/* Virtualized lists ([data-vscroll] = VList / VGrid): only the rows near the viewport are mounted, so at the edge of the mounted
    rows Up/Down would find nothing in the list and jump somewhere else (a later section, the top bar). If the list can still scroll that way,
    scroll it by about a row, wait for the rows to mount, then pick from where the focus was (shifted by the scroll). */
 let vsBusy = false
@@ -231,6 +269,7 @@ function pageMove(cur: HTMLElement, sign: 1 | -1) {
 /** Set by the on-screen keyboard: return true when it took over the text field (OK pressed in it). */
 export const navHooks: { text?: (el: HTMLInputElement | HTMLTextAreaElement) => boolean } = {}
 const NATIVE_CLICK = /^(BUTTON|A|INPUT|SELECT|TEXTAREA|SUMMARY)$/
+const hold = { t: 0, el: null as HTMLElement | null }
 export function installNav(onBack: () => void) {
   const onKey = (e: KeyboardEvent) => {
     if (navState.lock) return
@@ -274,7 +313,10 @@ export function installNav(onBack: () => void) {
     } else if ((e.keyCode === KEY.enter || e.keyCode === 32) && !typing && !(t instanceof HTMLSelectElement) && t.hasAttribute?.("data-nav") && ((e.keyCode === KEY.enter && isTv) || !NATIVE_CLICK.test(t.tagName))) {
       // TV: Enter clicks any [data-nav]; div/section/[role] with data-nav (any mode): Enter and Space click like a button
       e.preventDefault()
-      if (!e.repeat) t.click()
+      if (t.hasAttribute("data-hold")) {
+        // [data-hold]: OK clicks on release; holding it ~0.6s fires "contextmenu" instead (the card's long-press menu)
+        if (!e.repeat) { clearTimeout(hold.t); hold.el = t; hold.t = window.setTimeout(() => { hold.t = 0; t.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })) }, 600) }
+      } else if (!e.repeat) t.click()
     } else if (e.keyCode === KEY.back || e.keyCode === KEY.esc || (e.keyCode === KEY.bksp && isTv && !typing)) {
       e.preventDefault()
       // Back from page content first returns to the layout's active nav item ([data-nav-home])
@@ -284,6 +326,12 @@ export function installNav(onBack: () => void) {
       if (home && box && !topModal() && cur?.hasAttribute?.("data-nav") && !box.contains(cur)) return focusTo(home, false)
       onBack()
     }
+  }
+  const onKeyUp = (e: KeyboardEvent) => {
+    if (e.keyCode !== KEY.enter || !hold.el) return
+    const el = hold.el
+    hold.el = null
+    if (hold.t) { clearTimeout(hold.t); hold.t = 0; el.click() } // released before the long press
   }
   const onFocusIn = (e: FocusEvent) => {
     const el = (e.target as HTMLElement).closest?.<HTMLElement>("[data-nav]")
@@ -341,6 +389,7 @@ export function installNav(onBack: () => void) {
     }, 120)
   })
   window.addEventListener("keydown", onKey)
+  window.addEventListener("keyup", onKeyUp)
   if (isTv) {
     document.addEventListener("focusin", onFocusIn)
     document.addEventListener("mousemove", onMove, { passive: true })
@@ -348,6 +397,7 @@ export function installNav(onBack: () => void) {
   }
   return () => {
     window.removeEventListener("keydown", onKey)
+    window.removeEventListener("keyup", onKeyUp)
     document.removeEventListener("focusin", onFocusIn)
     document.removeEventListener("mousemove", onMove)
     mo.disconnect()

@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react"
 import { Check, ChevronLeft, ChevronRight, Play, Plus } from "lucide-react"
 import { Shell, TvButton, Empty } from "@/components/tv/ui"
-import { Card, Pill, RoundButton, SkelHero, SkelRail } from "@/components/gtv"
+import { Card, Pill, Rail, RoundButton, SkelHero, SkelRail } from "@/components/gtv"
+import { GameCard } from "@/components/tv/sports"
 import { cn } from "@/lib/utils"
 import { fmt, useT } from "@/lib/i18n"
 import { useHomeData } from "../home-data"
+import { useUpcomingGames } from "@/lib/sports/use-games"
+import { gameRoute, teamInGame } from "@/lib/sports/games"
+import { useFollows } from "@/lib/store"
+import { useRoute } from "@/lib/nav"
 import { GRail, useLeft } from "./parts"
 
 const TITLES: Record<string, string> = { favs: "gtv.home.watchlist", recents: "gtv.home.recents" }
@@ -13,6 +18,9 @@ export default function Home() {
   const t = useT()
   const h = useHomeData()
   const left = useLeft()
+  const { games } = useUpcomingGames()
+  const follows = useFollows()
+  const go = useRoute((s) => s.go)
   const scroller = useRef<HTMLDivElement>(null)
   const [n, setN] = useState(0)
   const [hold, setHold] = useState(false)
@@ -45,7 +53,7 @@ export default function Home() {
           <div className="flex gap-3"><TvButton onClick={h.retry}>{t("gtv.home.retry")}</TvButton><TvButton variant="secondary" onClick={h.changeSource}>{t("gtv.home.changeSource")}</TvButton></div></div></Empty>
       )}
       {h.status === "ready" && (
-        <div ref={scroller} className="-mx-[var(--gx)] -mt-[var(--hdr)] h-[calc(100%+var(--hdr))] overflow-y-auto px-[var(--gx)] [scroll-padding-top:calc(var(--hdr)+1rem)] [scroll-padding-bottom:4rem]">
+        <div ref={scroller} data-under className="-mx-[var(--gx)] -mt-[var(--hdr)] h-[calc(100%+var(--hdr))] overflow-y-auto [--up:var(--hdr)] px-[var(--gx)] [scroll-padding-top:calc(var(--hdr)+1rem)] [scroll-padding-bottom:4rem]">
           <section onFocus={() => { setHold(true); scroller.current?.scrollTo({ top: 0 }) }} onBlur={() => setHold(false)} className="gtv-hero relative -mx-[var(--gx)] mb-4 h-[58vh] min-h-[26rem] overflow-hidden">
             {art && <div key={item!.id} aria-hidden className="m-fade gtv-hero-art absolute inset-y-0 end-0 w-[65%] max-md:w-full max-md:opacity-40"><img src={art} alt="" decoding="async" className="size-full object-cover" /></div>}
             <div aria-hidden className="gtv-hero-fade absolute inset-0" />
@@ -53,7 +61,7 @@ export default function Home() {
             {item && (
               <div key={item.id} className="m-fade relative flex h-full max-w-[48rem] flex-col justify-end gap-3 px-[var(--gx)] pb-10 pt-[calc(var(--hdr)+1rem)]">
                 <div className="text-sm font-medium tracking-wide text-muted-foreground">{pick!.kicker === t("common.featured") ? t("gtv.home.topPick") : pick!.kicker}</div>
-                <h1 dir="auto" className="line-clamp-2 text-5xl font-medium leading-tight tracking-tight">{item.name}</h1>
+                <h1 dir="auto" className="line-clamp-2 text-3xl font-medium leading-tight tracking-tight md:text-5xl">{item.name}</h1>
                 {meta && <div dir="auto" className="text-base text-foreground/80">{meta}</div>}
                 {item.plot && <p dir="auto" className="line-clamp-3 max-w-xl text-base text-muted-foreground">{item.plot}</p>}
                 <div className="-ms-1 mt-2 flex items-center gap-3 p-1">
@@ -75,6 +83,14 @@ export default function Home() {
             )}
             {!item && <Empty>{t("gtv.home.empty")}</Empty>}
           </section>
+          {games.length > 0 && (
+            <Rail title={t("gtv.home.sports")}>
+              {games.map((g) => {
+                const route = gameRoute(follows, g)
+                return <GameCard key={g.id} g={g} mineId={teamInGame(follows, g)} onOpen={() => route && go("team", route)} />
+              })}
+            </Rail>
+          )}
           {h.rails.map((r) => (
             <GRail key={r.key} title={TITLES[r.key] ? t(TITLES[r.key]) : r.title} onSeeAll={r.seeAll}>
               {r.items.map((i) => (

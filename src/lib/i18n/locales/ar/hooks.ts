@@ -9,7 +9,12 @@ const d: Dict = {
   "hooks.detail.resume": "كمّل",
   "hooks.detail.play": "شغّل",
   "hooks.detail.watched": "اتشاف",
+  "hooks.detail.markWatched": "علّمها اتشافت",
+  "hooks.detail.markUnwatched": "علّمها لسه ماتشافتش",
+  "hooks.detail.removeContinue": "شيلها من كمّل مشاهدة",
+  "hooks.detail.match": "صحّح البيانات",
   "hooks.detail.ep": "ح {n}",
   "hooks.detail.rating": "التقييم",
+  "hooks.detail.refreshMeta": "حدّث البيانات",
 }
 export default d

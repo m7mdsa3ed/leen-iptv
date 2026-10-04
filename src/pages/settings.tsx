@@ -34,7 +34,7 @@ export default function SettingsPage() {
   )
   const body = (
     <div className={cn("min-h-0 min-w-0 flex-1 overflow-y-auto p-3 md:max-w-4xl")}>
-      <h2 className="mb-4 flex items-center gap-3 text-2xl font-medium">
+      <h2 className="mb-4 flex items-center gap-3 text-3xl font-medium tracking-tight">
         {mobile && <RoundButton label={t("settings.back")} onClick={close}><ChevronLeft className="rtl-flip" /></RoundButton>}
         {section.title}
       </h2>

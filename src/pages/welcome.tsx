@@ -28,7 +28,7 @@ export default function Welcome() {
   )
 
   return (
-    <div className="flex h-full flex-col items-center gap-8 overflow-y-auto bg-background p-4 py-[max(1.5rem,env(safe-area-inset-top))] md:justify-center md:gap-10">
+    <div className="flex h-full flex-col items-center gap-8 overflow-y-auto bg-background p-4 py-[max(1.5rem,env(safe-area-inset-top))] md:gap-10 md:[&>:first-child]:mt-auto md:[&>:last-child]:mb-auto">
       <div className="flex flex-col items-center gap-3 text-center">
         <LeenMark className="size-16 md:size-20" />
         <h1 className="text-3xl font-medium tracking-tight md:text-5xl">{t("welcome.title")}</h1>
@@ -42,12 +42,12 @@ export default function Welcome() {
       ) : (
         <div className="grid w-full max-w-[56rem] gap-4 md:grid-cols-2 md:gap-6" data-nav-group>
           <section className="flex flex-col gap-5 rounded-[28px] bg-surface p-6 md:p-8">
-            <h2 className="text-2xl font-medium">{t("welcome.account.title")}</h2>
+            <h2 className="text-2xl font-medium tracking-tight">{t("welcome.account.title")}</h2>
             {list(ACCOUNT)}
             <Pill data-autofocus="" variant="primary" onClick={() => setSignIn(true)}>{t("welcome.account.cta")}</Pill>
           </section>
           <section className="flex flex-col gap-5 rounded-[28px] bg-surface p-6 md:p-8">
-            <h2 className="text-2xl font-medium">{t("welcome.guest.title")}</h2>
+            <h2 className="text-2xl font-medium tracking-tight">{t("welcome.guest.title")}</h2>
             {list(GUEST)}
             <Pill onClick={() => choose("guest")}>{t("welcome.guest.cta")}</Pill>
           </section>

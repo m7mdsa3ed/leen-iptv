@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react"
-import { Card, Pill, Rail, SkelRail } from "@/components/gtv"
+import { Card, Pill, Rail } from "@/components/gtv"
 import { SourceFilter } from "@/components/source/SourceFilter"
-import { Empty, Shell } from "@/components/tv/ui"
+import { Empty, Pending, Shell } from "@/components/tv/ui"
 import { useT } from "@/lib/i18n"
 import { useLibrary } from "@/layouts/hooks/use-library"
 
@@ -13,9 +13,9 @@ export default function Library() {
   const empty = !continueWatching.length && !favorites.length && !history.length
   return (
     <Shell page="library" title={t("pages.library.title")}>
-      <div className="no-scrollbar -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)]">
+      <div data-under className="no-scrollbar -mx-[var(--gx)] -mt-[var(--hdr)] h-full overflow-y-auto px-[var(--gx)] pt-[var(--hdr)] [--up:var(--hdr)]">
         <SourceFilter className="pt-2" />
-        {status !== "ready" ? <><SkelRail variant="wide" /><SkelRail /></> : (
+        {status !== "ready" ? <Pending /> : (
           <>
             {continueWatching.length > 0 && <Rail title={t("pages.library.continue")}>{continueWatching.map((i) => <Card key={i.id} item={i} variant={i.kind === "live" ? "wide" : "poster"} pct={pct(i)} onOpen={() => open(i)} />)}</Rail>}
             {favorites.length > 0 && <Rail title={t("pages.library.watchlist")}>{favorites.map((i) => <Card key={i.id} item={i} onOpen={() => open(i)} />)}</Rail>}

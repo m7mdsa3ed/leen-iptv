@@ -7,6 +7,7 @@ import { useMode } from "@/lib/device"
 import { useT } from "@/lib/i18n"
 import { KEY } from "@/lib/nav"
 import type { Item, Kind } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
   const { groups, status, g, setG, items, rails, genres: genreNames, pct, isLocked, canLock, toggleLock: toggle, open, openCategory, openGenre, kindLabel, page } = useBrowse(kind)
@@ -17,17 +18,26 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
   return (
     <Shell page={page} title={kindLabel}>
       {status !== "ready" ? <Pending /> : (
-        <div className="flex h-full flex-col">
-          <SourceFilter />
-          <Chips cat items={[ALL, FAV, ...groups]} active={g} onPick={(c) => (c === ALL || c === FAV ? setG(c) : openCategory(c))} locked={isLocked}
-            onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
-            onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
-          <div className="min-h-0 flex-1">
-            {g === ALL ? (
-              rails.length ? <div className="-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] no-scrollbar">{genreNames.length > 0 && <section className="mb-2"><SectionTitle>{t("pages.browse.genres")}</SectionTitle><Chips items={genreNames} active="" onPick={(n) => openGenre(n)} /></section>}{rails.map(([c, a]) => <Rail key={c} title={c} onSeeAll={() => openCategory(c)}>{a.map(card)}</Rail>)}</div> : <Empty>{t("pages.browse.empty")}</Empty>
-            ) : items.length ? <VGrid items={items} render={card} /> : <Empty>{t("pages.browse.empty")}</Empty>}
-          </div>
-        </div>
+        (() => {
+          const filters = (<>
+            <SourceFilter />
+            <Chips cat items={[ALL, FAV, ...groups]} active={g} onPick={(c) => (c === ALL || c === FAV ? setG(c) : openCategory(c))} locked={isLocked}
+              onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
+              onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
+          </>)
+          // mobile: filters scroll with the content, which starts under the top bar and runs under the bottom bar (data-under)
+          const up = "-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]"
+          const body = (head?: React.ReactNode) => g === ALL
+            ? rails.length ? <div data-under className={cn("-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] no-scrollbar", head && up)}>{head}{genreNames.length > 0 && <section className="mb-2"><SectionTitle>{t("pages.browse.genres")}</SectionTitle><Chips items={genreNames} active="" onPick={(n) => openGenre(n)} /></section>}{rails.map(([c, a]) => <Rail key={c} title={c} onSeeAll={() => openCategory(c)}>{a.map(card)}</Rail>)}</div> : null
+            : items.length ? <VGrid items={items} render={card} head={head} className={head ? up : undefined} /> : null
+          { const b = body(filters); if (b) return b }
+          return (
+            <div className="flex h-full flex-col">
+              {filters}
+              <div className="min-h-0 flex-1">{body() ?? <Empty>{t("pages.browse.empty")}</Empty>}</div>
+            </div>
+          )
+        })()
       )}
     </Shell>
   )

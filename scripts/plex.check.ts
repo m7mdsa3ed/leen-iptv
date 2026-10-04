@@ -1,6 +1,6 @@
 // node scripts/plex.check.ts
 import assert from "node:assert/strict"
-import { buildUrl, mapDetail, mapMeta, photoUrl, sortConns, allowedConns, connKind } from "../src/lib/plex-pure.ts"
+import { buildUrl, mapDetail, mapMeta, photoUrl, sortConns, allowedConns, connKind, mapSegments } from "../src/lib/plex-pure.ts"
 
 assert.equal(buildUrl("http://h:32400/", "/library/sections", { a: "x y" }, "T"), "http://h:32400/library/sections?a=x%20y&X-Plex-Token=T")
 assert.equal(buildUrl("http://h", "/identity"), "http://h/identity")
@@ -55,3 +55,26 @@ assert.equal(srtToVtt("WEBVTT\n\n00:01.000 --> 00:02.000\nx"), "WEBVTT\n\n00:01.
 assert.equal(srtToVtt("[Script Info]\nDialogue: 0"), "")
 const ms = mapStreams({ Media: [{ Part: [{ Stream: [{ id: 5, streamType: 3, codec: "srt", languageCode: "eng" }, { id: 6, streamType: 3, codec: "pgs" }] }] }] })
 assert.deepEqual(ms.subs.map((x) => x.text), [true, false])
+
+// custom remote address: added to the plex.tv list as a "remote" entry, replaced on edit, honoured by modes
+import { isLanHost, withRemote, plexMode, firstReachable } from "../src/lib/plex-pure.ts"
+assert.ok(isLanHost("http://192.168.1.5:32400") && isLanHost("http://10.0.0.2") && isLanHost("http://172.20.1.1:1") && isLanHost("http://nas.local:1") && isLanHost("http://plexbox:32400"))
+assert.ok(!isLanHost("https://plex.example.com:32400") && !isLanHost("http://172.32.0.1") && !isLanHost("http://100.64.1.2:32400"))
+assert.equal(plexMode("remote"), "auto"); assert.equal(plexMode("local"), "local"); assert.equal(plexMode(undefined), "auto")
+const man = withRemote(undefined, "http://192.168.1.5:32400/", "https://plex.example.com:32400/")!
+assert.deepEqual(man.map((c) => [c.uri, !!c.local]), [["http://192.168.1.5:32400", true], ["https://plex.example.com:32400", false]])
+assert.equal(connKind(man, "https://plex.example.com:32400"), "Remote")
+assert.deepEqual(allowedConns(man, "local").map((c) => c.uri), ["http://192.168.1.5:32400"])
+assert.equal(allowedConns(man, "norelay").length, 2)
+assert.equal(sortConns(allowedConns([...conns, man[1]], "auto")).at(-1)!.uri, conns[2].uri) // plex.tv relay stays last
+assert.deepEqual(withRemote(man, "http://192.168.1.5:32400", "https://other.example.com", "https://plex.example.com:32400")!.map((c) => c.uri), ["http://192.168.1.5:32400", "https://other.example.com"])
+assert.equal(withRemote(man, "http://192.168.1.5:32400", "", "https://plex.example.com:32400"), undefined) // remote removed from a manual source
+assert.equal(withRemote(undefined, "http://192.168.1.5:32400", ""), undefined)
+assert.equal(withRemote(conns, "x", "")!.length, conns.length) // plex.tv list untouched
+// first reachable wins, failures are kept
+const fr = await firstReachable(["a", "b", "c"], async (c) => { if (c !== "b") throw new Error(c) })
+assert.equal(fr.cand, "b"); assert.equal(fr.errs.length, 1)
+assert.equal((await firstReachable(["a"], async () => { throw new Error("x") })).cand, undefined)
+console.log("plex remote ok")
+assert.deepEqual(mapSegments({ Marker: [{ type: "intro", startTimeOffset: 1000, endTimeOffset: 31000 }, { type: "commercial", startTimeOffset: 0, endTimeOffset: 5 }, { type: "credits", startTimeOffset: 90000, endTimeOffset: 80000 }] }), [{ kind: "intro", start: 1, end: 31 }]); assert.deepEqual(mapSegments({}), [])
+console.log("plex segments ok")

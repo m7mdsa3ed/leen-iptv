@@ -18,7 +18,7 @@ export function badKey(k: string): string | null {
 
 export const normUrl = (u: string) => u.trim().replace(/\/+$/, "").replace(/\/(rest|auth)\/v1$/, "")
 
-/** The Supabase project comes ONLY from the build environment (.env: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) - one project for the whole app,
+/** The sync server comes ONLY from the build environment (.env: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) - one server for the whole app,
  *  never entered per user. Leftover per-device config from earlier builds is removed. */
 export function loadConfig(): Config {
   try { localStorage.removeItem(CFG_KEY) } catch { /* ignore */ }
@@ -32,7 +32,7 @@ export class ApiError extends Error {
   constructor(status: number, msg: string) { super(msg); this.status = status }
 }
 
-async function req(cfg: Config, path: string, o: { method?: string; body?: unknown; token?: string; headers?: Record<string, string> } = {}): Promise<unknown> {
+async function req(cfg: Config, path: string, o: { method?: string; body?: unknown; token?: string; headers?: Record<string, string>; onResponse?: (r: Response) => void } = {}): Promise<unknown> {
   // New-style keys (sb_publishable_...) are not JWTs: they go in the apikey header only. A user's access token (a JWT) always goes in Authorization;
   // the classic anon key (a JWT) is also sent there for signed-out calls, like the official client does.
   const headers: Record<string, string> = { apikey: cfg.anonKey, ...(o.token || !cfg.anonKey.startsWith("sb_") ? { Authorization: `Bearer ${o.token ?? cfg.anonKey}` } : {}), ...o.headers }
@@ -41,6 +41,7 @@ async function req(cfg: Config, path: string, o: { method?: string; body?: unkno
   const timer = setTimeout(() => c.abort(), 30000)
   try {
     const r = await fetch(cfg.url + path, { method: o.method ?? (o.body !== undefined ? "POST" : "GET"), headers, body: o.body === undefined ? undefined : JSON.stringify(o.body), signal: c.signal })
+    o.onResponse?.(r)
     const t = await r.text()
     let j: J | null = null
     try { j = t ? JSON.parse(t) : null } catch { /* not json */ }
@@ -96,7 +97,7 @@ export const api = {
   updatePassword: (c: Config, accessToken: string, password: string) => req(c, "/auth/v1/user", { method: "PUT", token: accessToken, body: { password } }),
   user: async (c: Config, accessToken: string) => (await req(c, "/auth/v1/user", { token: accessToken })) as { id: string; email?: string },
   refresh: async (c: Config, s: Session) => toSession((await req(c, "/auth/v1/token?grant_type=refresh_token", { body: { refresh_token: s.refresh } })) as AuthRes, s.email),
-  /** call a Postgres function (see supabase/schema.sql); token = a signed-in user's access token for authenticated-only functions */
+  /** call a Postgres function (see the schema file); token = a signed-in user's access token for authenticated-only functions */
   rpc: (c: Config, name: string, body: unknown, token?: string) => req(c, `/rest/v1/rpc/${name}`, { body, token }),
   logout: (c: Config, s: Session) => req(c, "/auth/v1/logout", { method: "POST", body: {}, token: s.access }),
 
@@ -115,5 +116,22 @@ export const api = {
     const r = (await req(c, "/rest/v1/user_data?on_conflict=user_id", { token: s.access, headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: { user_id: s.id, data, updated_at: at, version: 1 } })) as unknown[]
     return r.length > 0
   },
+  /** shared metadata cache: one row by key (RLS: any signed-in user may read); null = not cached */
+  async metaGet(c: Config, s: Session, key: string): Promise<{ data: unknown; fetched_at: string } | null> {
+    const r = (await req(c, `/rest/v1/meta_cache?select=data,fetched_at&key=eq.${encodeURIComponent(key)}`, { token: s.access })) as { data: unknown; fetched_at: string }[]
+    return r[0] ?? null
+  },
+  /** how many rows the shared cache holds, and how many of them are title -> id lookups (PostgREST exact count, RLS applies) */
+  async metaCount(c: Config, s: Session): Promise<{ total: number; ids: number }> {
+    const n = async (filter: string) => {
+      let range = ""
+      await req(c, `/rest/v1/meta_cache?select=key&limit=1${filter}`, { token: s.access, headers: { Prefer: "count=exact" }, onResponse: (r) => { range = r.headers.get("content-range") ?? "" } })
+      return Number(range.split("/")[1]) || 0
+    }
+    const [total, ids] = await Promise.all([n(""), n(`&key=like.${encodeURIComponent("*/resolve/*")}`)])
+    return { total, ids }
+  },
+  /** writes only through meta_put(): the server validates, stamps the time and never replaces a row younger than 7 days */
+  metaPut: (c: Config, s: Session, key: string, data: unknown) => req(c, "/rest/v1/rpc/meta_put", { token: s.access, body: { p_key: key, p_data: data } }),
   del: (c: Config, s: Session) => req(c, `/rest/v1/user_data?user_id=eq.${s.id}`, { method: "DELETE", token: s.access }),
 }

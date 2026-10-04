@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronsUpDown } from "lucide-react"
 import { groupLabel, Logo } from "@/components/tv/ui"
-import { nowNext, useCatalog } from "@/lib/catalog"
+import { useCatalog } from "@/lib/catalog"
 import { fmt, useT } from "@/lib/i18n"
 import { usePData } from "@/lib/store"
 import { FAV } from "@/components/tv/groups"
@@ -16,7 +16,6 @@ const IDLE_MS = 8000
 export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { item: Item; tune: (c: Item, list: Item[]) => void; close: () => void }) {
   const t = useT()
   useTick(30000)
-  const epg = useCatalog((s) => s.epg)
   const live = useCatalog((s) => s.byKind.live)
   const realGroups = useCatalog((s) => s.groups.live)
   const favs = usePData().favs
@@ -53,7 +52,6 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
     const i = groups.indexOf(g)
     if (groups.length > 1) setG(groups[(i + d + groups.length) % groups.length])
   }
-  const at = Date.now()
   return (
     <>
       <div aria-hidden className="absolute inset-0 z-[11]" onClick={close} />
@@ -72,7 +70,6 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
         <div key={g} data-nav-group className="rail !mb-0 !gap-3 !pb-3">
           {shown.map((c) => {
             const cur = c.id === item.id
-            const { now } = nowNext(epg, c.epgId, at)
             return (
               <button
                 key={c.id} data-nav data-pill data-stile data-cur={cur ? "" : undefined} aria-current={cur}
@@ -81,12 +78,8 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
                 onClick={() => (cur ? close() : tune(c, cat))}
               >
                 <span className="flex items-center gap-2.5">
-                  <span className="size-10 shrink-0 overflow-hidden rounded-lg bg-surface-3"><Logo item={c} className="size-full p-1" /></span>
+                  <span className="size-10 shrink-0 overflow-hidden rounded-[calc(var(--pl-r)*.4)] bg-surface-3"><Logo item={c} className="size-full p-1" /></span>
                   <span dir="auto" className="min-w-0 flex-1 truncate text-base">{c.num ? <bdi className="me-2 opacity-60">{fmt.number(c.num)}</bdi> : null}{c.name}</span>
-                </span>
-                <span dir="auto" className="block h-5 truncate text-sm opacity-70">{now?.t ?? ""}</span>
-                <span dir="ltr" data-ltr className="pl-progress">
-                  {now && <span style={{ transform: `scaleX(${Math.min(1, Math.max(0, (at - now.s) / (now.e - now.s)))})` }} />}
                 </span>
               </button>
             )

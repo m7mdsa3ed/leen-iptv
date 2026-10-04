@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { get, set } from "idb-keyval"
 import { useApp } from "@/lib/store"
 import { useCatalog } from "@/lib/catalog"
 import type { Item } from "@/lib/types"
-import { DEFAULT_CFG, PROVIDERS } from "./providers"
-import { cleanTitle, norm } from "./title"
-import type { Ids, Meta, PersonInfo, PersonRef, Provider, ProviderCfg, Query, SimilarRef } from "./types"
+import { DEFAULT_CFG, forceTmdb, PROVIDERS, tmdbSearch } from "./providers"
+import { cleanTitle, matchId, matchKeyOf, norm } from "./title"
+import { cached, forget, META_TTL, scheduleCachePrune } from "./cache"
+import type { EpisodeMeta, Ids, Meta, PersonInfo, PersonRef, Provider, ProviderCfg, Query, SimilarRef } from "./types"
 
-const WEEK = 7 * 864e5
 
 /** Saved config merged with the registry: unknown ids dropped, new providers appended (disabled). */
 export function normalizeCfg(saved: ProviderCfg[] | undefined): ProviderCfg[] {
@@ -19,19 +19,21 @@ export function normalizeCfg(saved: ProviderCfg[] | undefined): ProviderCfg[] {
 const emptyMeta = (): Meta => ({ genres: [], ratings: [], cast: [], directors: [], similar: [], ids: {} })
 
 /** Run providers in priority order; the first non-empty value per field wins, ratings from all are kept. Ids found early feed later providers. */
-export async function loadMeta(q: Query, cfgs: ProviderCfg[]): Promise<Meta> {
+export async function loadMeta(q: Query, cfgs: ProviderCfg[], onFail?: () => void): Promise<Meta> {
   const m = emptyMeta()
   const ids: Ids = { ...q.ids }
   for (const c of cfgs) {
     const p: Provider | undefined = PROVIDERS.find((x) => x.id === c.id)
     if (!p || !c.enabled) continue
     let r
-    try { r = await p.fetch({ ...q, ids }, c) } catch { continue } // one broken provider must not hide the others
+    try { r = await p.fetch({ ...q, ids }, c) } catch { onFail?.(); continue } // one broken provider must not hide the others
     if (!r) continue
-    for (const k of ["title", "year", "plot", "poster", "backdrop"] as const) m[k] ||= r[k]
+    for (const k of ["title", "year", "plot", "poster", "backdrop", "logo", "cert", "awards"] as const) m[k] ||= r[k]
     m.runtime ||= r.runtime
     if (!m.backdrops?.length && r.backdrops?.length) m.backdrops = r.backdrops
     if (!m.trailers?.length && r.trailers?.length) m.trailers = r.trailers
+    for (const k of ["tagline", "original", "status", "next"] as const) (m as unknown as Record<string, unknown>)[k] ||= r[k]
+    for (const k of ["languages", "countries", "studios", "crew"] as const) if (!m[k]?.length && r[k]?.length) (m[k] as unknown[]) = r[k]!
     for (const k of ["genres", "directors", "similar"] as const) if (!m[k].length && r[k]?.length) (m[k] as unknown[]) = r[k]!
     // cast: names-only lists (Xtream, OMDb) give way to a list that has photos
     if (r.cast?.length && (!m.cast.length || (!m.cast.some((c) => c.photo) && r.cast.some((c) => c.photo)))) m.cast = r.cast
@@ -43,11 +45,32 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[]): Promise<Meta> {
   return m
 }
 
+const sigOf = (cfgs: ProviderCfg[]) => cfgs.filter((c) => c.enabled).map((c) => `${c.id}:${c.key ? 1 : 0}:${c.lang ?? ""}`).join(",")
+/** Cache key of a title lookup: what the title IS (kind + cleaned name + year), not the item id, so the same movie from another source / profile reuses the entry. A panel-provided id (`xid`) tells remakes apart. */
+const lookupKey = (kind: string, ct: { title: string; year?: string }, xid: string, matched: string | undefined, sig: string) => `meta5:${kind}:${norm(ct.title)}:${ct.year ?? ""}:${xid}:${matched ?? ""}:${sig}`
+const isEmptyMeta = (x: Meta) => !(x.plot || x.cast.length)
+
+/** Settings > Fix matches: look a title up the way Detail would (same cache entry, no panel info) so it counts as checked. true = a provider knew it. */
+export async function checkTitle(item: Item, cfgs: ProviderCfg[]): Promise<boolean> {
+  return !isEmptyMeta(await titleMeta(item, cfgs))
+}
+/** The cached lookup behind checkTitle (and Replace posters, which wants its poster). Panel info is not used, so the panel's own poster never shows up here. */
+export async function titleMeta(item: Item, cfgs: ProviderCfg[]): Promise<Meta> {
+  const ct = cleanTitle(item.srcName ?? item.name)
+  const kind = item.kind === "series" ? "series" : "movie"
+  return cached(lookupKey(kind, ct, "", undefined, sigOf(cfgs)), META_TTL, async () => {
+    let failed = false
+    const r = await loadMeta({ kind, title: ct.title, year: ct.year, ids: {} }, cfgs, () => (failed = true))
+    if (failed && isEmptyMeta(r)) throw new Error("lookup failed") // rate limited / offline: not cached as "nothing found"
+    return r
+  }, isEmptyMeta)
+}
+
 /** Source data (e.g. Plex, Jellyfin) beats providers: `base` wins per field, providers only fill gaps. */
 function withBase(m: Meta, b?: Partial<Meta>): Meta {
   if (!b) return m
   const r = { ...m }
-  for (const k of ["title", "year", "plot", "poster", "backdrop"] as const) r[k] = b[k] || m[k]
+  for (const k of ["title", "year", "plot", "poster", "backdrop", "logo", "cert", "awards"] as const) r[k] = b[k] || m[k]
   r.runtime = b.runtime || m.runtime
   r.backdrops = b.backdrops?.length ? b.backdrops : m.backdrops
   r.trailers = b.trailers?.length ? b.trailers : m.trailers
@@ -58,34 +81,103 @@ function withBase(m: Meta, b?: Partial<Meta>): Meta {
   return r
 }
 
-/** Details for a movie/series, cached for a week. `ready` = the Xtream info has been fetched (or will not be). */
+/** Key of a manual TMDB match (Settings `metaMatch`): what the title IS, so every copy of it shares the match. Uses the source's name, not a matched rename. */
+export const matchKey = (item: Item) => matchKeyOf(item.kind, item.srcName ?? item.name)
+
+/**
+ * Matches that only hold a TMDB id (made by an older version, imported, or synced from an older device) have no title / poster / backdrop to show,
+ * so the catalog keeps the panel's art. Look them up once (a few per session, quietly) and store what the catalog should show.
+ */
+export function useBackfillMatches() {
+  const matches = useApp((s) => s.settings.metaMatch)
+  const saved = useApp((s) => s.settings.meta)
+  const setSettings = useApp((s) => s.setSettings)
+  const cfg = useMemo(() => normalizeCfg(saved).find((c) => c.id === "tmdb" && c.enabled && c.key), [saved])
+  const tried = useRef(new Set<string>())
+  useEffect(() => {
+    if (!cfg || !matches) return
+    const todo = Object.entries(matches).filter(([k, v]) => !tried.current.has(k) && (typeof v === "string" || !v.poster)).slice(0, 25)
+    if (!todo.length) return
+    let live = true
+    ;(async () => {
+      for (const [k, v] of todo) {
+        tried.current.add(k)
+        try {
+          const r = (await tmdbSearch(k.startsWith("series:") ? "series" : "movie", `tmdb ${matchId(v)}`, cfg))[0]
+          const cur = useApp.getState().settings.metaMatch
+          if (!live || !r || matchId(cur?.[k]) !== matchId(v)) continue // reset or changed meanwhile
+          setSettings({ metaMatch: { ...cur, [k]: { id: r.id, title: r.title, year: r.year, poster: r.poster?.replace("/w185/", "/w500/"), backdrop: r.backdrop } } })
+        } catch { /* offline / bad id: the Detail page fills it in when the title is opened */ }
+      }
+    })()
+    return () => { live = false }
+  }, [matches, cfg]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** Details for a movie/series, cached for META_TTL (30 days); `refresh()` drops this title's cached data and fetches it again. `ready` = the Xtream info has been fetched (or will not be). */
 export function useMeta(item: Item | undefined, xtream: Record<string, unknown> | undefined, ready: boolean, base?: Partial<Meta>) {
   const saved = useApp((s) => s.settings.meta)
   const cfgs = useMemo(() => normalizeCfg(saved), [saved])
+  const entry = useApp((s) => (item ? s.settings.metaMatch?.[matchKey(item)] : undefined)) // manual match picked by the user
+  const matched = matchId(entry)
   const [meta, setMeta] = useState<Meta | null>(null)
   const [loading, setLoading] = useState(false)
+  const [rev, setRev] = useState(0) // bumped by refresh(): reruns the load (and, through useSeasonMeta, the episode data)
+  const keyRef = useRef("")
   const online = cfgs.some((c) => c.enabled && c.id !== "xtream" && (c.key || !PROVIDERS.find((p) => p.id === c.id)?.needsKey))
-  const sig = cfgs.filter((c) => c.enabled).map((c) => `${c.id}:${c.key ? 1 : 0}:${c.lang ?? ""}`).join(",")
+  const sig = sigOf(cfgs)
 
   useEffect(() => {
     if (!item || !ready || item.kind === "live") return
     let live = true
     setMeta(null)
-    const ct = cleanTitle(item.name)
-    const q: Query = { kind: item.kind === "series" ? "series" : "movie", title: ct.title, year: ct.year, ids: {}, xtream }
-    const key = `meta2:${item.id}:${sig}`
+    const ct = cleanTitle(item.srcName ?? item.name) // the source's name: stable across a matched rename
+    const q: Query = { kind: item.kind === "series" ? "series" : "movie", title: ct.title, year: ct.year, ids: matched ? { tmdb: matched } : {}, xtream }
+    const run = matched ? cfgs.filter((c) => c.id !== "xtream") : cfgs // the user said the panel's data is wrong for this title
+    const xid = String(xtream?.tmdb_id ?? xtream?.tmdb ?? xtream?.imdb_id ?? "")
+    const key = (keyRef.current = lookupKey(q.kind, ct, xid, matched, sig))
+    scheduleCachePrune()
     ;(async () => {
       setLoading(true)
-      const c = online ? await get<{ at: number; m: Meta }>(key) : undefined
-      if (c && Date.now() - c.at < (c.m.plot || c.m.cast.length ? WEEK : 864e5)) return live && void setMeta(withBase(c.m, base))
-      const m = await loadMeta(q, cfgs)
-      if (online) void set(key, { at: Date.now(), m }) // cached without `base`: source data is merged fresh each time
-      if (live) setMeta(withBase(m, base))
+      const c = online ? await get<{ at: number; v: Meta }>(key).catch(() => undefined) : undefined
+      if (c && live) setMeta(withBase(c.v, matched ? undefined : base)) // stale-while-revalidate: show what we have at once
+      // fresh entries return without a request; misses/stale go through the shared cache (one in-flight call per title)
+      const m = online ? await cached(key, META_TTL, () => loadMeta(q, run), isEmptyMeta) : await loadMeta(q, run)
+      if (live) setMeta(withBase(m, matched ? undefined : base)) // a manual match beats server data too. The cache holds the provider data only: source data (`base`) is merged fresh each time
+      // older id-only matches: store what the catalog should show (title, poster, backdrop, year) now that we know it
+      const cur = useApp.getState().settings.metaMatch
+      const k = matchKey(item)
+      if (matched && m.title && typeof cur?.[k] === "string") useApp.getState().setSettings({ metaMatch: { ...cur, [k]: { id: matched, title: m.title, year: m.year, poster: m.poster, backdrop: m.backdrop } } })
     })().finally(() => live && setLoading(false))
     return () => { live = false }
-  }, [item, xtream, ready, sig, base]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [item, xtream, ready, sig, base, matched, rev]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { meta, loading, online }
+  /** Forget this title's cached provider data (details + its seasons) and load it fresh. A wrong title is fixed with Match metadata, not here. */
+  const refresh = async () => {
+    const tmdb = meta?.ids.tmdb
+    if (tmdb) forceTmdb(tmdb) // fetch from TMDB, not from the shared cache
+    await forget([keyRef.current, ...(tmdb ? [`season:tmdb:${tmdb}:`] : [])].filter(Boolean))
+    setRev((n) => n + 1)
+  }
+  return { meta, loading, online, matched, refresh, rev }
+}
+
+/** Provider episodes of one season (by TMDB id), cached for META_TTL (30 days); `rev` changes = load again (after a refresh). null until loaded, or when no provider can tell. */
+export function useSeasonMeta(tmdb: string | undefined, season: number | null, rev = 0) {
+  const saved = useApp((s) => s.settings.meta)
+  const cfg = useMemo(() => normalizeCfg(saved).find((c) => c.enabled && c.key && PROVIDERS.find((p) => p.id === c.id)?.season), [saved])
+  const [eps, setEps] = useState<EpisodeMeta[] | null>(null)
+  useEffect(() => {
+    setEps(null)
+    if (!tmdb || season === null || !cfg) return
+    let live = true
+    const p = PROVIDERS.find((x) => x.id === cfg.id)!
+    cached(`season:${cfg.id}:${tmdb}:${season}:${cfg.lang ?? ""}`, META_TTL, async () => (await p.season!(tmdb, season, cfg)) ?? [], (x) => !x.length)
+      .then((r) => live && setEps(r))
+      .catch(() => {}) // a season the provider does not have (numbering differs) just leaves the panel's episodes as they are
+    return () => { live = false }
+  }, [tmdb, season, cfg, rev])
+  return eps
 }
 
 /* ---------- "More like this", only titles that exist in the user's catalog ---------- */

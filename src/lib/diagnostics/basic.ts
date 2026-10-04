@@ -74,7 +74,6 @@ export function playbackChecks(): Check[] {
     can("mp4", "video/mp4", true),
     can("mkv", "video/x-matroska", false, "diag.pb.mkv.hint"),
     can("hlsNative", "application/vnd.apple.mpegurl", false, "diag.pb.hlsNative.hint"),
-    feat("decomp", "DecompressionStream" in window, "diag.pb.decomp.hint"),
     feat("pip", !!document.pictureInPictureEnabled, "diag.pb.optional"),
     feat("fullscreen", !!(document.fullscreenEnabled || doc.webkitFullscreenEnabled), "diag.pb.optional"),
     feat("wake", "wakeLock" in navigator, "diag.pb.wake.hint"),
@@ -118,9 +117,9 @@ export function networkChecks(): Check[] {
       const r = await probe(px("https://www.gstatic.com/generate_204", p), { read: 64 })
       return r.kind === "ok" ? res("ok", t("diag.net.explicit.ok", { streams: String(s().proxyStreams) }), undefined, Math.round(r.ms)) : res("fail", say(r), t("diag.net.explicit.hint"))
     }),
-    ...useApp.getState().sources.filter((x) => x.enabled !== false && (x.url || x.server || x.epgUrl)).map((src) =>
+    ...useApp.getState().sources.filter((x) => x.enabled !== false && (x.url || x.server)).map((src) =>
       mk("network", `mixed.${src.id}`, t("diag.net.mixed"), async () => {
-        const urls = [src.url, src.server, src.epgUrl, ...(src.conns ?? []).map((c) => c.uri)].filter(Boolean) as string[]
+        const urls = [src.url, src.server, ...(src.conns ?? []).map((c) => c.uri)].filter(Boolean) as string[]
         const bad = urls.filter((u) => /^http:/i.test(u))
         if (location.protocol !== "https:") return res("ok", t("diag.net.mixed.page", { proto: location.protocol }))
         if (!bad.length) return res("ok", t("diag.net.mixed.https"))

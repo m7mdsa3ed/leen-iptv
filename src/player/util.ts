@@ -1,4 +1,5 @@
 import { fmt } from "@/lib/i18n"
+import { isGenericEpTitle } from "@/lib/meta/episodes"
 
 export const HIDE_MS = 5000 // controls auto-hide, same on tv / desktop / mobile
 export const BANNER_MS = 4000 // title banner after a channel / episode change
@@ -16,11 +17,12 @@ export const isEpisode = (id: string) => id.includes("|ep|")
 export const epOf = (name: string) => { const m = name.match(/\sS(\d+)E(\d+)$/); return m ? { s: +m[1], e: +m[2] } : null }
 export const speedLabel = (n: number) => `${fmt.digits(n)}x`
 
-/** Title + subtitle line shared by the top bar and the More panel (episodes: series + S/E; live: number + category; movies: year + category). */
-export function describe(item: { id: string; kind: string; name: string; group: string; num?: number; year?: string }, t: (k: string, v?: Record<string, string | number>) => string) {
+/** Title + subtitle line shared by the top bar and the More panel (episodes: series + S/E + episode title; live: number + category; movies: year + category). */
+export function describe(item: { id: string; kind: string; name: string; group: string; num?: number; year?: string; epTitle?: string }, t: (k: string, v?: Record<string, string | number>) => string) {
   const ep = isEpisode(item.id) ? epOf(item.name) : null
   const title = isEpisode(item.id) && item.group ? item.group : item.name
-  const sub = (item.kind === "live" ? [item.num ? fmt.number(item.num) : "", item.group] : ep ? [t("player.epShort", { s: ep.s, e: ep.e })] : [item.year ? fmt.digits(item.year) : "", item.group]).filter(Boolean).join("  ·  ")
+  const epTitle = ep && item.epTitle && !isGenericEpTitle(item.epTitle, item.group) ? item.epTitle : "" // "Episode 3" adds nothing next to "S1 E3"
+  const sub = (item.kind === "live" ? [item.num ? fmt.number(item.num) : "", item.group] : ep ? [t("player.epShort", { s: ep.s, e: ep.e }), epTitle] : [item.year ? fmt.digits(item.year) : "", item.group]).filter(Boolean).join("  ·  ")
   return { title, sub }
 }
 

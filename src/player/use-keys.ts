@@ -7,10 +7,10 @@ import type { MenuKind } from "./menus"
 import { fsEl } from "./util"
 
 export type KeyCtx = {
-  live: boolean; show: boolean; menu: MenuKind | null; err: string; help: boolean; more: "closed" | "open" | "closing"; nextShow: boolean; canPip: boolean; overlay: "none" | "guide" | "strip"
+  live: boolean; show: boolean; menu: MenuKind | null; err: string; help: boolean; more: "closed" | "open" | "closing"; nextShow: boolean; canPip: boolean; overlay: "none" | "strip"
   back: () => void; hide: () => void; closeMenu: () => void; closeHelp: () => void; toggleHelp: () => void
-  closeMore: () => void; openMore: () => void; cancelNext: () => void
-  closeOverlay: () => void; openGuide: () => void; openStrip: () => void
+  closeMore: () => void; openMore: () => void; cancelNext: () => void; skipSeg?: () => void
+  closeOverlay: () => void; openStrip: () => void
   play: () => void; pause: () => void; toggle: () => void; seek: (d: number) => void; zap: (d: number) => void
   toggleFav: () => void; openMenu: (m: MenuKind) => void; cycleFit: () => void; poke: () => void
   toggleFs: () => void; togglePip: () => void; toggleMute: () => void; setVolume: (delta: number) => void; digit: (d: number) => void
@@ -62,9 +62,8 @@ export function useKeys(c: KeyCtx) {
       if (k === KEY.ff) return stop(), c.seek(30), c.poke()
       if (k === KEY.rw) return stop(), c.seek(-10), c.poke()
       if (c.overlay !== "none") {
-        // guide / strip own the keys: arrows, OK, CH+/CH- go to the D-pad nav (or the strip's own handler), never to zapping. Only the desktop switches leak in.
+        // the strip owns the keys: arrows, OK, CH+/CH- go to the D-pad nav (or the strip's own handler), never to zapping. Only the desktop switch leaks in.
         if (!isTv && c.live && !(e.target instanceof HTMLInputElement)) {
-          if (k === 71 && !e.ctrlKey && !e.metaKey && !e.altKey) return stop(), c.openGuide()
           if (k === 67 && !e.ctrlKey && !e.metaKey && !e.altKey) return stop(), c.openStrip()
         }
         return
@@ -88,7 +87,6 @@ export function useKeys(c: KeyCtx) {
         const up = k === KEY.up ? 1 : k === KEY.down ? -1 : 0
         if (k === 32) return stop(), c.toggle(), c.poke()
         if (k === 70) return stop(), c.toggleFs()
-        if (c.live && k === 71 && !e.ctrlKey && !e.metaKey && !e.altKey) return stop(), c.openGuide()
         if (c.live && k === 67 && !e.ctrlKey && !e.metaKey && !e.altKey) return stop(), c.openStrip()
         if (k === 80 && c.canPip) return stop(), c.togglePip()
         if (k === 77) return stop(), c.toggleMute()
@@ -98,11 +96,10 @@ export function useKeys(c: KeyCtx) {
       }
       if (locked) {
         stop()
-        if (isTv && c.live && k === KEY.enter) return c.openGuide() // TV live: OK = guide, Left/Right = channel strip, Info/Blue/other = controls
-        if (isTv && c.live && (k === KEY.left || k === KEY.right)) return c.openStrip()
+        if (isTv && c.live && (k === KEY.left || k === KEY.right)) return c.openStrip() // TV live: Left/Right = channel strip, Info/Blue/other = controls
         if (!c.live && k === KEY.left) c.seek(-10)
         else if (!c.live && k === KEY.right) c.seek(30)
-        else if (k === KEY.enter && !c.live) c.toggle()
+        else if (k === KEY.enter && !c.live) (c.skipSeg ?? c.toggle)()
         c.poke()
         return
       }

@@ -84,3 +84,41 @@ end $$;
 revoke all on function public.link_create(text, text), public.link_poll(uuid), public.link_finish(uuid), public.link_lookup(text), public.link_approve(text, text, text) from public;
 grant execute on function public.link_create(text, text), public.link_poll(uuid), public.link_finish(uuid) to anon, authenticated;
 grant execute on function public.link_lookup(text), public.link_approve(text, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------------------------
+-- Shared metadata cache: raw TMDB title / season responses, plus which TMDB id a cleaned title resolved to (/resolve/), read by every signed-in device before it
+-- calls TMDB, so a title is fetched from TMDB once for everyone. Full provider responses (the provider is recorded per row). Public movie data only, never user
+-- data or keys. Clients cannot write the table: they call meta_put(), which validates the row, stamps
+-- the time on the server and refuses to replace a row that is younger than 7 days (so one bad client
+-- cannot overwrite fresh data). `by` records who wrote a row, to clean up after a bad one.
+-- ---------------------------------------------------------------------------------------------
+create table if not exists public.meta_cache (
+  key text primary key check (key ~ '^tmdb:v[0-9]+:[A-Za-z-]{2,10}:(/(movie|tv)/[0-9]+(/season/[0-9]+)?|/resolve/(movie|series))\?' and length(key) <= 300),
+  data jsonb not null check (jsonb_typeof(data) = 'object' and pg_column_size(data) <= 2000000),
+  fetched_at timestamptz not null default now(),
+  "by" uuid default auth.uid(),
+  provider text generated always as (split_part(key, ':', 1)) stored -- which metadata provider the row came from (the key prefix), so rows can be told apart or re-read if the provider changes
+);
+-- tables made before: full (untrimmed) responses are kept, so the size cap is 2 MB; record the provider; widen the key check for /resolve/ rows, which hold only an id
+alter table public.meta_cache add column if not exists provider text generated always as (split_part(key, ':', 1)) stored;
+alter table public.meta_cache drop constraint if exists meta_cache_data_check;
+alter table public.meta_cache add constraint meta_cache_data_check check (jsonb_typeof(data) = 'object' and pg_column_size(data) <= 2000000);
+alter table public.meta_cache drop constraint if exists meta_cache_key_check;
+alter table public.meta_cache add constraint meta_cache_key_check check (key ~ '^tmdb:v[0-9]+:[A-Za-z-]{2,10}:(/(movie|tv)/[0-9]+(/season/[0-9]+)?|/resolve/(movie|series))\?' and length(key) <= 300);
+alter table public.meta_cache drop constraint if exists meta_cache_resolve_check;
+alter table public.meta_cache add constraint meta_cache_resolve_check check (key !~ ':/resolve/' or (jsonb_typeof(data->'id') = 'number' and (data->>'id') ~ '^[1-9][0-9]{0,9}$' and data - 'id' = '{}'::jsonb));
+alter table public.meta_cache enable row level security;
+drop policy if exists "meta_cache_read" on public.meta_cache;
+create policy "meta_cache_read" on public.meta_cache for select to authenticated using (true); -- no insert / update / delete policies on purpose
+
+create or replace function public.meta_put(p_key text, p_data jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'not_signed_in'; end if;
+  insert into public.meta_cache as m (key, data, fetched_at, "by") values (p_key, p_data, now(), auth.uid())
+  on conflict (key) do update set data = excluded.data, fetched_at = now(), "by" = auth.uid()
+  where m.fetched_at < now() - interval '7 days';
+end $$;
+
+revoke all on function public.meta_put(text, jsonb) from public, anon;
+grant execute on function public.meta_put(text, jsonb) to authenticated;

@@ -1,12 +1,13 @@
 // Jellyfin server as a source: username/password or Quick Connect sign-in, catalog (per library), live TV + guide when the
 // server has it, detail, HLS URL, progress reporting. The token rides as api_key in the query so GETs stay CORS-simple.
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
-import type { Episode, Item, Prog, Source } from "./types"
-import { fetchT, mixed, plexFetch, px, scanLan } from "./net"
+import type { Episode, Item, Source } from "./types"
+import { HttpError, fetchT, mixed, plexFetch, px, scanLan } from "./net"
 import { t } from "./i18n"
 import { useApp } from "./store"
 import { clientId } from "./plex"
-import { authHeader, imageUrl, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapPrograms, mapStreams, normServer, toTicks, type Img } from "./jellyfin-pure"
+import { firstReachable } from "./plex-pure"
+import { authHeader, imageUrl, jfCands, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapIntroSkipper, mapSegments, mapStreams, normServer, toTicks, type Img } from "./jellyfin-pure"
 
 export { normServer }
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -35,6 +36,34 @@ export async function jellyfinServerInfo(server: string): Promise<{ name: string
   const j = await call<J>(server, "/System/Info/Public", { headers: { Accept: "application/json" } }, {}, undefined)
   if (!j?.Id) throw new Error(t("errors.jellyfin.notServer"))
   return { name: String(j.ServerName || "Jellyfin"), id: String(j.Id), version: String(j.Version ?? "") }
+}
+
+/* ---------- local / remote address ---------- */
+/** One address answers /System/Info/Public (2.5s local, 6s remote), is the SAME server, and still accepts the saved token. */
+async function jfProbe(s: Source, c: { uri: string; kind: string }) {
+  const h = { headers: { Accept: "application/json" } }
+  const j = await (await plexFetch(jfUrl(c.uri, "/System/Info/Public"), proxy(), h, c.kind === "local" ? 2500 : 6000)).json().catch(() => { throw new Error(t("errors.jellyfin.notServer")) })
+  if (!j?.Id || (s.serverId && j.Id !== s.serverId)) throw new Error(t("errors.jellyfin.notServer")) // another box on that address
+  if (s.token && s.userId) {
+    try { await plexFetch(jfUrl(c.uri, `/Users/${s.userId}`, {}, s.token), proxy(), h, 6000) } catch (e) {
+      if (e instanceof HttpError && (e.status === 401 || e.status === 403)) throw Object.assign(new Error(t("source.conn.badToken", { host: c.uri.replace(/^https?:\/\//, "") })), { auth: true })
+      /* other failures: the public call already worked, so let the load report them */
+    }
+  }
+}
+
+/** Make sure the source's address works. Order: saved one (unless `force`), then local -> remote as the connection mode allows; the winner is saved into `server`. Returns the source to use. */
+export async function ensureJellyfinConnection(s: Source, force = false): Promise<Source> {
+  const cands = jfCands(s)
+  const cur = normServer(s.server ?? "")
+  if (!cands.length) throw new Error(t("source.conn.noRoute", { name: s.name }))
+  const save = (uri: string) => { if (uri !== cur) useApp.getState().updateSource(s.id, { server: uri }); return { ...s, server: uri } }
+  if (cands.length === 1) return save(cands[0].uri) // nothing to choose between; the load reports real errors
+  const now = cands.find((c) => c.uri === cur)
+  if (now && !force) { try { await jfProbe(s, now); return s } catch { /* try the others */ } }
+  const { cand, errs } = await firstReachable(cands, (c) => jfProbe(s, c))
+  if (!cand) throw errs.find((e) => (e as { auth?: boolean })?.auth) ?? new Error(t("source.conn.noRoute", { name: s.name }))
+  return save(cand.uri)
 }
 
 const auth = (j: J): JfAuth => ({ token: String(j.AccessToken), userId: String(j.User?.Id) })
@@ -107,19 +136,6 @@ export async function loadJellyfin(s: Source, px_: string, step: (m: string) => 
   return out
 }
 
-/** Guide for the given channel ids between `from` and `to` (ms), in the app's EPG shape. Batched to keep URLs short. */
-export async function jellyfinEpg(s: Source, px_: string, channelIds: string[], from: number, to: number): Promise<Map<string, Prog[]>> {
-  const all: J[] = []
-  for (let i = 0; i < channelIds.length; i += 50) {
-    const r = await get<{ Items?: J[] }>(s, px_, "/LiveTv/Programs", {
-      UserId: s.userId, ChannelIds: channelIds.slice(i, i + 50).join(","), MinEndDate: new Date(from).toISOString(), MaxStartDate: new Date(to).toISOString(),
-      EnableImages: "false", EnableUserData: "false", Fields: "Overview",
-    })
-    all.push(...(r.Items ?? []))
-  }
-  return mapPrograms(all)
-}
-
 export async function jellyfinDetail(s: Source, px_: string, item: Item): Promise<{ info: Record<string, unknown>; meta: Partial<import("./meta/types").Meta>; episodes: Episode[] }> {
   const img = jellyfinImg(s)
   const [d, sim, eps] = await Promise.all([
@@ -170,8 +186,17 @@ export function jellyfinReport(s: Source, item: Item, state: "start" | "progress
 /** Mark as watched. */
 export const jellyfinMarkPlayed = (s: Source, item: Item) => send(s, "POST", `/Users/${s.userId}/PlayedItems/${item.sid}`)
 
+/** Mark as unwatched (also clears the resume position). */
+export const jellyfinMarkUnplayed = (s: Source, item: Item) => send(s, "DELETE", `/Users/${s.userId}/PlayedItems/${item.sid}`)
+
 /** Audio + subtitle streams to pick from. */
 export const jellyfinTracks = async (s: Source, item: Item) => mapStreams(await get<J>(s, proxy(), `/Users/${s.userId}/Items/${item.sid}`))
+
+/** Intro / recap / outro segments: the server's own, else the Intro Skipper plugin's intro. */
+export async function jellyfinSegments(s: Source, item: Item) {
+  const own = await get<J>(s, proxy(), `/MediaSegments/${item.sid}`).then(mapSegments, () => [])
+  return own.length ? own : get<J>(s, proxy(), `/Episode/${item.sid}/IntroTimestamps/v1`).then(mapIntroSkipper, () => [])
+}
 
 /** WebVTT text of one subtitle stream (the server converts text subtitles on the fly; fetched, not linked, so no CORS setup on <video>). */
 export const jellyfinSubtitle = async (s: Source, item: Item, index: number) =>

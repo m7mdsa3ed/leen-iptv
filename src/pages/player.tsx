@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { nowNext, useCatalog } from "@/lib/catalog"
 import { isTv, useTouch } from "@/lib/device"
 import { navState, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
@@ -15,10 +14,11 @@ import { Flash, NumberEntry, Spinner, useFlash } from "@/player/indicators"
 import { KeysHelp } from "@/player/keys-help"
 import { PlayerMenu, type MenuKind } from "@/player/menus"
 import { NextCard } from "@/player/next-card"
+import { SkipButton } from "@/player/skip-button"
+import { useSegments } from "@/player/use-segments"
 import { MorePanel } from "@/player/more/panel"
 import { useGuard } from "@/player/more/hooks"
 import { ChannelStrip } from "@/player/overlays/channel-strip"
-import { GuideOverlay } from "@/player/overlays/guide-overlay"
 import type { MoreActions } from "@/player/more/actions"
 import { FITS, prefs, setPrefs, SUB_SIZES } from "@/player/prefs"
 import { TopBar } from "@/player/top-bar"
@@ -33,7 +33,7 @@ import "./player.css"
 
 const NONE: string[] = []
 type MoreState = "closed" | "open" | "closing"
-type Overlay = "none" | "guide" | "strip" // live only: full-screen guide / bottom channel strip (one at a time)
+type Overlay = "none" | "strip" // live only: bottom channel strip
 
 // ponytail: module-level so the picked quality carries to the next episode; resets to Original on reload
 let lastQ: StreamQ = STREAM_QS[0]
@@ -43,7 +43,6 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const touch = useTouch()
   const back = useRoute((s) => s.back)
   const toggleFav = useApp((s) => s.toggleFav)
-  const epg = useCatalog((s) => s.epg)
   const favs = useApp((s) => (s.profileId && s.data[s.profileId]?.favs) || NONE)
   const vref = useRef<HTMLVideoElement>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -79,6 +78,8 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const [muted, setMuted] = useState(() => prefs().muted)
   const [fs, setFs] = useState(false)
   const [pip, setPip] = useState(false)
+  const [sleepMin, setSleepMin] = useState(0) // 0 = off, else the chosen preset in minutes
+  const [sleepAt, setSleepAt] = useState<number | null>(null) // wall-clock time the timer fires
   const [flash, fire] = useFlash()
   const hideT = useRef(0)
   const bannerT = useRef(0)
@@ -97,7 +98,10 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const E = useEngine({ vref, item, live, raw: S.raw, url: S.url, direct: S.direct, setProxied: S.setProxied, src: S.src })
   useTracking({ vref, item, live, src: S.src, plex: S.plex, jf: S.jf, resume, meas: E.meas, statsRef: E.statsRef })
   const hasNext = !live && isEpisode(item.id) && idx < queue.length - 1
-  const showNext = useApp((s) => s.settings.nextBanner ?? true), autoNext = useApp((s) => s.settings.autoNext ?? true)
+  const showNext = useApp((s) => s.settings.nextBanner ?? true), autoAll = useApp((s) => s.settings.autoNext ?? true)
+  const noAuto = useApp((s) => s.settings.noAutoShows) ?? [], showKey = item.series ?? item.group
+  const autoNext = autoAll && !noAuto.includes(showKey) // per-show off switch (Next card)
+  const toggleShowAuto = () => useApp.getState().setSettings({ noAutoShows: noAuto.includes(showKey) ? noAuto.filter((k) => k !== showKey) : [...noAuto, showKey] })
 
   /* ---------- controls visibility ---------- */
   const poke = useCallback(() => {
@@ -120,6 +124,8 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const advance = () => { setIdx((i) => Math.min(i + 1, qref.current.length - 1)); showBanner() }
   const nu = useNextUp({ vref, enabled: hasNext && showNext, itemId: item.id, onNext: advance, auto: autoNext })
   const nextOn = hasNext && nu.show
+  const sg = useSegments({ vref, item, live, plex: S.plex, jf: S.jf })
+  const skipOn = !!sg.seg && !nextOn // credits give way to the Next card
   const nextItem = queue[idx + 1]
   const next_ = () => (live ? zap(1) : idx < queue.length - 1 && setIdx(idx + 1))
   const prev_ = () => (live ? zap(-1) : idx > 0 && setIdx(idx - 1))
@@ -167,10 +173,10 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const openMenu = (m: MenuKind) => {
     const v = vref.current!, h = E.hls.current
     const a = document.activeElement as HTMLElement | null
-    opener.current = a?.closest("[data-controls]") ? a : null
-    if (m === "audio") setAudioSel(srvAudio ? tr.audio ?? S.tracks.audio.find((x) => x.def)?.id ?? S.tracks.audio[0].id : Math.max(0, h?.audioTrack ?? 0))
-    if (m === "subs" && srvSubs) setSubSel(tr.sub ?? -1)
-    else if (m === "subs") {
+    if (a?.closest("[data-controls]")) opener.current = a // a sheet opened from another sheet (Settings > Speed) keeps the original control
+    if (m === "audio" || m === "av") setAudioSel(srvAudio ? tr.audio ?? S.tracks.audio.find((x) => x.def)?.id ?? S.tracks.audio[0].id : Math.max(0, h?.audioTrack ?? 0))
+    if ((m === "subs" || m === "av") && srvSubs) setSubSel(tr.sub ?? -1)
+    else if (m === "subs" || m === "av") {
       if (!h) E.setSubs(Array.from(v.textTracks).map((x, i) => ({ id: i, label: x.label || x.language || t("player.subtitleTrack", { n: i + 1 }) })))
       setSubSel(h ? (h.subtitleDisplay ? h.subtitleTrack : -1) : Array.from(v.textTracks).findIndex((x) => x.mode === "showing"))
     }
@@ -240,6 +246,22 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   }
   const pickFit = (i: number) => { setFit(i); setPrefs({ fit: i }); setMenu(null) }
   const cycleFit = () => pickFit((fit + 1) % FITS.length)
+  const setSleep = (n: number) => {
+    setMenu(null)
+    setSleepMin(n)
+    setSleepAt(n ? Date.now() + n * 60000 : null)
+    fire("clock", n ? t("player.sleep.min", { n }) : t("player.off"))
+  }
+  // one timeout for the whole remaining time: when it fires, stop playback and leave the player
+  useEffect(() => {
+    if (!sleepAt) return
+    const id = window.setTimeout(() => {
+      vref.current?.pause()
+      setSleepMin(0); setSleepAt(null)
+      back()
+    }, Math.max(0, sleepAt - Date.now()))
+    return () => clearTimeout(id)
+  }, [sleepAt, back])
 
   /* ---------- More panel ---------- */
   const openMore = () => {
@@ -280,7 +302,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   }), [])
 
   /* ---------- live overlays: guide + channel strip ---------- */
-  const openOverlay = (o: "guide" | "strip") => {
+  const openOverlay = (o: "strip") => {
     if (!live || E.err || moreRef.current !== "closed") return
     if (ovRef.current === o) return
     setMenu(null); setHelp(false); setShow(false)
@@ -374,7 +396,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   useKeys({
     live, show, menu, err: E.err, help, more, nextShow: nextOn, canPip, overlay: ov,
     back, hide, closeMenu: () => setMenu(null), closeHelp: () => setHelp(false), toggleHelp: () => setHelp((h) => !h),
-    closeMore, openMore, cancelNext: nu.cancel, closeOverlay, openGuide: () => openOverlay("guide"), openStrip: () => openOverlay("strip"),
+    closeMore, openMore, cancelNext: nu.cancel, skipSeg: skipOn ? sg.skip : undefined, closeOverlay, openStrip: () => openOverlay("strip"),
     play, pause, toggle, seek, zap, toggleFav: () => toggleFav(item.id), openMenu, cycleFit, poke,
     toggleFs, togglePip, toggleMute, setVolume: bumpVolume, digit,
   })
@@ -390,7 +412,6 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
     tp.w = window.setTimeout(() => (show ? (setShow(false), setMenu(null)) : poke()), live ? 0 : 300)
   }
 
-  const { now, next } = live ? nowNext(epg, item.epgId) : ({} as ReturnType<typeof nowNext>)
   const isFav = favs.includes(item.id)
 
   return (
@@ -435,27 +456,28 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
       {num && <NumberEntry n={num} />}
 
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-        <TopBar item={item} on={(show || banner) && more !== "open" && ov === "none"} hints={isTv && live} showBack={show && !isTv} favBtn={touch && !isTv} isFav={isFav} onFav={() => toggleFav(item.id)} onBack={back} now={now} next={next} />
+        <TopBar item={item} on={(show || banner) && more !== "open" && ov === "none"} hints={isTv && live} showBack={show && !isTv} favBtn={touch && !isTv} isFav={isFav} onFav={() => toggleFav(item.id)} onBack={back} />
         <Controls
           on={show && more === "closed" && ov === "none"} live={live} tv={isTv} touch={touch && !isTv} vref={vref}
-          paused={E.paused} queueLen={queue.length} mediaServer={S.mediaServer} sq={sq} fitName={t(`player.fit.${FITS[fit]}`)} speed={speed}
-          canPip={canPip} pip={pip} fs={fs} isFav={isFav} stats={E.stats} vol={vol} muted={muted}
+          paused={E.paused} queueLen={queue.length}
+          sleepAt={sleepAt} canPip={canPip} pip={pip} fs={fs} isFav={isFav} stats={E.stats} vol={vol} muted={muted}
           onPrev={prev_} onNext={next_} onToggle={toggle} onSeek={(d) => { seek(d); poke() }} onSeekFrac={seekFrac}
           onMute={toggleMute} onVolume={(x) => setVolume(x, false)} onFav={() => toggleFav(item.id)} onMenu={openMenu}
-          onPip={togglePip} onFs={toggleFs} onMore={openMore} onGuide={() => openOverlay("guide")} onChannels={() => openOverlay("strip")}
+          onPip={togglePip} onFs={toggleFs} onMore={openMore} onChannels={() => openOverlay("strip")}
         />
       </div>
 
-      {nextOn && nextItem && <NextCard item={nextItem} secs={nu.secs} auto={autoNext} tv={isTv} onSkip={nu.skip} onCancel={nu.cancel} />}
+      {skipOn && <SkipButton seg={sg.seg!} onSkip={sg.skip} />}
+      {nextOn && nextItem && <NextCard item={nextItem} secs={nu.secs} auto={autoNext} autoAll={autoAll} showOff={!autoNext && autoAll} tv={isTv} onSkip={nu.skip} onCancel={nu.cancel} onToggleShow={toggleShowAuto} />}
       {more !== "closed" && <MorePanel item={item} closing={more === "closing"} act={act} />}
-      {ov === "guide" && <GuideOverlay item={item} tune={tune} close={closeOv} />}
       {ov === "strip" && <ChannelStrip item={item} tune={tune} close={closeOv} />}
       {help && <KeysHelp live={live} onClose={() => setHelp(false)} />}
       {menu && (
         <PlayerMenu
           menu={menu} audio={srvAudio ? S.tracks.audio : E.audio} audioSel={audioSel} onAudio={pickAudio} subs={srvSubs ? S.tracks.subs : E.subs} subSel={subSel} onSub={pickSub}
           subSize={subSize} onSubSize={stepSubSize} subOffset={S.sidecar !== null ? subOffset : null} onSubOffset={stepSubOffset}
-          sq={sq} onQuality={pickQ} speed={speed} onSpeed={pickSpeed} fit={fit} onFit={pickFit} onClose={() => setMenu(null)}
+          sq={sq} onQuality={pickQ} speed={speed} onSpeed={pickSpeed} fit={fit} onFit={pickFit} sleepMin={sleepMin} onSleep={setSleep}
+          live={live} mediaServer={S.mediaServer} onMenu={openMenu} onClose={() => setMenu(null)}
         />
       )}
       {E.err && <ErrorScreen name={item.name} msg={E.err} canNext={queue.length > 1} onRetry={E.retry} onNext={() => zap(1)} onBack={back} />}

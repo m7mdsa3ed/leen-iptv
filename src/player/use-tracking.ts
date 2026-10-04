@@ -30,8 +30,8 @@ export function useTracking(o: {
   /* save progress */
   useEffect(() => {
     if (live) return
-    const t = setInterval(() => { const v = vref.current; if (v && v.duration > 0) setProgress(item.id, v.currentTime, v.duration) }, 10000)
-    return () => { clearInterval(t); const v = vref.current; if (v && v.duration > 0) setProgress(item.id, v.currentTime, v.duration) }
+    const t = setInterval(() => { const v = vref.current; if (v && v.duration > 0) setProgress(item.id, v.currentTime, v.duration, item.series) }, 10000)
+    return () => { clearInterval(t); const v = vref.current; if (v && v.duration > 0) setProgress(item.id, v.currentTime, v.duration, item.series) }
   }, [item.id, live, setProgress]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Watch history: one session per playback, +5s while actually playing (paused/buffering time is not counted).

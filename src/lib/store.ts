@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import type { ColorThemeId } from "@/lib/themes"
 import { persist } from "zustand/middleware"
 import { LAYOUT_IDS } from "./layouts"
 import type { ProviderCfg } from "./meta/types"
@@ -6,13 +7,16 @@ import { isTv } from "./device"
 import { resolveLang, translate } from "./i18n/pure"
 import { ar, en } from "./i18n/locales"
 import type { LayoutId } from "./layouts"
-import type { Profile, Source } from "./types"
+import type { MetaMatch, Profile, Source } from "./types"
+import type { Follow } from "./sports/types"
 
-type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }> }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; cardSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series" | "library"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; autoNext?: boolean; meta?: ProviderCfg[] }
+/** A user-made group of live channels (name is its key within a profile). */
+export type LiveList = { name: string; items: string[] }
+type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }>; lists?: LiveList[]; follows?: Follow[] }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; colorTheme?: ColorThemeId; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; cardSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series" | "library"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; autoNext?: boolean; noAutoShows?: string[]; meta?: ProviderCfg[]; metaMatch?: Record<string, MetaMatch>; logoMatch?: Record<string, string>; sharedMeta?: boolean; metaPosters?: boolean; sportsNotify?: { enabled: boolean; lead: number } }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
-const empty = (): PData => ({ favs: [], recents: [], progress: {} })
+const empty = (): PData => ({ favs: [], recents: [], progress: {}, lists: [], follows: [] })
 const uid = () => Math.random().toString(36).slice(2, 9)
 
 interface S {
@@ -34,9 +38,14 @@ interface S {
   moveSource: (id: string, dir: -1 | 1) => void // priority order
   setSourceFilter: (id: string | null) => void
   toggleFav: (id: string) => void
+  toggleFollow: (f: Follow) => void
+  saveList: (name: string, items?: string[]) => void
+  removeList: (name: string) => void
+  toggleListChannel: (name: string, id: string) => void
   toggleLock: (key: string) => void
   pushRecent: (id: string) => void
-  setProgress: (id: string, pos: number, dur: number) => void
+  setProgress: (id: string, pos: number, dur: number, series?: string) => void
+  markSeen: (entries: { id: string; dur?: number }[], seen: boolean) => void
   setSettings: (p: Partial<Settings>) => void
 }
 
@@ -84,6 +93,20 @@ export const useApp = create<S>()(
         }),
       setSourceFilter: (id) => set({ sourceFilter: id }),
       toggleFav: (id) => set((s) => upd(s, (d) => ({ ...d, favs: d.favs.includes(id) ? d.favs.filter((x) => x !== id) : [id, ...d.favs] }))),
+      // follow/unfollow one team for this profile (synced as a t/ entity, tombstoned when removed)
+      toggleFollow: (f) => set((s) => upd(s, (d) => {
+        const follows = d.follows ?? []
+        const same = (x: Follow) => x.provider === f.provider && x.teamId === f.teamId
+        return { ...d, follows: follows.some(same) ? follows.filter((x) => !same(x)) : [f, ...follows] }
+      })),
+      saveList: (name, items = []) => set((s) => upd(s, (d) => {
+        const lists = d.lists ?? []
+        return { ...d, lists: lists.some((l) => l.name === name) ? lists.map((l) => (l.name === name ? { ...l, items } : l)) : [...lists, { name, items }] }
+      })),
+      removeList: (name) => set((s) => upd(s, (d) => ({ ...d, lists: (d.lists ?? []).filter((l) => l.name !== name) }))),
+      toggleListChannel: (name, id) => set((s) => upd(s, (d) => ({
+        ...d, lists: (d.lists ?? []).map((l) => (l.name === name ? { ...l, items: l.items.includes(id) ? l.items.filter((x) => x !== id) : [...l.items, id] } : l)),
+      }))),
       toggleLock: (key) =>
         set((s) => ({
           profiles: s.profiles.map((p) =>
@@ -91,7 +114,14 @@ export const useApp = create<S>()(
           ),
         })),
       pushRecent: (id) => set((s) => upd(s, (d) => ({ ...d, recents: [id, ...d.recents.filter((x) => x !== id)].slice(0, 40) }))),
-      setProgress: (id, pos, dur) => set((s) => upd(s, (d) => ({ ...d, progress: { ...d.progress, [id]: { pos, dur, t: Date.now() } } }))),
+      // an episode also writes the series entry (last episode wins) so Continue watching, which lists catalog items, can show the series
+      setProgress: (id, pos, dur, series) => set((s) => upd(s, (d) => { const p = { pos, dur, t: Date.now() }; return { ...d, progress: { ...d.progress, [id]: p, ...(series ? { [series]: p } : {}) } } })),
+      // ponytail: "unseen" = position 0 (not a delete) so sync's last-writer-wins carries it and server resume is not re-seeded
+      markSeen: (entries, seen) => set((s) => upd(s, (d) => {
+        const progress = { ...d.progress }, t = Date.now()
+        for (const e of entries) { const dur = progress[e.id]?.dur || e.dur || 1; progress[e.id] = { pos: seen ? dur : 0, dur, t } }
+        return { ...d, progress }
+      })),
       setSettings: (p) => set((s) => ({ settings: { ...s.settings, ...p } })),
     }),
     {
@@ -102,7 +132,7 @@ export const useApp = create<S>()(
       merge: (saved, cur) => {
         const m = { ...cur, ...(saved as object) } as S
         m.settings = { ...cur.settings, ...m.settings } // settings saved by older versions lack new keys
-        if (!LAYOUT_IDS.includes(m.settings.layout)) m.settings.layout = (m.settings.layout as string) === "cinema" ? "netflix" : "googletv" // renamed / removed layouts
+        if (!LAYOUT_IDS.includes(m.settings.layout)) m.settings.layout = "googletv" // removed layouts
         let id: string | null = null
         try { id = sessionStorage.getItem("iptv-profile") } catch { /* ignore */ }
         m.sourceFilter = null
@@ -115,4 +145,10 @@ export const useApp = create<S>()(
 export const useProfile = () => useApp((s) => s.profiles.find((p) => p.id === s.profileId) ?? null)
 export const usePData = (): PData => useApp((s) => (s.profileId && s.data[s.profileId]) || EMPTY)
 const EMPTY = empty()
+const EMPTY_LISTS: LiveList[] = []
+/** The picked profile's custom live lists (stable reference; empty array when there is none). */
+export const useLists = (): LiveList[] => useApp((s) => (s.profileId && s.data[s.profileId]?.lists) || EMPTY_LISTS)
+const EMPTY_FOLLOWS: Follow[] = []
+/** The picked profile's followed teams (stable reference; empty array when there is none). */
+export const useFollows = (): Follow[] => useApp((s) => (s.profileId && s.data[s.profileId]?.follows) || EMPTY_FOLLOWS)
 export const useSource = () => useApp((s) => s.sources.find((x) => x.id === s.sourceId) ?? null)

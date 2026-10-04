@@ -120,7 +120,7 @@ export default function DiagnosticsPage() {
         <div className="min-h-0 flex-1 overflow-y-auto p-1 pb-6">
           <div className="flex flex-col gap-4 md:max-w-4xl">
             <section className="flex flex-col gap-3 rounded-[28px] bg-surface p-5 text-foreground md:p-6">
-              <h2 className="text-2xl font-medium tracking-tight">{t("diag.title")}</h2>
+              <h2 className="text-3xl font-medium tracking-tight">{t("diag.title")}</h2>
               <p className="text-sm text-muted-foreground">{t("diag.desc")}</p>
               <div data-nav tabIndex={0} role="status" aria-live="polite" className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl text-base outline-none">
                 <span className={TONE.ok}>{t("diag.sum.ok", { n: fmt.number(n("ok")) })}</span>

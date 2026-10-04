@@ -21,7 +21,7 @@ export function useAct() {
   return { busy, err, ok, run }
 }
 
-/** Shown when the build has no Supabase project (.env). Sync is configured by whoever builds the app, not by each user. */
+/** Shown when the build has no sync server configured (.env). Sync is configured by whoever builds the app, not by each user. */
 function NotAvailable() {
   const t = useT()
   return (
@@ -71,7 +71,7 @@ function PhoneSignIn({ onCancel }: { onCancel: () => void }) {
           <div className="flex items-center gap-3 text-muted-foreground"><div className="size-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />{t("sync.link.waiting")}</div>
         </>
       )}
-      {!link && !err && <div className="text-muted-foreground">{t("common.loading")}</div>}
+      {!link && !err && <div role="status" className="text-sm text-muted-foreground">{t("common.loading")}</div>}
       {err && <p role="alert" className="text-sm text-destructive">{err}</p>}
       <div data-nav-group className="flex flex-wrap justify-center gap-2">
         <Pill onClick={() => setRound(round + 1)}>{t("sync.link.newCode")}</Pill>

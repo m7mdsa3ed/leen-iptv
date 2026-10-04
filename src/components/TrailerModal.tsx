@@ -4,6 +4,7 @@ import { Clapperboard, X } from "lucide-react"
 import { isTv } from "@/lib/device"
 import { useT } from "@/lib/i18n"
 import { focusFirst } from "@/lib/nav"
+import { Pill } from "@/components/gtv"
 
 /** Trailer dialog. Mounted once in App.tsx; Back (App's installNav handler) calls closeTrailer. */
 export const useTrailer = create<{ cur: { key: string; name: string } | null }>(() => ({ cur: null }))
@@ -25,7 +26,7 @@ export function TrailerModal() {
   }, [cur])
   if (!cur) return null
   return (
-    <div data-modal role="dialog" aria-modal="true" aria-label={t("trailer.title", { name: cur.name })} className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/90 p-4">
+    <div data-modal role="dialog" aria-modal="true" aria-label={t("trailer.title", { name: cur.name })} className="dark fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="relative aspect-video w-full max-w-[min(100%,calc((100vh-9rem)*16/9))] overflow-hidden rounded-2xl bg-black" dir="ltr">
         {state !== "error" && (
           <iframe
@@ -43,8 +44,8 @@ export function TrailerModal() {
         {state === "loading" && <div role="status" aria-label={t("trailer.loading")} className="absolute inset-0 grid animate-pulse place-items-center bg-surface-2/40 text-white/70"><Clapperboard className="size-12" /></div>}
         {state === "error" && <div role="alert" className="absolute inset-0 grid place-items-center p-6 text-center text-lg text-white/80">{t("trailer.error")}</div>}
       </div>
-      <div className="flex items-center gap-4">
-        <button data-nav data-autofocus="" onClick={closeTrailer} className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-medium text-black outline-none focus-visible:ring-4 focus-visible:ring-white/60"><X className="size-5" />{t("trailer.close")}</button>
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center">
+        <Pill variant="primary" data-autofocus="" onClick={closeTrailer}><X />{t("trailer.close")}</Pill>
         <span className="text-sm text-white/60">{t("trailer.privacy")}</span>
       </div>
     </div>

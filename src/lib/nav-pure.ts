@@ -41,3 +41,20 @@ export function pickIndex(a: Box, boxes: Box[], dir: Dir, ax?: number | null): n
   })
   return r >= 0 ? r : best
 }
+
+/** Index of the box that starts the visual row `t` sits on (boxes crossing t's vertical centre): the leftmost one, or the
+ *  rightmost in RTL. -1 = none. Used when Up/Down enters a new row/group so focus lands on its first item. */
+export function lineStart(boxes: Box[], t: Box, rtl = false): number {
+  const cy = (t.top + t.bottom) / 2
+  let best = -1
+  boxes.forEach((b, i) => {
+    if (b.top > cy || b.bottom < cy) return
+    if (best < 0 || (rtl ? b.right > boxes[best].right : b.left < boxes[best].left)) best = i
+  })
+  return best
+}
+
+/** Page-stack length after a popstate that landed on history depth `d` with `n` pages stacked. `ours` = back()/reset() already
+ *  trimmed the stack. Any other Back (system gesture, browser button) drops exactly one page, even when the browser skipped
+ *  entries (Chromium skips entries pushed without a user gesture, e.g. the stack rebuilt from the URL at startup). */
+export const popLen = (d: number, n: number, ours: boolean) => (ours || d >= n ? n : Math.max(1, n - 1))

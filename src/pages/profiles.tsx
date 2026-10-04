@@ -28,7 +28,7 @@ export default function Profiles() {
       <h1 className="text-3xl font-medium tracking-tight md:text-5xl">{t("pages.profiles.who")}</h1>
       <div className="flex flex-wrap justify-center gap-4 md:gap-8">
         {profiles.map((p, i) => (
-          <button key={p.id} data-nav data-card data-autofocus={i === 0 ? "" : undefined} onClick={() => pick(p.id)} className="flex flex-col items-center gap-4 rounded-3xl p-4">
+          <button key={p.id} data-nav data-card data-autofocus={i === 0 ? "" : undefined} onClick={() => pick(p.id)} className="flex flex-col items-center gap-4 rounded-2xl p-4">
             <div data-tile className="relative rounded-full">
               <Avatar name={p.name} color={p.color} className="size-24 text-4xl md:size-36 md:text-6xl" />
               {p.pin && <span className="absolute bottom-1 end-1 grid size-8 place-items-center rounded-full bg-black/70 text-white"><Lock className="size-4" /></span>}
@@ -37,7 +37,7 @@ export default function Profiles() {
           </button>
         ))}
         {!adding && (
-          <button data-nav onClick={() => setAdding(true)} className="flex flex-col items-center gap-4 rounded-3xl p-4 text-muted-foreground">
+          <button data-nav onClick={() => setAdding(true)} className="flex flex-col items-center gap-4 rounded-2xl p-4 text-muted-foreground">
             <div className="grid size-24 place-items-center rounded-full bg-surface-2 md:size-36"><Plus className="size-12" /></div>
             <span className="text-lg md:text-2xl">{t("pages.profiles.add")}</span>
           </button>

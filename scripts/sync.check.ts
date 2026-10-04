@@ -63,9 +63,65 @@ console.log("sync ok")
 {
   const a = slice({ settings: { theme: "system", trackHistory: true } })
   assert.equal(flatten(a)["c/cardSize"], undefined)
-  const b = slice({ settings: { theme: "system", trackHistory: true, cardSize: "large", homeOrder: ["live", "cont"] } })
+  const b = slice({ settings: { theme: "system", trackHistory: true, cardSize: "large", colorTheme: "forest", homeOrder: ["live", "cont"] } })
   const f = flatten(b)
   assert.equal(f["c/cardSize"].v, "large")
+  assert.equal(f["c/colorTheme"].v, "forest")
+  assert.equal(flatten(a)["c/colorTheme"], undefined)
   assert.deepEqual(f["c/homeOrder"].v, ["live", "cont"])
 }
 console.log("display settings ok")
+
+// manual TMDB matches: one entity per title, so different titles matched on two devices both survive; a reset propagates
+{
+  const K1 = "movie:el fil el azraq:2014", K2 = "series:la totfe2 el shams:"
+  const a = slice({ settings: { theme: "system", trackHistory: true, metaMatch: { [K1]: { id: "279690", title: "الفيل الأزرق", poster: "p.jpg" } } } })
+  const b = slice({ settings: { theme: "system", trackHistory: true, metaMatch: { [K2]: "120911" } } })
+  const eA = stamp({}, flatten(a), 10), eB = stamp({}, flatten(b), 20)
+  const M = merge(buildSnapshot(a, eA, {}, 30), buildSnapshot(b, eB, {}, 30))
+  const ap = applySnapshot(a, M)
+  assert.deepEqual(ap.slice.settings.metaMatch, { [K1]: { id: "279690", title: "الفيل الأزرق", poster: "p.jpg" }, [K2]: "120911" }) // display info rides along; old id-only entries still load
+  assert.equal(stamp(ap.stamps, flatten(ap.slice), 99), ap.stamps) // no echo
+  // B resets K2 later: A loses it, and with no matches left the setting is undefined
+  const b2 = slice({ settings: { theme: "system", trackHistory: true } })
+  const M2 = merge(merge(M, buildSnapshot(b2, stamp(eB, flatten(b2), 40), {}, 50)), { ...emptySnap(), e: { [`m/${encodeURIComponent(K1)}`]: { t: 60, del: 1 } } })
+  assert.equal(applySnapshot(ap.slice, M2).slice.settings.metaMatch, undefined)
+}
+console.log("meta match ok")
+
+// manual channel logos: one entity per channel key, both devices' picks survive
+{
+  const a = slice({ settings: { theme: "system", trackHistory: true, logoMatch: { beinsports1: "a.png" } } })
+  const b = slice({ settings: { theme: "system", trackHistory: true, logoMatch: { mbc1: "b.png" } } })
+  const M = merge(buildSnapshot(a, stamp({}, flatten(a), 10), {}, 30), buildSnapshot(b, stamp({}, flatten(b), 20), {}, 30))
+  const ap = applySnapshot(a, M)
+  assert.deepEqual(ap.slice.settings.logoMatch, { beinsports1: "a.png", mbc1: "b.png" })
+  assert.equal(stamp(ap.stamps, flatten(ap.slice), 99), ap.stamps) // no echo
+  // "Remove all" on A later: B loses both (tombstones), and the setting is undefined again
+  const a2 = slice({ settings: { theme: "system", trackHistory: true } })
+  const M2 = merge(M, buildSnapshot(a2, stamp(ap.stamps, flatten(a2), 40), {}, 50))
+  assert.equal(applySnapshot(b, M2).slice.settings.logoMatch, undefined)
+  // an import on B (many at once) reaches A
+  const b3 = slice({ settings: { theme: "system", trackHistory: true, logoMatch: { x: "https://x", y: "https://y" }, metaMatch: { "movie:z:": "3" } } })
+  const M3 = merge(M2, buildSnapshot(b3, stamp({}, flatten(b3), 60), {}, 70))
+  const a3 = applySnapshot(a2, M3).slice.settings
+  assert.deepEqual([a3.logoMatch, a3.metaMatch], [{ x: "https://x", y: "https://y" }, { "movie:z:": "3" }])
+}
+console.log("logo match ok")
+
+// sports follows: one entity per team, per profile; unfollow tombstones; two devices union
+{
+  const liv = { provider: "espn", teamId: "soccer/eng.1/364", name: "Liverpool", badge: "https://cdn/liv.png", league: "Premier League" }
+  const mun = { provider: "espn", teamId: "soccer/eng.1/360", name: "Manchester United", league: "Premier League" }
+  const a = slice({ data: { p1: { favs: [], recents: [], progress: {}, follows: [liv] } } })
+  const b = slice({ data: { p1: { favs: [], recents: [], progress: {}, follows: [mun] } } })
+  const M = merge(buildSnapshot(a, stamp({}, flatten(a), 10), {}, 30), buildSnapshot(b, stamp({}, flatten(b), 20), {}, 30))
+  const ap = applySnapshot(a, M)
+  assert.deepEqual(ap.slice.data.p1.follows, [mun, liv]) // sorted by provider:teamId; both devices' picks kept
+  assert.equal(stamp(ap.stamps, flatten(ap.slice), 99), ap.stamps) // no echo
+  // B unfollows United later: A loses it too
+  const b2 = slice({ data: { p1: { favs: [], recents: [], progress: {}, follows: [] } } })
+  const M2 = merge(M, buildSnapshot(b2, stamp(stamp({}, flatten(b), 20), flatten(b2), 40), {}, 50))
+  assert.deepEqual(applySnapshot(ap.slice, M2).slice.data.p1.follows, [liv])
+}
+console.log("follows ok")

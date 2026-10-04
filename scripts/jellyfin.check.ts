@@ -1,6 +1,6 @@
 // node scripts/jellyfin.check.ts
 import assert from "node:assert/strict"
-import { authHeader, fromTicks, imageUrl, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapPrograms, normServer, toTicks } from "../src/lib/jellyfin-pure.ts"
+import { authHeader, fromTicks, imageUrl, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapSegments, mapIntroSkipper, normServer, toTicks } from "../src/lib/jellyfin-pure.ts"
 
 assert.equal(normServer(" jf.lan:8096/ "), "http://jf.lan:8096")
 assert.equal(normServer("https://jf.example.com//"), "https://jf.example.com")
@@ -27,23 +27,12 @@ assert.equal(show.logo, undefined)
 assert.deepEqual(show.genres, [])
 
 const ep = mapEpisode({ Id: "e1", Name: "Pilot", ParentIndexNumber: 2, IndexNumber: 3, RunTimeTicks: 30000000000, UserData: { PlaybackPositionTicks: 100000000 } }, { ...show, logo: "L" }, "s1", img)
-assert.deepEqual(ep, { id: "e1", season: 2, num: 3, title: "Pilot", dur: 3000, item: { id: "s1|ep|e1", kind: "movie", sid: "e1", name: "X S2E3", group: "X", logo: "L", plot: undefined, resume: 10, dur: 3000 } })
+assert.deepEqual(ep, { id: "e1", season: 2, num: 3, title: "Pilot", dur: 3000, item: { id: "s1|ep|e1", kind: "movie", sid: "e1", name: "X S2E3", group: "X", series: "s1|series|7", logo: "L", plot: undefined, resume: 10, dur: 3000 } })
 assert.equal(mapEpisode({ Id: "e0", ParentIndexNumber: 0, IndexNumber: 1 }, show, "s1", img).season, 0) // specials stay in season 0
 
 const ch = mapChannel({ Id: "c1", Name: "BBC", ChannelNumber: "5", ImageTags: { Primary: "i" } }, "s1", img)
 assert.deepEqual(ch, { id: "s1|live|c1", kind: "live", sid: "c1", name: "BBC", group: "Live TV", logo: "IMG/c1/Primary/300/i", epgId: "c1", num: 5 })
 assert.equal(mapChannel({ Id: "c2", Name: "Y", ChannelNumber: "5a" }, "s1", img).num, undefined)
-
-const g = mapPrograms([
-  { ChannelId: "c1", Name: "B", StartDate: "2026-01-01T11:00:00Z", EndDate: "2026-01-01T12:00:00Z" },
-  { ChannelId: "c1", Name: "A", EpisodeTitle: "Ep", Overview: "o", StartDate: "2026-01-01T10:00:00Z", EndDate: "2026-01-01T11:00:00Z" },
-  { ChannelId: "c2", Name: "bad", StartDate: "nope", EndDate: "2026-01-01T11:00:00Z" },
-])
-assert.deepEqual([...g.keys()], ["c1"])
-assert.deepEqual(g.get("c1"), [
-  { s: Date.parse("2026-01-01T10:00:00Z"), e: Date.parse("2026-01-01T11:00:00Z"), t: "A: Ep", d: "o" },
-  { s: Date.parse("2026-01-01T11:00:00Z"), e: Date.parse("2026-01-01T12:00:00Z"), t: "B", d: undefined },
-])
 
 const d = mapDetail({
   Id: "42", Overview: "p", ProductionYear: 1995, PremiereDate: "1995-12-15T00:00:00Z", RunTimeTicks: 72000000000, CommunityRating: 8.25, CriticRating: 88,
@@ -66,3 +55,21 @@ assert.deepEqual(jfStreams({ MediaSources: [{ MediaStreams: [{ Type: "Video", In
 import { shiftVtt } from "../src/lib/jellyfin-pure.ts"
 assert.equal(shiftVtt("WEBVTT\n\n00:00:01.000 --> 01:00:02.500 align:start\nhi 00:00:09.000", 1.5), "WEBVTT\n\n00:00:02.500 --> 01:00:04.000 align:start\nhi 00:00:09.000")
 assert.equal(shiftVtt("00:00:01.000 --> 00:00:02.000", -5), "00:00:00.000 --> 00:00:00.000")
+
+// local + remote addresses
+import { jfActiveKind, jfCands } from "../src/lib/jellyfin-pure.ts"
+const both = { server: "http://192.168.1.20:8096", localServer: "192.168.1.20:8096", remoteServer: "https://jelly.example.com/" }
+assert.deepEqual(jfCands(both), [{ uri: "http://192.168.1.20:8096", kind: "local" }, { uri: "https://jelly.example.com", kind: "remote" }]) // auto: local first
+assert.deepEqual(jfCands({ ...both, connMode: "auto" }).map((c) => c.kind), ["local", "remote"])
+assert.deepEqual(jfCands({ ...both, connMode: "local" }).map((c) => c.kind), ["local"])
+assert.deepEqual(jfCands({ ...both, connMode: "remote" }).map((c) => c.kind), ["remote"])
+assert.equal(jfCands({ ...both, connMode: "local" }, true).length, 2) // diagnostics list both
+assert.deepEqual(jfCands({ remoteServer: "https://j.example.com", connMode: "local" }), []) // mode allows nothing
+assert.deepEqual(jfCands({ server: "http://jf.local:8096" }), [{ uri: "http://jf.local:8096", kind: "local" }]) // legacy source
+assert.deepEqual(jfCands({ server: "https://jelly.example.com" }), [{ uri: "https://jelly.example.com", kind: "remote" }])
+assert.equal(jfActiveKind(both), "local")
+assert.equal(jfActiveKind({ ...both, server: "https://jelly.example.com" }), "remote")
+assert.equal(jfActiveKind({ server: "http://10.0.0.5:8096" }), "local")
+assert.deepEqual(mapSegments({ Items: [{ Type: "Recap", StartTicks: 0, EndTicks: 150000000 }, { Type: "Intro", StartTicks: 150000000, EndTicks: 450000000 }, { Type: "Commercial", StartTicks: 0, EndTicks: 9 }] }), [{ kind: "recap", start: 0, end: 15 }, { kind: "intro", start: 15, end: 45 }])
+assert.deepEqual(mapIntroSkipper({ Valid: true, IntroStart: 5, IntroEnd: 50 }), [{ kind: "intro", start: 5, end: 50 }]); assert.deepEqual(mapIntroSkipper({ Valid: false }), [])
+console.log("jellyfin segments ok")

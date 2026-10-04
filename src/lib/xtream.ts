@@ -12,9 +12,6 @@ async function call<T>(s: Source, proxy: string, action = "", extra = ""): Promi
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 type R = Record<string, string | number | undefined>
 
-export const xmltvUrl = (s: Source) =>
-  `${base(s)}/xmltv.php?username=${encodeURIComponent(s.user!)}&password=${encodeURIComponent(s.pass!)}`
-
 export function xtreamUrl(s: Source, kind: "live" | "movie" | "series", sid: string, ext: string) {
   return `${base(s)}/${kind}/${encodeURIComponent(s.user!)}/${encodeURIComponent(s.pass!)}/${sid}.${ext}`
 }
@@ -61,8 +58,8 @@ export async function connInfo(s: Source, proxy: string): Promise<{ act: number;
 }
 
 export async function vodInfo(s: Source, proxy: string, sid: string) {
-  const r = await call<{ info?: R }>(s, proxy, "get_vod_info", `&vod_id=${sid}`)
-  return r.info ?? {}
+  const r = await call<{ info?: R; movie_data?: R }>(s, proxy, "get_vod_info", `&vod_id=${sid}`)
+  return { ...r.info, added: r.movie_data?.added, container: r.movie_data?.container_extension } // streamInfo() reads these
 }
 
 export async function seriesInfo(s: Source, proxy: string, series: Item) {
@@ -85,6 +82,7 @@ export async function seriesInfo(s: Source, proxy: string, series: Item) {
           kind: "movie",
           name: `${series.name} S${season}E${num}`,
           group: series.name,
+          series: series.id,
           logo: String(info.movie_image ?? "") || series.logo,
           url: xtreamUrl(s, "series", String(e.id), ext),
           plot: info.plot ? String(info.plot) : undefined,

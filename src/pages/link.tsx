@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Check } from "lucide-react"
 import { LeenMark, Pill } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
-import { api, loadConfig, type Session } from "@/lib/sync/client"
+import { loadConfig, syncBackend as api, type Session } from "@/lib/api"
 import { approveLink, canLink, cleanCode, prettyCode } from "@/lib/sync/link"
 import { Field, SectionCard } from "@/settings/controls"
 import { useAct } from "@/settings/AccountSync"
@@ -24,10 +24,10 @@ export default function LinkPage({ id }: { id?: string }) {
   const fail = () => { throw new Error(t("sync.err.noSession")) }
 
   return (
-    <div className="flex h-full flex-col items-center gap-6 overflow-y-auto bg-background p-4 py-[max(1.5rem,env(safe-area-inset-top))] md:justify-center">
+    <div className="flex h-full flex-col items-center gap-6 overflow-y-auto bg-background p-4 py-[max(1.5rem,env(safe-area-inset-top))] md:[&>:first-child]:mt-auto md:[&>:last-child]:mb-auto">
       <div className="flex flex-col items-center gap-2 text-center">
         <LeenMark className="size-14" />
-        <h1 className="text-2xl font-medium tracking-tight md:text-4xl">{t("sync.link.page.title")}</h1>
+        <h1 className="text-3xl font-medium tracking-tight md:text-5xl">{t("sync.link.page.title")}</h1>
       </div>
       <div className="w-full max-w-[32rem]">
         {!canLink() ? (

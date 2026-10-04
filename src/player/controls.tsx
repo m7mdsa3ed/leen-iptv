@@ -1,10 +1,9 @@
-import type { ReactNode, RefObject } from "react"
-import { Captions, ChevronsUp, Expand, Gauge, LayoutGrid, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Star, Timer, Volume1, Volume2, VolumeX } from "lucide-react"
+import { useEffect, useState, type ReactNode, type RefObject } from "react"
+import { Expand, Info, ListVideo, MessageSquareText, Minimize, MoonStar, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Settings2, SkipBack, SkipForward, Star, Volume2, VolumeX } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
-import type { StreamQ } from "@/lib/quality"
 import { useVideoTime } from "./use-time"
-import { mmss, speedLabel } from "./util"
+import { mmss } from "./util"
 import { QualityBadge, qualityDetail, type Stats } from "./stats"
 import type { MenuKind } from "./menus"
 
@@ -36,24 +35,36 @@ function SeekRow({ vref, on, onSeekFrac, onToggle }: { vref: RefObject<HTMLVideo
 
 export type ControlsProps = {
   on: boolean; live: boolean; tv: boolean; touch: boolean; vref: RefObject<HTMLVideoElement | null>
-  paused: boolean; queueLen: number; mediaServer: boolean; sq: StreamQ; fitName: string; speed: number
+  paused: boolean; queueLen: number
+  sleepAt: number | null // active sleep timer: the wall-clock time it fires, else null
   canPip: boolean; pip: boolean; fs: boolean; isFav: boolean; stats: Stats | null; vol: number; muted: boolean
   onPrev: () => void; onNext: () => void; onToggle: () => void; onSeek: (d: number) => void; onSeekFrac: (f: number) => void
   onMute: () => void; onVolume: (x: number) => void; onFav: () => void; onMenu: (m: MenuKind) => void
-  onPip: () => void; onFs: () => void; onMore: () => void; onGuide: () => void; onChannels: () => void
+  onPip: () => void; onFs: () => void; onMore: () => void; onChannels: () => void
+}
+
+/** Minutes left on an active sleep timer ("30 min", "1 min"). Ticks on its own so Player never re-renders every second. */
+function SleepLeft({ at }: { at: number }) {
+  const t = useT()
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => tick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return <>{t("player.sleep.min", { n: Math.max(1, Math.ceil((at - Date.now()) / 60000)) })}</>
 }
 
 /** One tool button for every non-transport control: same height and radius everywhere, icon only on phones, icon + label from lg and on TV (CSS decides, see .pl-tool). */
-function Tool({ label, text, active, onClick, children }: { label: string; text?: string; active?: boolean; onClick: () => void; children: ReactNode }) {
+function Tool({ label, text, active, more, onClick, children }: { label: string; text?: ReactNode; active?: boolean; more?: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <Pill aria-label={label} className={`pl-btn pl-tool${text ? " pl-tool-t" : ""}${active ? " pl-tool-on" : ""}`} onClick={onClick}>
+    <Pill aria-label={label} data-more={more ? "" : undefined} className={`pl-btn pl-tool${text ? " pl-tool-t" : ""}${active ? " pl-tool-on" : ""}`} onClick={onClick}>
       {children}
       {text && <span className="pl-tool-lbl" dir="auto">{text}</span>}
     </Pill>
   )
 }
 
-/** Bottom block: seek bar + times (VOD), then transport (left) and tools (right), then the "More" handle. Sizes come from --pl-h (player.css), so phone, desktop and TV share one layout. */
+/** Bottom block: seek bar + times (VOD), then transport (left) and a short tools row (right): options are grouped into Audio & subtitles and Settings sheets; More (series info, episodes, cast) is the last tool. Sizes come from --pl-h (player.css), so phone, desktop and TV share one layout. */
 export function Controls(c: ControlsProps) {
   const t = useT()
   return (
@@ -76,20 +87,15 @@ export function Controls(c: ControlsProps) {
         </div>
         <div className="pl-tools">
           {!c.touch && <Tool label={t("player.favorite")} active={c.isFav} onClick={c.onFav}><Star className={c.isFav ? "fill-yellow-400 text-yellow-400" : ""} /></Tool>}
-          {c.live && <Tool label={t("player.guide")} text={t("player.guide")} onClick={c.onGuide}><LayoutGrid /></Tool>}
           {c.live && <Tool label={t("player.channels")} text={t("player.channels")} onClick={c.onChannels}><ListVideo /></Tool>}
-          <Tool label={t("player.audio")} text={t("player.audio")} onClick={() => c.onMenu("audio")}><Volume1 /></Tool>
-          <Tool label={t("player.subtitles")} text={t("player.subtitles")} onClick={() => c.onMenu("subs")}><Captions /></Tool>
-          {c.mediaServer && !c.live && <Tool label={t("player.quality")} text={c.sq.id === "original" ? t("player.original") : `${c.sq.height}p`} onClick={() => c.onMenu("quality")}><Gauge /></Tool>}
-          {!c.live && <Tool label={t("player.speed")} text={speedLabel(c.speed)} onClick={() => c.onMenu("speed")}><Timer /></Tool>}
-          <Tool label={t("player.aspect")} text={c.fitName} onClick={() => c.onMenu("aspect")}><Maximize /></Tool>
+          <Tool label={t("player.av")} text={t("player.av")} onClick={() => c.onMenu("av")}><MessageSquareText /></Tool>
+          <Tool label={t("player.settings")} text={t("player.settings")} onClick={() => c.onMenu("settings")}><Settings2 /></Tool>
+          {c.sleepAt && <Tool label={t("player.sleep.title")} text={<SleepLeft at={c.sleepAt} />} active onClick={() => c.onMenu("sleep")}><MoonStar /></Tool>}
           {c.canPip && <Tool label={t("player.pip")} active={c.pip} onClick={c.onPip}><PictureInPicture2 /></Tool>}
           {!c.tv && <Tool label={t("player.fullscreen")} onClick={c.onFs}>{c.fs ? <Minimize /> : <Expand />}</Tool>}
           {c.stats && <QualityBadge s={c.stats} />}
+          <Tool more label={t("player.moreOpen")} text={t("player.more")} onClick={c.onMore}><Info /></Tool>
         </div>
-      </div>
-      <div className="pointer-events-auto mt-1 flex justify-center">
-        <Pill data-more variant="ghost" aria-label={t("player.moreOpen")} className="pl-more-btn text-white/80" onClick={c.onMore}><ChevronsUp className="pl-more-ic" />{t("player.more")}</Pill>
       </div>
       {c.tv && <div className="pointer-events-none mt-1 text-center text-sm text-white/60">{t("player.remoteHint")}</div>}
     </div>

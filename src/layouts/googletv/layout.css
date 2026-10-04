@@ -13,3 +13,6 @@ html[data-layout=googletv] .gtv-hdr-solid { transition: opacity var(--dur) var(-
 html[data-layout=googletv] .gtv-hero-fade { background-image: linear-gradient(to right, var(--background) 35%, var(--fade-mid) 65%, var(--fade-to)); }
 html[dir=rtl][data-layout=googletv] .gtv-hero-fade { background-image: linear-gradient(to left, var(--background) 35%, var(--fade-mid) 65%, var(--fade-to)); }
 html[data-layout=googletv] .gtv-hero-fade-b { background-image: linear-gradient(to top, var(--background), var(--fade-to)); }
+/* show page: episode rows (vertical list), the focused row lifts on a surface */
+html[data-layout=googletv] .gtv-ep { transition: background-color var(--dur-fast) var(--ease); }
+html[data-layout=googletv] .gtv-ep:focus-visible, html[data-layout=googletv] .gtv-ep[data-focused="true"], html[data-mode=tv][data-layout=googletv] .gtv-ep:focus { background: var(--surface-2); }

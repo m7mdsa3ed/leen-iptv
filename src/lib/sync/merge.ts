@@ -3,7 +3,7 @@
 export type Ent = { t: number; del?: 1; v?: unknown }
 export type Prog = { pos: number; dur: number; t: number }
 export type Day = { sec: number; sessions: number; live: number; movie: number; series: number }
-/** keys: p/<profileId> s/<sourceId> f/<profileId>/<itemId> r/<profileId>/<itemId> c/<setting> */
+/** keys: p/<profileId> s/<sourceId> f/<profileId>/<itemId> r/<profileId>/<itemId> l/<profileId>/<list> t/<profileId>/<provider:teamId> m/<titleKey> g/<logoKey> c/<setting> */
 export type Snapshot = { v: 1; e: Record<string, Ent>; progress: Record<string, Prog>; days: Record<string, Day> }
 /** local stamp bookkeeping: h = hash of the value when it was last stamped */
 export type Stamp = { t: number; del?: 1; h: string }
@@ -42,11 +42,11 @@ type P = { id: string }
 export type AppSlice = {
   profiles: P[]
   sources: P[]
-  data: Record<string, { favs: string[]; recents: string[]; progress: Record<string, Prog> }>
-  settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown } & Partial<Record<DisplayKey, unknown>>
+  data: Record<string, { favs: string[]; recents: string[]; progress: Record<string, Prog>; lists?: { name: string; items: string[] }[]; follows?: { provider: string; teamId: string; name: string; badge?: string; league?: string; kind?: "team" | "league" }[] }>
+  settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown; metaMatch?: Record<string, string | { id: string }>; logoMatch?: Record<string, string> } & Partial<Record<DisplayKey, unknown>>
 }
 /** Display preferences that follow the account. Only written once set (an untouched device never overwrites a customised one); "reset" stores an empty value, not undefined. */
-export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext"] as const
+export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext", "noAutoShows", "colorTheme"] as const
 type DisplayKey = (typeof DISPLAY_KEYS)[number]
 export const RECENTS_MAX = 40
 
@@ -61,11 +61,15 @@ export function flatten(s: AppSlice): Record<string, { h: string; v?: unknown }>
     const d = s.data[pid]
     d.favs.forEach((id) => (o[`f/${pid}/${id}`] = { h: "1" }))
     d.recents.forEach((id, i) => (o[`r/${pid}/${id}`] = { h: i === 0 ? "0" : "1" })) // re-pushing to the top restamps
+    for (const l of d.lists ?? []) put(`l/${pid}/${encodeURIComponent(l.name)}`, l.items) // one entity per custom live list (name rides in the key)
+    for (const f of d.follows ?? []) put(`t/${pid}/${encodeURIComponent(`${f.provider}:${f.teamId}`)}`, f) // one entity per followed team
   }
   put("c/theme", s.settings.theme ?? null)
   put("c/trackHistory", s.settings.trackHistory ?? null)
   put("c/meta", s.settings.meta ?? null)
   for (const k of DISPLAY_KEYS) if (s.settings[k] !== undefined) put(`c/${k}`, s.settings[k])
+  for (const k in s.settings.metaMatch ?? {}) put(`m/${encodeURIComponent(k)}`, s.settings.metaMatch![k]) // one entity per manual TMDB match: two devices matching different titles both keep theirs
+  for (const k in s.settings.logoMatch ?? {}) put(`g/${encodeURIComponent(k)}`, s.settings.logoMatch![k]) // one entity per manual channel logo
   put("c/sourceOrder", s.sources.map((x) => x.id))
   return o
 }
@@ -111,7 +115,7 @@ export function applySnapshot(cur: AppSlice, m: Snapshot): { slice: AppSlice; da
   const sources = ordered(cur.sources, "s/", Array.isArray(orderEnt?.v) ? (orderEnt!.v as string[]) : undefined)
   const pset = new Set(profiles.map((p) => p.id))
   const data: AppSlice["data"] = {}
-  for (const p of profiles) data[p.id] = { favs: [], recents: [], progress: {} }
+  for (const p of profiles) data[p.id] = { favs: [], recents: [], progress: {}, lists: [], follows: [] }
   const favT: Record<string, [string, number][]> = {}, recT: Record<string, [string, number][]> = {}
   for (const k in m.e) {
     const x = alive(k)
@@ -127,6 +131,32 @@ export function applySnapshot(cur: AppSlice, m: Snapshot): { slice: AppSlice; da
     data[pid].favs = (favT[pid] ?? []).sort(by("favs")).map((x) => x[0])
     data[pid].recents = (recT[pid] ?? []).sort(by("recents")).slice(0, RECENTS_MAX).map((x) => x[0])
   }
+  // custom live lists: the name rides in the key, the value is the channel id array
+  const listT: Record<string, { name: string; items: string[] }[]> = {}
+  for (const k in m.e) {
+    if (k[0] !== "l" || k[1] !== "/") continue
+    const x = alive(k)
+    if (!x) continue
+    const [pid, enc] = split(k)
+    if (!pset.has(pid)) continue
+    ;(listT[pid] ??= []).push({ name: decodeURIComponent(enc), items: Array.isArray(x.v) ? (x.v as string[]) : [] })
+  }
+  for (const pid of pset) {
+    const local = (cur.data[pid]?.lists ?? []).map((l) => l.name) // keep this device's order, new lists appended by name
+    const want = new Map((listT[pid] ?? []).map((l) => [l.name, l]))
+    data[pid].lists = [...local.filter((n) => want.has(n)), ...[...want.keys()].filter((n) => !local.includes(n)).sort()].map((n) => want.get(n)!)
+  }
+  // sports follows: one entity per team (provider + team id ride in the key), sorted for determinism
+  const followT: Record<string, { provider: string; teamId: string; name: string; badge?: string; league?: string }[]> = {}
+  for (const k in m.e) {
+    if (k[0] !== "t" || k[1] !== "/") continue
+    const x = alive(k)
+    if (!x || !x.v || typeof x.v !== "object") continue
+    const [pid] = split(k)
+    if (!pset.has(pid)) continue
+    ;(followT[pid] ??= []).push(x.v as { provider: string; teamId: string; name: string })
+  }
+  for (const pid of pset) data[pid].follows = (followT[pid] ?? []).sort((a, b) => `${a.provider}:${a.teamId}`.localeCompare(`${b.provider}:${b.teamId}`))
   for (const k in m.progress) {
     const [pid, id] = [k.slice(0, k.indexOf("/")), k.slice(k.indexOf("/") + 1)]
     if (pset.has(pid)) data[pid].progress[id] = m.progress[k]
@@ -136,6 +166,20 @@ export function applySnapshot(cur: AppSlice, m: Snapshot): { slice: AppSlice; da
     const x = alive(`c/${key}`)
     if (x) (settings as Record<string, unknown>)[key] = x.v === null ? undefined : x.v
   }
+  // manual TMDB matches: the title key rides in the key, the value is the TMDB id ("Back to automatic" = tombstone)
+  const metaMatch: Record<string, string | { id: string }> = {}
+  for (const k in m.e) {
+    const x = k.startsWith("m/") && alive(k)
+    const v = x ? (x.v as { id?: unknown } | string) : undefined
+    if (typeof v === "string" || (v && typeof v.id === "string")) metaMatch[decodeURIComponent(k.slice(2))] = v as string | { id: string } // id, or id + display info
+  }
+  settings.metaMatch = Object.keys(metaMatch).length ? metaMatch : undefined
+  const logoMatch: Record<string, string> = {}
+  for (const k in m.e) {
+    const x = k.startsWith("g/") && alive(k)
+    if (x && typeof x.v === "string") logoMatch[decodeURIComponent(k.slice(2))] = x.v
+  }
+  settings.logoMatch = Object.keys(logoMatch).length ? logoMatch : undefined
   const slice = { profiles, sources, data, settings }
   const flat = flatten(slice)
   const stamps: Record<string, Stamp> = {}

@@ -20,7 +20,7 @@ export function useSourceFilter() {
     // two sources with the same name (ignoring case) would be indistinguishable: append their type label ("Mohamed - Plex")
     const dup = new Map<string, number>()
     for (const s of list) dup.set(s.name.trim().toLowerCase(), (dup.get(s.name.trim().toLowerCase()) ?? 0) + 1)
-    return list.map((s) => ({ id: s.id, name: s.name, title: (dup.get(s.name.trim().toLowerCase()) ?? 0) > 1 ? `${s.name} · ${s.label}` : s.name, label: s.label, color: s.color, count: stats[s.id]?.count ?? 0 }))
+    return list.map((s) => ({ id: s.id, name: s.name, title: (dup.get(s.name.trim().toLowerCase()) ?? 0) > 1 ? `${s.name} · ${s.label}` : s.name, label: s.label, type: s.type, color: s.color, count: stats[s.id]?.count ?? 0 }))
   }, [list, stats])
   return { sources, filter: filter && list.some((s) => s.id === filter) ? filter : null, setFilter, multi: list.length > 1 }
 }

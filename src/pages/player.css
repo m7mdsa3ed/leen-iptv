@@ -12,7 +12,7 @@
   --pl-bar: 4px;
   --pl-thumb: 14px;
   --pl-h: 2.75rem;                        /* one control height: round buttons and tools; the main play button is 1.3x */
-  --pl-title: 1.25rem; --pl-sub: .875rem; /* headings of the top bar and guide header */
+  --pl-title: 1.25rem; --pl-sub: .875rem; /* headings of the top bar */
   --pl-r: 28px;                           /* panel radius: sheets, next card, indicators */
 }
 @media (min-width: 640px) { .pl-root { --pl-h: 3rem; --pl-title: 1.875rem; --pl-sub: 1.125rem; } }
@@ -20,10 +20,6 @@ html[data-mode=tv] .pl-root { --pl-h: 3rem; }        /* rem is 20px x --tv-scale
 @media (max-height: 520px) { .pl-root { --pl-h: 2.5rem; } .pl-bottom { padding-top: 1.5rem !important; } .pl-top { padding-bottom: 1.5rem !important; } } /* phone landscape */
 /* Google TV: white pill primary, soft surface buttons */
 html[data-layout=googletv] .pl-root { --pl-btn: rgba(255, 255, 255, .12); }
-/* Apple TV: translucent capsules (plain rgba, no blur), thin bar */
-html[data-layout=appletv] .pl-root { --pl-btn: rgba(255, 255, 255, .2); --pl-btn-edge: rgba(255, 255, 255, .14); --pl-prim: rgba(255, 255, 255, .92); --pl-bar: 3px; --pl-thumb: 8px; }
-/* Netflix: red accent, rectangular-ish primary, thick bar */
-html[data-layout=netflix] .pl-root { --pl-btn: rgba(255, 255, 255, .14); --pl-prim: var(--accent-blue); --pl-prim-fg: #fff; --pl-prim-r: 12px; --pl-fill: var(--accent-blue); --pl-bar: 7px; --pl-thumb: 18px; }
 
 /* ---- overlay layers: fade + 10px slide, same timing everywhere ---- */
 .pl-layer {
@@ -32,10 +28,10 @@ html[data-layout=netflix] .pl-root { --pl-btn: rgba(255, 255, 255, .14); --pl-pr
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur);
 }
 .pl-layer[data-on] { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
-.pl-top { transform: translate3d(0, -10px, 0); background: linear-gradient(to bottom, rgba(0, 0, 0, .85), rgba(0, 0, 0, 0)); }
-.pl-bottom { transform: translate3d(0, 10px, 0); background: linear-gradient(to top, rgba(0, 0, 0, .88), rgba(0, 0, 0, 0)); }
+.pl-top { transform: translate3d(0, -10px, 0); background: var(--bar-top); }
+.pl-bottom { transform: translate3d(0, 10px, 0); background: var(--bar-bottom); }
 
-/* ---- shared pieces: top bar, guide header, channel strip, next card ---- */
+/* ---- shared pieces: top bar, channel strip, next card ---- */
 .pl-pad-top { padding-top: max(1rem, env(safe-area-inset-top)); }
 @media (min-width: 640px) { .pl-pad-top { padding-top: max(1.75rem, env(safe-area-inset-top)); } }
 .pl-title { font-size: var(--pl-title); font-weight: 500; }
@@ -71,10 +67,6 @@ html[data-mode=tv] .pl-root .pl-tool-t { padding-inline: 1.1rem; }
 html[data-mode=tv] .pl-root .pl-tool-lbl { display: inline; }
 .pl-root .pl-btn { background: var(--pl-btn); color: #fff; box-shadow: inset 0 0 0 1px var(--pl-btn-edge); }
 .pl-root .pl-primary { background: var(--pl-prim); color: var(--pl-prim-fg); border-radius: var(--pl-prim-r); }
-.pl-root .pl-more-btn { background: transparent; color: #fff; gap: .5rem; }
-.pl-more-ic { width: 1.4rem !important; height: 1.4rem !important; stroke-width: 2.4; opacity: .9; }
-@keyframes pl-bob-k { 50% { transform: translate3d(0, -3px, 0); } }
-html[data-motion=full] .pl-more-ic { animation: pl-bob-k 1.8s ease-in-out infinite; }
 .pl-root .pl-badge { background: var(--pl-btn); }
 /* TV focus = white pill (shared rule in index.css); keep the primary's ring readable on every skin */
 html[data-mode=tv] .pl-root .pl-primary:focus { box-shadow: 0 0 0 3px var(--accent-blue), 0 0 0 6px var(--focus-bg); }
@@ -115,8 +107,7 @@ html[data-motion=off] .pl-more-out, html[data-motion=off] .pl-dim-out { display:
 /* current episode / channel */
 .pl-cur [data-tile] { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
 
-/* ---- live: full-screen guide + bottom channel strip (plain rgba, no blur) ---- */
-.pl-guide { background: rgba(0, 0, 0, .82); }
+/* ---- live: bottom channel strip (plain rgba, no blur) ---- */
 .pl-strip { background: linear-gradient(to top, rgba(0, 0, 0, .92) 60%, rgba(0, 0, 0, 0)); }
 @keyframes pl-strip-k { from { opacity: 0; transform: translate3d(0, 24px, 0); } }
 .pl-strip-in { animation: pl-strip-k var(--dur) var(--ease) backwards; }

@@ -9,9 +9,20 @@ import { useTheme } from "@/lib/theme"
 import { useLanguageAttr, useT } from "@/lib/i18n"
 import { TrailerModal, closeTrailer, useTrailer } from "@/components/TrailerModal"
 import { RecoveryGate } from "@/settings/AccountSync"
+import { Toasts } from "@/components/tv/toast"
+import { startReminders } from "@/lib/sports/reminders"
+import { CardMenu, closeCardMenu, useCardMenu } from "@/components/tv/card-menu"
+import { ListModal } from "@/components/tv/list-modal"
+import EpisodePage from "@/pages/episode"
+import { MatchModal } from "@/components/tv/match-modal"
+import { useBackfillMatches } from "@/lib/meta"
+import { closeLogoMatch, closeMatch, useLogoMatch, useMatch } from "@/components/tv/match"
+import { LogoModal } from "@/components/tv/logo-modal"
+import { closeListModal, useListModal } from "@/components/tv/lists"
 import { ExitConfirm, askExit, closeExit, useExitAsk } from "@/components/tv/exit-confirm"
 import { installNav, useRoute } from "@/lib/nav"
 import { CARD_K } from "@/lib/cards"
+import { SearchPalette, closePalette, installPaletteKeys, usePalette } from "@/components/tv/search-palette"
 import { OnScreenKeyboard, closeKeyboard, installKeyboard, useKbd } from "@/components/tv/keyboard"
 import { useApp } from "@/lib/store"
 import Browse from "@/pages/browse"
@@ -21,18 +32,18 @@ import GenrePage from "@/pages/genre"
 import HistoryPage from "@/pages/history"
 import StatsPage from "@/pages/stats"
 import DiagnosticsPage from "@/pages/diagnostics"
-import Guide from "@/pages/guide"
 import Home from "@/pages/home"
 import Library from "@/pages/library"
 import Live from "@/pages/live"
 import PersonPage from "@/pages/person"
+import TeamPage from "@/pages/team"
 import Player from "@/pages/player"
 import Profiles from "@/pages/profiles"
 import LinkPage from "@/pages/link"
 import Welcome from "@/pages/welcome"
-import Search from "@/pages/search"
 import Settings from "@/pages/settings"
 import Sources from "@/pages/sources"
+import Sports from "@/pages/sports"
 
 // after a refresh only the item id is in the URL: rebuild the zapping queue (the channel's category) once the catalog is ready
 function RestorePlayer({ id }: { id: string }) {
@@ -47,11 +58,11 @@ function RestorePlayer({ id }: { id: string }) {
 }
 
 // pages rendered inside a layout Shell: their top bar stays put and only [data-page-content] (the Shell's <main>) animates
-const SHELL_PAGES = new Set(["home", "live", "guide", "movies", "series", "search", "library", "settings", "category", "genre", "history", "stats", "diagnostics"])
+const SHELL_PAGES = new Set(["home", "live", "sports", "movies", "series", "search", "library", "settings", "category", "genre", "history", "stats", "diagnostics"])
 
 /** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
 const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, guide: Guide, movies: Browse, series: Browse, search: Search, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, person: PersonPage, detail: Detail, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage,
+  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, detail: Detail, episode: EpisodePage, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage,
 }
 
 function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
@@ -86,14 +97,22 @@ export default function App() {
   useEffect(() =>
     installNav(() => {
       if (useKbd.getState().el) return closeKeyboard()
+      if (usePalette.getState().open) return closePalette()
       const ask = usePinAsk.getState().ask
       if (ask) return ask.resolve(false), usePinAsk.setState({ ask: null })
+      if (useCardMenu.getState().cur) return closeCardMenu()
+      if (useListModal.getState().cur) return closeListModal()
+      if (useMatch.getState().item) return closeMatch()
+      if (useLogoMatch.getState().item) return closeLogoMatch()
       if (useTrailer.getState().cur) return closeTrailer()
       if (useExitAsk.getState().open) return closeExit()
       if (!useRoute.getState().back() && isTv) askExit()
     }), [])
 
+  useBackfillMatches()
   useEffect(() => installKeyboard(), [])
+  useEffect(() => installPaletteKeys(), [])
+  useEffect(() => { startReminders() }, []) // sports reminders while the app is open
   const catNav = useApp((s) => s.settings.catNav ?? "bar")
   useEffect(() => { document.documentElement.dataset.catnav = catNav }, [catNav])
   const cardSize = useApp((s) => s.settings.cardSize ?? "normal"), cardInfo = useApp((s) => s.settings.cardInfo ?? "show")
@@ -138,10 +157,16 @@ export default function App() {
         </div>
       ))}
       <PinModal />
+      <CardMenu />
+      <ListModal />
+      <MatchModal />
+      <LogoModal />
+      <SearchPalette />
       <OnScreenKeyboard />
       <ExitConfirm />
       <RecoveryGate />
       <TrailerModal />
+      <Toasts />
     </>
   )
 }

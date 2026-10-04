@@ -1,5 +1,6 @@
 import { fmt, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { SourceMark } from "./SourceMark"
 import { useSourceFilter } from "@/layouts/hooks/use-source-filter"
 
 /**
@@ -22,7 +23,7 @@ export function SourceFilter({ className }: { className?: string }) {
       </button>
       {sources.map((s) => (
         <button key={s.id} data-nav data-pill role="radio" aria-checked={filter === s.id} onClick={() => setFilter(s.id)} className={tab(filter === s.id)}>
-          <span aria-hidden style={{ background: s.color }} className="size-2.5 shrink-0 rounded-full" />
+          <SourceMark type={s.type} color={s.color} />
           <span dir="auto" className="max-w-[10rem] truncate">{s.title}</span>
           {count(s.count)}
         </button>

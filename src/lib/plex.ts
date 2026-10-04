@@ -1,12 +1,12 @@
 // Plex Media Server as a source: plex.tv PIN sign-in, server discovery, catalog, detail, HLS URL, progress sync.
 // All identity values and the token ride in the query string and requests only send Accept, so GETs stay CORS-simple.
-// No EPG / live TV for Plex in this version.
+// No live TV for Plex in this version.
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Source } from "./types"
 import { fetchT, mixed, plexFetch, px, scanLan } from "./net"
 import { t } from "./i18n"
 import { useApp } from "./store"
-import { allowedConns, srtToVtt, buildUrl, connKind, identity, mapDetail, mapMeta, mapStreams, photoUrl, sortConns, type Conn, type ConnMode } from "./plex-pure"
+import { allowedConns, srtToVtt, buildUrl, connKind, identity, mapDetail, mapMeta, mapSegments, mapStreams, photoUrl, sortConns, plexMode, type Conn, type ConnMode } from "./plex-pure"
 
 export { sortConns }
 export type PlexServer = { name: string; id: string; token: string; owned: boolean; connections: Conn[] }
@@ -83,7 +83,7 @@ export async function pickConnection(s: PlexServer, mode: ConnMode = "auto"): Pr
 
 /** Make sure the source's address works: saved one first, then the other addresses the mode allows; the winner is saved. Returns the source to use. */
 export async function ensureConnection(s: Source, force = false): Promise<Source> {
-  const mode = s.connMode ?? "auto"
+  const mode = plexMode(s.connMode)
   const conns = s.conns ?? []
   const cur = (s.server ?? "").replace(/\/+$/, "")
   const allowedNow = !conns.length || allowedConns(conns, mode).some((c) => c.uri.replace(/\/+$/, "") === cur)
@@ -168,6 +168,7 @@ export async function plexDetail(s: Source, px_: string, item: Item): Promise<{ 
         sid: String(e.ratingKey),
         name: `${item.name} S${season}E${num}`,
         group: item.name,
+        series: item.id,
         logo: e.thumb ? img(e.thumb, 400, 225) : item.logo,
         plot: e.summary || undefined,
         resume: e.viewOffset ? Math.round(e.viewOffset / 1000) : undefined,
@@ -214,12 +215,18 @@ export function plexTimeline(s: Source, item: Item, state: "playing" | "paused" 
 /** Audio + subtitle streams to pick from. */
 export const plexTracks = async (s: Source, item: Item) => mapStreams((await get<Container>(s, proxy(), `/library/metadata/${item.sid}`)).MediaContainer?.Metadata?.[0] ?? {})
 
+/** Intro / credits markers of an episode. */
+export const plexSegments = async (s: Source, item: Item) => mapSegments((await get<Container>(s, proxy(), `/library/metadata/${item.sid}`, { includeMarkers: 1 })).MediaContainer?.Metadata?.[0] ?? {})
+
 /** WebVTT text of one text subtitle stream (Plex converts to SRT with format=srt; fetched, not linked, so no CORS setup on <video>). */
 export const plexSubtitle = async (s: Source, stream: number) =>
   srtToVtt(await (await plexFetch(sUrl(s, `/library/streams/${stream}`, { encoding: "utf-8", format: "srt" }), proxy(), undefined, 20000)).text())
 
 /** Tell the server to kill the transcode. */
 export const plexStopTranscode = (s: Source, item: Item) => ping(s, "/video/:/transcode/universal/stop", { session: plexTranscodeId(item) })
+
+/** Mark as unwatched (also clears the resume offset). */
+export const plexUnscrobble = (s: Source, item: Item) => ping(s, "/:/unscrobble", { key: item.sid!, identifier: "com.plexapp.plugins.library" })
 
 /** Mark as watched. */
 export const plexScrobble = (s: Source, item: Item) => ping(s, "/:/scrobble", { key: item.sid!, identifier: "com.plexapp.plugins.library" })

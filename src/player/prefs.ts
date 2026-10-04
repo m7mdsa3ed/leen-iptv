@@ -4,6 +4,9 @@ export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const
 
 export const SUB_SIZES = [75, 100, 125, 150, 200] as const
 
+// Sleep-timer presets in minutes (not persisted: a leftover timer on reload would be surprising)
+export const SLEEP_MIN = [15, 30, 45, 60, 90] as const
+
 // audioLang / subLang: last picked language (ISO code) on a media server; subLang "off" = subtitles were turned off
 type P = { vol: number; muted: boolean; fit: number; speed: number; subSize: number; audioLang: string; subLang: string }
 const K = "leen-player"

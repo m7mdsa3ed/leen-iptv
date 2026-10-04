@@ -1,7 +1,6 @@
 import { useMemo } from "react"
 import { t, useLang } from "@/lib/i18n"
-import { progressPct } from "./hooks/use-live"
-import { hm, nowNext, useCatalog } from "@/lib/catalog"
+import { useCatalog } from "@/lib/catalog"
 import { useApp, usePData } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { useOpen } from "@/components/tv/ui"
@@ -39,8 +38,6 @@ export function useHomeData() {
   const { byKind, groups } = useCatalogView()
   const filter = useActiveFilter()
   const enabled = useSources()
-  const epg = useCatalog((s) => s.epg)
-  useCatalog((s) => s.epgTick)
   const d = usePData()
   const go = useRoute((s) => s.go)
   const openItem = useOpen()
@@ -72,15 +69,13 @@ export function useHomeData() {
     for (let n = 0; n < vod.length && featured.length < 5; n++) add(vod[(day + n * 7) % vod.length])
     if (!featured.length) add(byKind.live[0])
     const pct = (i: Item) => { const p = d.progress[i.id]; return p ? (p.pos / p.dur) * 100 : undefined }
-    const sub = (i: Item) => { const n = nowNext(epg, i.epgId).now; return n ? `${hm(n.s)} \u2068${n.t}\u2069` : undefined }
-    const livePct = (i: Item) => { const n = nowNext(epg, i.epgId).now; return n ? progressPct(n.s, n.e) : undefined }
     const seeAll = (k: Kind, g: string) => () => go("category", { id: `${k}|${g}` })
     const rails: HomeRail[] = []
     const card = (l: Item[]) => (l.some((i) => i.kind !== "live") ? "poster" : "wide") as "wide" | "poster"
     if (cont.length) rails.push({ key: "cont", title: t("common.continueWatching"), kind: "wide", card: card(cont), items: cont, pct })
     if (favs.length) rails.push({ key: "favs", title: t("common.favorites"), kind: "wide", card: card(favs), items: favs })
     if (recents.length) rails.push({ key: "recents", title: t("common.recents"), kind: "wide", card: card(recents), items: recents })
-    if (live.length) rails.push({ key: "live", title: t("common.liveNow"), kind: "wide", items: live, sub, pct: livePct })
+    if (live.length) rails.push({ key: "live", title: t("common.liveNow"), kind: "wide", items: live })
     for (const r of [...genre("movie"), ...genre("series")]) {
       const title = t(r.k === "movie" ? "common.moviesIn" : "common.showsIn", { g: r.g })
       rails.push({ key: r.k + r.g, title, kind: "poster", items: r.items, seeAll: seeAll(r.k, r.g) })
@@ -90,7 +85,7 @@ export function useHomeData() {
     rails.splice(0, rails.length, ...rails.filter((r) => !hide.includes(homeRowOf(r.key))).sort((a, b) => rank(a) - rank(b))) // stable: genre rails keep their order
     const hp: HeroPick | undefined = hero ? { item: hero, kicker: kicker(hero) } : undefined
     return { hero: hp, featured, rails, live, favIds: d.favs }
-  }, [d, byId, byKind, groups, epg, go, filter, lang, homeOrder, homeHide])
+  }, [d, byId, byKind, groups, go, filter, lang, homeOrder, homeHide])
 
   return {
     status, msg, ...data,

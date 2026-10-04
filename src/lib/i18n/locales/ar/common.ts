@@ -3,6 +3,7 @@ import type { Dict } from "../../pure.ts"
 const d: Dict = {
   "common.ok": "تمام",
   "common.cancel": "إلغاء",
+  "common.removeContinue": "شيلها من كمّل مشاهدة",
   "common.back": "رجوع",
   "common.save": "حفظ",
   "common.close": "اقفل",
@@ -46,5 +47,14 @@ const d: Dict = {
   "kb.right": "يمين",
   "kb.space": "مسافة",
   "kb.done": "إدخال",
+  "search.live": "بث مباشر",
+  "search.movie": "فيلم",
+  "search.series": "مسلسل",
+  "search.recent": "عمليات البحث الأخيرة",
+  "search.clear": "مسح",
+  "search.remove": "شيل",
+  "search.hint": "اكتب عشان تدوّر على قنوات وأفلام ومسلسلات",
+  "search.none": "مفيش نتايج",
+  "common.moreOptions": "اختيارات تانية",
 }
 export default d

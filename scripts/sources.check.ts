@@ -1,6 +1,7 @@
 // node scripts/sources.check.ts
 import assert from "node:assert/strict"
-import { dedupeKey, groupKey, mergeSources, onlySource, srcOfId } from "../src/lib/merge-pure.ts"
+import { applyMatches, dedupeKey, groupKey, mergeSources, onlySource, srcOfId } from "../src/lib/merge-pure.ts"
+import { matchKeyOf } from "../src/lib/meta/title.ts"
 import type { Item } from "../src/lib/types.ts"
 
 const it = (src: string, kind: Item["kind"], raw: string, name: string, group: string, year?: string): Item => ({ id: `${src}|${kind}|${raw}`, kind, name, group, year })
@@ -38,4 +39,35 @@ assert.equal(d.items.length, 2)
 // filter view
 assert.ok(onlySource(m.byKind.movie, "b").some((x) => x.id === "b|movie|7"), "alt shows under its own source filter")
 assert.ok(!onlySource(m.byKind.movie, "b").some((x) => x.id === "a|movie|2"))
+
+// manual metadata matches: rename + re-poster the primary and its alts everywhere, keep the source name, leave the rest alone
+{
+  const parts = [
+    { id: "a", items: [it("a", "movie", "1", "AR - El Fil El Azraq (2014) 4K", "Arabic", "2014"), it("a", "movie", "2", "Other (2014)", "Arabic"), it("a", "live", "3", "El Fil El Azraq (2014)", "News")] },
+    { id: "b", items: [it("b", "movie", "9", "El Fil El Azraq (2014)", "Films", "2014")] },
+  ]
+  const base = mergeSources(parts)
+  const key = matchKeyOf("movie", "El Fil El Azraq (2014)")
+  assert.equal(key, matchKeyOf("movie", "AR - El Fil El Azraq (2014) 4K"))
+  const m = applyMatches(base, { [key]: { id: "279690", title: "الفيل الأزرق", year: "2014", poster: "https://img/p.jpg", backdrop: "https://img/b.jpg" } })
+  const p = m.byId.get("a|movie|1")!
+  assert.deepEqual([p.name, p.srcName, p.logo, p.backdrop], ["الفيل الأزرق", "AR - El Fil El Azraq (2014) 4K", "https://img/p.jpg", "https://img/b.jpg"])
+  assert.equal(m.byKind.movie.find((x) => x.id === "a|movie|1"), p) // lists see the renamed item
+  assert.equal(m.byId.get("b|movie|9")!.name, "الفيل الأزرق") // the alt copy too
+  assert.equal(m.primaryOf.get("b|movie|9"), p)
+  assert.equal(m.byId.get("a|movie|2"), base.byId.get("a|movie|2")) // unmatched: same object
+  assert.equal(m.byId.get("a|live|3")!.name, "El Fil El Azraq (2014)") // live is never matched
+  assert.equal(applyMatches(m, { [key]: { id: "1", title: "Again" } }).byId.get("a|movie|1")!.srcName, "AR - El Fil El Azraq (2014) 4K") // re-applying keeps the source name
+  assert.equal(applyMatches(base, { [key]: "279690" }), base) // id-only (older) match: no display info, nothing renamed
+  assert.equal(applyMatches(base, {}), base)
+  // Replace posters: only the poster changes (also for alts), a manual match poster still wins, live is never touched
+  const pp = applyMatches(base, undefined, { [key]: "https://meta/p.jpg" })
+  const pm = pp.byId.get("a|movie|1")!
+  assert.equal(pm.logo, "https://meta/p.jpg")
+  assert.ok(pm.mposter && pm.name === "AR - El Fil El Azraq (2014) 4K" && !pm.srcName)
+  assert.equal(pp.byId.get("b|movie|9")!.logo, "https://meta/p.jpg")
+  assert.equal(applyMatches(base, { [key]: { id: "1", title: "X", poster: "https://img/p.jpg" } }, { [key]: "https://meta/p.jpg" }).byId.get("a|movie|1")!.logo, "https://img/p.jpg")
+  assert.equal(applyMatches(base, { [key]: { id: "1", title: "X" } }, { [key]: "https://meta/p.jpg" }).byId.get("a|movie|1")!.logo, "https://meta/p.jpg")
+  assert.equal(applyMatches(base, undefined, {}), base)
+}
 console.log("sources.check ok")

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from "lucide-react"
+import { Clock, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from "lucide-react"
 
-export type FlashKind = "play" | "pause" | "back" | "fwd" | "vol" | "mute"
+export type FlashKind = "play" | "pause" | "back" | "fwd" | "vol" | "mute" | "clock"
 type FlashState = { k: number; kind: FlashKind; text?: string } | null
 
 /** Transient centre indicator (seek, volume, mute, play/pause). The element is removed by a timer, so it also disappears when animations are off. */
@@ -18,7 +18,7 @@ export function useFlash() {
   return [f, fire] as const
 }
 
-const ICON = { play: Play, pause: Pause, back: RotateCcw, fwd: RotateCw, mute: VolumeX, vol: Volume2 } as const
+const ICON = { play: Play, pause: Pause, back: RotateCcw, fwd: RotateCw, mute: VolumeX, vol: Volume2, clock: Clock } as const
 
 export function Flash({ f }: { f: FlashState }) {
   if (!f) return null
@@ -40,12 +40,12 @@ export function Spinner({ title, started, label }: { title: string; started: boo
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center" role="status" aria-label={label}>
       <div className="size-16 animate-spin rounded-full border-4 border-white/30 border-t-white" />
-      {!started && <div dir="auto" className="max-w-xl truncate text-lg text-white/80">{title}</div>}
+      {!started && <div dir="auto" className="pl-sub max-w-xl truncate">{title}</div>}
     </div>
   )
 }
 
 /** Channel number being typed with the remote / keyboard. */
 export const NumberEntry = ({ n }: { n: string }) => (
-  <div dir="ltr" data-ltr className="absolute end-[var(--gx)] top-[max(1rem,env(safe-area-inset-top))] z-[6] rounded-[var(--pl-r)] bg-black/70 px-6 py-3 text-3xl sm:text-5xl">{n}</div>
+  <div dir="ltr" data-ltr className="absolute end-[var(--gx)] top-[max(1rem,env(safe-area-inset-top))] z-[6] rounded-[var(--pl-r)] bg-black/60 px-6 py-3 text-3xl sm:text-5xl">{n}</div>
 )

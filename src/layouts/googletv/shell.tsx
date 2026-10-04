@@ -53,7 +53,7 @@ export default function Shell({ page, title, children }: ShellProps) {
           </>
         )}
       </header>
-      <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden pb-6" : "overflow-y-auto pb-6", mobile && "pb-[var(--float-nav-h)]")}>{children}</main>
+      <main data-page-content className={cn("min-h-0 flex-1 px-[var(--gx)] pt-[var(--hdr)] [scroll-padding-top:var(--hdr)]", tv ? "overflow-hidden" : "overflow-y-auto", mobile && "pb-[var(--float-nav-h)]")}>{children}</main>
       {mobile && (
         <nav data-nav-wrap aria-label={t("gtv.shell.main")} className="float-nav">
           {tabs.map(({ key: k, label, route, icon: Icon }) => (

@@ -1,15 +1,17 @@
 // Per-source checks (catalog, auth, playlists, Plex connections, Jellyfin) and stream checks.
-import { useCatalog } from "@/lib/catalog"
+import { logoState, useCatalog } from "@/lib/catalog"
+import { loadLogoIndex } from "@/lib/logos"
+import { chanKey, findRow, logoFor, type LogoFrom } from "@/lib/logos-pure"
 import { fmt, t } from "@/lib/i18n"
-import { jfUrl, normServer } from "@/lib/jellyfin-pure"
+import { jfActiveKind, jfCands, jfUrl, normServer } from "@/lib/jellyfin-pure"
 import { jellyfinStopTranscode, jellyfinStreamUrl } from "@/lib/jellyfin"
 import { mixed, px, pxStream } from "@/lib/net"
 import { plexStopTranscode, plexStreamUrl, plexUrl } from "@/lib/plex"
-import { allowedConns, connKind, sortConns } from "@/lib/plex-pure"
+import { allowedConns, connKind, plexMode, sortConns } from "@/lib/plex-pure"
 import { srcOfId } from "@/lib/merge-pure"
 import { useApp } from "@/lib/store"
 import type { Item, Source } from "@/lib/types"
-import { xmltvUrl, xtreamUrl } from "@/lib/xtream"
+import { xtreamUrl } from "@/lib/xtream"
 import { hasProxy } from "./basic"
 import { httpSay, probe, say, type Probe } from "./probe"
 import { res, type Check, type Env, type GroupId, type Result, type Status } from "./types"
@@ -67,6 +69,29 @@ export function sourceChecks(src: Source, env: Env): Check[] {
     return res("ok", t("diag.src.catalog.ok", { count: fmt.number(st.count) }))
   })
 
+  if (src.type !== "plex") add("logos", t("diag.src.logos"), async () => {
+    const live = logoState().raw(src.id).filter((i) => i.kind === "live")
+    if (!live.length) return res("skip", t("diag.src.logos.none"))
+    const ix = await loadLogoIndex()
+    const matches = settings().logoMatch
+    const n: Record<LogoFrom, number> = { manual: 0, source: 0, db: 0, none: 0 }
+    const byName: string[] = [], missing: string[] = []
+    const seen = new Set<string>() // one line per channel, not per HD/FHD/backup copy
+    for (const i of live) {
+      const { from } = logoFor(i, ix, matches)
+      n[from]++
+      const k = chanKey(i.name).key
+      if ((from !== "db" && from !== "none") || seen.has(k)) continue
+      seen.add(k)
+      if (from === "none") missing.push(i.name)
+      else { const r = findRow(ix!, i.name, i.group, i.epgId); byName.push(`${i.name}  ->  ${r?.[0]} [${r?.[2]}]`) }
+    }
+    const list = (head: string, l: string[]) => (l.length ? `\n\n${head} (${fmt.number(l.length)}):\n${l.slice(0, 400).join("\n")}${l.length > 400 ? "\n..." : ""}` : "")
+    const detail = t("diag.src.logos.ok", { have: fmt.number(live.length - n.none), total: fmt.number(live.length), source: fmt.number(n.source), db: fmt.number(n.db), manual: fmt.number(n.manual) })
+      + list(t("diag.src.logos.matched"), byName) + list(t("diag.src.logos.missing"), missing)
+    return res(n.none > live.length / 10 ? "warn" : "ok", detail, ix ? t("diag.src.logos.hint") : t("diag.src.logos.noIndex"))
+  }, { slow: true })
+
   if (src.type === "xtream") {
     add("auth", t("diag.src.xtream"), async () => {
       const u = `${trim(src.server ?? "")}/player_api.php?username=${encodeURIComponent(src.user ?? "")}&password=${encodeURIComponent(src.pass ?? "")}`
@@ -100,18 +125,6 @@ export function sourceChecks(src: Source, env: Env): Check[] {
     })
   }
 
-  if ((src.type === "m3u" && src.epgUrl) || src.type === "xtream") {
-    add("epg", t("diag.src.epg"), async () => {
-      const url = src.epgUrl || xmltvUrl(src)
-      const { r } = await viaApp(url, undefined, 4096)
-      if (r.kind !== "ok") return res("warn", say(r), t("diag.src.epg.hint"), undefined)
-      const b = r.text ?? ""
-      const looks = /^\s*(<\?xml|<tv)/i.test(b) || b.charCodeAt(0) === 0x1f // 0x1f8b = gzip
-      const n = useCatalog.getState().epg.size
-      return res(looks ? "ok" : "warn", `HTTP ${r.status} · ${looks ? "XMLTV" : t("diag.src.epg.notXml")} · ${t("diag.src.epg.loaded", { n: fmt.number(n) })}`, looks ? undefined : t("diag.src.epg.hint"), ms(r))
-    })
-  }
-
   if (src.type === "plex") out.push(...plexChecks(src, env))
   if (src.type === "jellyfin") out.push(...jellyfinChecks(src, env))
   return out
@@ -120,7 +133,7 @@ export function sourceChecks(src: Source, env: Env): Check[] {
 function plexChecks(src: Source, env: Env): Check[] {
   const out: Check[] = []
   const conns = src.conns?.length ? src.conns : src.server ? [{ uri: src.server }] : []
-  const mode = src.connMode ?? "auto"
+  const mode = plexMode(src.connMode)
   const cur = trim(src.server ?? "")
   const kindT = (k: string) => t(`diag.plex.kind.${k}`)
   const ident = (uri: string) => plexUrl(uri, "/identity", {}, src.token)
@@ -169,22 +182,41 @@ function plexChecks(src: Source, env: Env): Check[] {
 
 function jellyfinChecks(src: Source, env: Env): Check[] {
   const base = normServer(src.server ?? "")
-  return [
-    mk("sources", src, "info", t("diag.jf.info"), async () => {
-      const { d, p } = await env.dual(jfUrl(base, "/System/Info/Public"), JSON_H)
-      const v = verdict(d, p, streamPath(src, base), t("diag.jf.proxyHint"))
-      const ok = [d, p].find((x) => x?.kind === "ok")
-      const j = ok ? json(ok) : null
-      if (ok && !j?.Id) return res("fail", t("diag.jf.notServer"), t("diag.jf.notServerHint"))
-      return j ? { ...v, detail: `${j.ServerName ?? "Jellyfin"} ${j.Version ?? ""}\n${v.detail}` } : v
-    }),
-    mk("sources", src, "auth", t("diag.jf.auth"), async () => {
-      const { r } = await viaApp(jfUrl(base, `/Users/${src.userId}/Views`, {}, src.token), JSON_H, 131072)
-      if (r.kind === "http" && (r.status === 401 || r.status === 403)) return res("fail", t("diag.jf.auth.bad"), t("diag.jf.auth.badHint"))
-      if (r.kind !== "ok") return res("fail", say(r), t("diag.jf.auth.net"))
-      return res("ok", t("diag.jf.auth.ok", { n: (json(r)?.Items ?? []).length }), undefined, ms(r))
-    }),
-  ]
+  const all = jfCands(src, true)
+  const allowed = new Set(jfCands(src).map((c) => c.uri))
+  const hostOf = (u: string) => u.replace(/^https?:\/\//, "")
+  const kindT = (k: string) => t(`source.conn.kind.${k}`)
+  const reach = async (c: { uri: string }) => { const { r } = await viaApp(jfUrl(c.uri, "/System/Info/Public"), JSON_H, 16384); if (r.kind !== "ok") throw r; return r }
+  const out: Check[] = []
+  if (all.length > 1 || src.connMode === "local" || src.connMode === "remote") out.push(mk("sources", src, "inuse", t("source.conn.diag.inuse"), async () => {
+    const lines = [t("source.conn.active", { kind: kindT(jfActiveKind(src)), host: hostOf(base) }), t("source.conn.diag.mode", { mode: t(`source.conn.mode.${src.connMode ?? "auto"}`) })]
+    let pick: (typeof all)[number] | undefined
+    for (const c of jfCands(src)) { try { await reach(c); pick = c; break } catch { /* next */ } }
+    lines.push(pick ? t("source.conn.diag.willUse", { kind: kindT(pick.kind), host: hostOf(pick.uri) }) : t("source.conn.diag.none"))
+    return res(pick ? "ok" : "fail", lines.join("\n"), pick ? undefined : t("source.conn.diag.noneHint"))
+  }))
+  all.forEach((c, i) => out.push(mk("sources", src, `addr${i}`, `${t("source.conn.diag.addr", { kind: kindT(c.kind) })}${c.uri === base ? ` (${t("source.conn.diag.inUse")})` : ""} - ${hostOf(c.uri)}`, async () => {
+    if (!allowed.has(c.uri)) return res("skip", t("source.conn.diag.blocked", { mode: t(`source.conn.mode.${src.connMode ?? "auto"}`) }))
+    const { d, p } = await env.dual(jfUrl(c.uri, "/System/Info/Public"), JSON_H)
+    const v = verdict(d, p, streamPath(src, c.uri), t("diag.jf.proxyHint"))
+    const ok = [d, p].find((x) => x?.kind === "ok")
+    const j = ok ? json(ok) : null
+    if (ok && !j?.Id) return res("fail", t("diag.jf.notServer"), t("diag.jf.notServerHint"))
+    if (ok && src.serverId && j?.Id !== src.serverId) return res("fail", t("source.conn.diag.other"), t("source.conn.diag.otherHint"))
+    if (ok && src.token && src.userId) { // same token must work on this address too
+      const { r } = await viaApp(jfUrl(c.uri, `/Users/${src.userId}`, {}, src.token), JSON_H, 4096)
+      if (r.kind === "http" && (r.status === 401 || r.status === 403)) return res("fail", t("source.conn.badToken", { host: hostOf(c.uri) }), t("diag.jf.auth.badHint"))
+    }
+    return j ? { ...v, detail: `${j.ServerName ?? "Jellyfin"} ${j.Version ?? ""}\n${v.detail}` } : v
+  })))
+  if (!all.length) out.push(mk("sources", src, "info", t("diag.jf.info"), async () => res("fail", t("diag.jf.notServer"), t("diag.jf.notServerHint"))))
+  out.push(mk("sources", src, "auth", t("diag.jf.auth"), async () => {
+    const { r } = await viaApp(jfUrl(base, `/Users/${src.userId}/Views`, {}, src.token), JSON_H, 131072)
+    if (r.kind === "http" && (r.status === 401 || r.status === 403)) return res("fail", t("diag.jf.auth.bad"), t("diag.jf.auth.badHint"))
+    if (r.kind !== "ok") return res("fail", say(r), t("diag.jf.auth.net"))
+    return res("ok", t("diag.jf.auth.ok", { n: (json(r)?.Items ?? []).length }), undefined, ms(r))
+  }))
+  return out
 }
 
 /* ---------- 5. streams ---------- */

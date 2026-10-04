@@ -2,6 +2,9 @@
 const NOISE = /\b(4k|uhd|fhd|hd|sd|hdr10?\+?|hevc|x26[45]|h\.?26[45]|web-?dl|web-?rip|blu-?ray|brrip|dvdrip|hdtv|2160p|1080p|720p|480p|dubbed|subbed|multi)\b/gi
 const YEAR = /[([]\s*((?:19|20)\d{2})\s*[)\]]/
 
+/** The bracketed year of a name, as cleanTitle() reads it (cheap: one regex). */
+export const yearOf = (name: string) => name.match(YEAR)?.[1]
+
 export function cleanTitle(name: string): { title: string; year?: string } {
   let s = name
   const year = s.match(YEAR)?.[1]
@@ -12,6 +15,13 @@ export function cleanTitle(name: string): { title: string; year?: string } {
   s = s.replace(NOISE, " ").replace(/[-|:\s]+$/, "").replace(/\s+/g, " ").trim()
   return { title: s || name.trim(), year }
 }
+
+/** Key of a manual match: what the title IS (kind + cleaned name + year), so every copy of it shares the match. Build it from the source's name (`srcName ?? name`). */
+export const matchKeyOf = (kind: string, name: string) => { const c = cleanTitle(name); return `${kind}:${norm(c.title)}:${c.year ?? ""}` }
+export const matchId = (v: string | { id: string } | undefined) => (typeof v === "string" ? v : v?.id)
+
+/** A usable TMDB id, or undefined: panels send "", "0", "N/A" or junk. */
+export const tmdbId = (v: unknown) => (/^[1-9]\d*$/.test(String(v ?? "").trim()) ? String(v).trim() : undefined)
 
 /** Comparison key: lowercase, no accents or punctuation. */
 export const norm = (name: string) =>

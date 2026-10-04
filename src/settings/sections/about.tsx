@@ -1,3 +1,4 @@
+import { LAYOUTS_META } from "@/lib/layouts"
 import { useEffect, useState } from "react"
 import { LeenMark } from "@/components/gtv"
 import { Pill, Row, SectionCard } from "../controls"
@@ -33,7 +34,7 @@ export default function AboutSection() {
       </SectionCard>
       <SectionCard title={t("settings.about.device")}>
         <Row label={t("settings.about.screenMode")}>{t(`settings.mode.${mode}`)}</Row>
-        <Row label={t("settings.about.layout")}>{layout}</Row>
+        <Row label={t("settings.about.layout")}>{LAYOUTS_META.find((l) => l.id === layout)?.name ?? layout}</Row>
         <Row label={t("settings.about.browser")} description={<span dir="ltr" className="inline-block">{ua()}</span>} />
         {store && <Row label={t("settings.about.storage")}>{store}</Row>}
       </SectionCard>

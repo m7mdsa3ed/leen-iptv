@@ -1,5 +1,6 @@
 import { Backdrop } from "@/components/Backdrop"
-import { ArrowLeft, Clapperboard, Play, Star } from "lucide-react"
+import { ArrowLeft, Clapperboard, MoreHorizontal, Play, Star } from "lucide-react"
+import { ActionsMenu } from "@/components/tv/actions-menu"
 import { Chips, Logo } from "@/components/tv/ui"
 import { Card, Pill, Rail, RoundButton, SkelBar } from "@/components/gtv"
 import { SourceChooser } from "@/components/source/SourceChooser"
@@ -7,11 +8,12 @@ import { isTv } from "@/lib/device"
 import { useT } from "@/lib/i18n"
 import { openTrailer } from "@/components/TrailerModal"
 import { useDetail } from "@/layouts/hooks/use-detail"
+import { Awards, TitleArt } from "@/components/tv/title-art"
 
 export default function Detail({ id }: { id: string }) {
   const D = useDetail(id)
   const t = useT()
-  const { item, isSeries, loading, error: err, plot, chips, ratings, poster, backdrops, episodes: eps, seasons, season, setSeason, shown, pct, epLabel, play, fav, toggleFav, similar, open, back } = D
+  const { item, isSeries, loading, error: err, plot, chips, ratings, poster, backdrops, seasons, season, setSeason, shown, pct, epLabel, fav, toggleFav, similar, open, back } = D
   const genreList = D.genres
   if (!item) return null
   return (
@@ -24,17 +26,18 @@ export default function Detail({ id }: { id: string }) {
         <div className="mt-6 flex flex-col gap-6 md:mt-10 md:flex-row md:gap-10">
           <Logo item={poster!} className="aspect-[2/3] w-36 shrink-0 self-start rounded-2xl object-cover shadow-2xl md:w-64" />
           <div className="min-w-0 md:flex-1">
-            <h1 dir="auto" className="text-3xl font-medium tracking-tight text-foreground md:text-5xl">{item.name}</h1>
+            <TitleArt title={D.title} logo={D.logo} className="text-3xl font-medium tracking-tight text-foreground md:text-5xl" />
             <SourceChooser className="mt-4" alternatives={D.alternatives} selected={D.selected} onSelect={D.selectSource} />
             {(chips.length > 0 || ratings.length > 0 || genreList.length > 0) && (
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                {item.group && <button data-nav onClick={() => D.openCategory()} className="rounded-full bg-accent-blue-container px-3 py-1 text-sm text-foreground"><bdi>{item.group}</bdi></button>}
-                {genreList.map((g) => <button key={g} data-nav onClick={() => D.openGenre(g)} className="rounded-full bg-surface-2 px-3 py-1 text-sm text-foreground/80"><bdi>{g}</bdi></button>)}
-                {chips.map((m) => <span key={m} className="rounded-full bg-surface-2 px-3 py-1 text-sm text-foreground/80"><bdi>{m}</bdi></span>)}
+                {item.group && <button data-nav data-pill onClick={() => D.openCategory()} className="inline-flex min-h-11 items-center rounded-full bg-accent-blue-container px-4 text-sm text-foreground"><bdi>{item.group}</bdi></button>}
+                {genreList.map((g) => <button key={g} data-nav data-pill onClick={() => D.openGenre(g)} className="inline-flex min-h-11 items-center rounded-full bg-surface-2 px-4 text-sm text-foreground/80"><bdi>{g}</bdi></button>)}
+                {chips.map((m) => <span key={m} className="inline-flex min-h-11 items-center rounded-full bg-surface-2 px-4 text-sm text-foreground/80"><bdi>{m}</bdi></span>)}
                 {ratings.map((r) => <span key={r.source} className="rounded-full bg-accent-blue-container px-3 py-1 text-sm text-foreground">{r.source} <b>{r.value}</b></span>)}
               </div>
             )}
             {plot && <p dir="auto" className="mt-5 line-clamp-6 max-w-3xl text-base text-foreground/80 md:text-lg">{plot}</p>}
+            <Awards text={D.awards} className="mt-3" />
             {D.directors.length ? <p className="mt-3 max-w-3xl text-base text-muted-foreground">{t(isSeries ? "pages.detail.createdBy" : "pages.detail.director", { names: D.directors.join(", ") })}</p> : null}
             {!D.cast.length && D.castText && <p className="mt-3 line-clamp-2 max-w-3xl text-base text-muted-foreground">{t("pages.detail.cast", { names: D.castText })}</p>}
             {loading && !plot && (
@@ -42,7 +45,7 @@ export default function Detail({ id }: { id: string }) {
                 <SkelBar className="w-full" /><SkelBar className="w-11/12" /><SkelBar className="w-2/3" />
               </div>
             )}
-            {err && <p className="mt-3 text-destructive">{err}</p>}
+            {err && <p role="alert" className="mt-3 text-sm text-destructive">{err}</p>}
             <div className="-ms-1 mt-6 flex flex-wrap items-center gap-3 p-1">
               <Pill variant="primary" data-autofocus="" onClick={D.playMain} disabled={!D.canPlay}>
                 <Play className="fill-current" />{D.resumeLabel}
@@ -51,6 +54,7 @@ export default function Detail({ id }: { id: string }) {
                 <Star className={fav ? "fill-yellow-400 text-yellow-400" : ""} />
               </RoundButton>
               {D.trailer && <Pill onClick={() => openTrailer(D.trailer!)}><Clapperboard />{t("trailer.button")}</Pill>}
+              <ActionsMenu items={D.marks} trigger={(o) => <RoundButton label={t("common.moreOptions")} active={o.open} aria-haspopup="menu" aria-expanded={o.open} onClick={o.toggle}><MoreHorizontal /></RoundButton>} />
             </div>
           </div>
         </div>
@@ -59,7 +63,7 @@ export default function Detail({ id }: { id: string }) {
             <Chips items={seasons.map((s) => t("pages.detail.season", { n: s }))} active={t("pages.detail.season", { n: season })} onPick={(l) => setSeason(seasons.find((s) => t("pages.detail.season", { n: s }) === l) ?? season)} />
             <Rail>
               {shown.map((e) => {
-                return <Card key={e.id} item={e.item} variant="wide" pct={pct(e.item)} onOpen={() => play(eps, eps.indexOf(e))} sub={epLabel(e)} />
+                return <Card key={e.id} item={e.item} variant="wide" pct={pct(e.item)} onOpen={() => D.openEpisode(e)} sub={epLabel(e)} />
               })}
             </Rail>
           </div>
