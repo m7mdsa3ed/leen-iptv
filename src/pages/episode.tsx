@@ -5,6 +5,8 @@ import { Pill, RoundButton } from "@/components/gtv"
 import { isTv } from "@/lib/device"
 import { useT } from "@/lib/i18n"
 import { useEpisode } from "@/layouts/hooks/use-episode"
+import { ActionsMenu } from "@/components/tv/actions-menu"
+import { mmss } from "@/player/util"
 
 /** One episode: still, title, plot, air date, Play / Resume, watched toggle, previous / next, guest stars and crew. Shared by every layout. */
 export default function EpisodePage({ id }: { id: string }) {
@@ -15,7 +17,7 @@ export default function EpisodePage({ id }: { id: string }) {
   if (!episode) return <Empty>{E.missing ? t("pages.episode.missing") : t("common.loading")}</Empty>
   const art = [E.still, ...D.backdrops].filter((x): x is string => !!x)
   return (
-    <div className="relative h-full overflow-y-auto bg-background px-[var(--gx)] pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
+    <div className="relative h-full overflow-y-auto bg-background px-[var(--gx)] pb-[max(2.5rem,var(--safe-b))] pt-[max(1.5rem,var(--safe-t))]">
       {art.length > 0 && <Backdrop srcs={art} className="absolute inset-x-0 top-0 h-[34rem] opacity-30" />}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-r rtl:bg-gradient-to-l from-background via-background/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-t from-background via-transparent to-transparent" />
@@ -38,7 +40,15 @@ export default function EpisodePage({ id }: { id: string }) {
             )}
             {E.plot && <p dir="auto" className="mt-4 max-w-2xl text-base text-foreground/80 md:text-lg">{E.plot}</p>}
             <div className="-ms-1 mt-6 flex flex-wrap items-center gap-3 p-1">
-              <Pill variant="primary" data-autofocus="" onClick={E.play}><Play className="fill-current" />{t(E.resuming ? "pages.episode.resume" : "pages.episode.play")}</Pill>
+              {E.resumeAt > 0 ? (
+                <ActionsMenu
+                  items={[
+                    { label: t("gtv.detail.resumeFrom", { time: mmss(E.resumeAt) }), run: () => E.play() },
+                    { label: t("gtv.detail.fromStart"), run: () => E.play(true) },
+                  ]}
+                  trigger={(o) => <Pill variant="primary" data-autofocus="" aria-haspopup="menu" aria-expanded={o.open} onClick={o.toggle}><Play className="fill-current" />{t("pages.episode.resume")}</Pill>}
+                />
+              ) : <Pill variant="primary" data-autofocus="" onClick={() => E.play()}><Play className="fill-current" />{t(E.resuming ? "pages.episode.resume" : "pages.episode.play")}</Pill>}
               <Pill onClick={E.toggleWatched}>{E.watched ? <Check /> : <Eye />}{t(E.watched ? "hooks.detail.markUnwatched" : "hooks.detail.markWatched")}</Pill>
               {E.prev && <Pill onClick={() => E.openEp(E.prev!)}><ChevronLeft className="rtl-flip" />{t("pages.episode.prev")}</Pill>}
               {E.next && <Pill onClick={() => E.openEp(E.next!)}>{t("pages.episode.next")}<ChevronRight className="rtl-flip" /></Pill>}

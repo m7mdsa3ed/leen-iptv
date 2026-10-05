@@ -215,6 +215,8 @@ export default function SourcesSection() {
   const sources = useApp((s) => s.sources)
   const { updateSource, moveSource, removeSource, setSettings } = useApp()
   const badges = useApp((s) => s.settings.sourceBadges)
+  const groupMedia = useApp((s) => s.settings.groupMedia !== false)
+  const groupLive = useApp((s) => !!s.settings.groupLive)
   const stat = useCatalog((s) => s.sources)
   const go = useRoute((s) => s.go)
   const reset = useRoute((s) => s.reset)
@@ -247,6 +249,8 @@ export default function SourcesSection() {
       <SectionCard>
         <Row label={t("settings.sources.add")} description={t("settings.sources.add.desc")}><Pill variant="primary" onClick={() => go("sources")}>{t("settings.sources.add")}</Pill></Row>
         <ToggleRow label={t("settings.sources.badges")} description={t("settings.sources.badges.desc")} checked={badges} onChange={(v) => setSettings({ sourceBadges: v })} />
+        <ToggleRow label={t("settings.sources.groupMedia")} description={t("settings.sources.groupMedia.desc")} checked={groupMedia} onChange={(v) => setSettings({ groupMedia: v })} />
+        <ToggleRow label={t("settings.sources.groupLive")} description={t("settings.sources.groupLive.desc")} checked={groupLive} onChange={(v) => setSettings({ groupLive: v })} />
       </SectionCard>
     </div>
   )

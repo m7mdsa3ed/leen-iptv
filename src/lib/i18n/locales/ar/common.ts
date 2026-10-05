@@ -56,5 +56,6 @@ const d: Dict = {
   "search.hint": "اكتب عشان تدوّر على قنوات وأفلام ومسلسلات",
   "search.none": "مفيش نتايج",
   "common.moreOptions": "اختيارات تانية",
+  "common.alpha": "اقفز لحرف",
 }
 export default d

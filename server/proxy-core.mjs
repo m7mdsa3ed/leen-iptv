@@ -1,4 +1,4 @@
-// CORS proxy handler: /p?url=<encoded> (any method; body and x-plex-*/accept/content-type/authorization/range headers are forwarded). Shared by `pnpm proxy` and the Vite dev/preview server.
+// CORS proxy handler: /p?url=<encoded> (any method; body and x-plex-*/accept/content-type/authorization/range/api-key/x-user-agent headers are forwarded). Shared by `pnpm proxy` and the Vite dev/preview server.
 // Follows redirects (providers 302 streams to other hosts that send no CORS headers) and rewrites HLS playlists
 // so every segment/key goes back through /p too. Returns true when it handled the request.
 import { Readable } from "node:stream"
@@ -29,7 +29,7 @@ export function proxyHandler(req, res) {
   ;(async () => {
     try {
       const headers = {}
-      for (const [k, v] of Object.entries(req.headers)) if (/^(x-plex-.*|x-emby-authorization|accept|content-type|range)$/.test(k)) headers[k] = v
+      for (const [k, v] of Object.entries(req.headers)) if (/^(x-plex-.*|x-emby-authorization|accept|content-type|range|api-key|x-user-agent)$/.test(k)) headers[k] = v
       const init = { method: req.method, headers, redirect: "manual", signal: ctl.signal }
       if (req.method !== "GET" && req.method !== "HEAD") {
         const chunks = []
@@ -63,7 +63,7 @@ export function proxyHandler(req, res) {
       if (!up.body) return res.end()
       Readable.fromWeb(up.body).on("error", () => res.destroy()).pipe(res)
     } catch (e) {
-      if (!res.headersSent) res.writeHead(/blocked/.test(String(e)) ? 403 : 502, CORS).end(String(e))
+      if (!res.headersSent) res.writeHead(/blocked/.test(String(e)) ? 403 : 502, CORS).end(`${e}${e?.cause ? ` (${e.cause.code ?? e.cause})` : ""}`) // cause = ECONNREFUSED / ETIMEDOUT / ENOTFOUND
       else res.destroy()
     }
   })()

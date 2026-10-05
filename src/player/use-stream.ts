@@ -4,7 +4,7 @@ import { useSourceOf } from "@/lib/sources"
 import { mixed, px, pxStream } from "@/lib/net"
 import type { Item } from "@/lib/types"
 import type { StreamQ } from "@/lib/quality"
-import { plexStreamUrl, plexSubtitle, plexTracks } from "@/lib/plex"
+import { plexDirectUrl, plexStreamUrl, plexSubtitle, plexTracks } from "@/lib/plex"
 import { jellyfinStreamUrl, jellyfinSubtitle, jellyfinTracks } from "@/lib/jellyfin"
 import type { SrvTrack } from "@/lib/plex-pure"
 import { xtreamUrl } from "@/lib/xtream"
@@ -19,7 +19,7 @@ export function useStream(item: Item, sq: StreamQ, tr: Picked) {
   const src = useSourceOf(item) // the item's own source (multi-source)
   const plex = src?.type === "plex" ? src : null
   const jf = src?.type === "jellyfin" ? src : null
-  // Jellyfin plays DIRECT from the browser to the server (it can be on the viewer's LAN while this app is served from elsewhere,
+  // Plex and Jellyfin play DIRECT from the browser to the server (it can be on the viewer's LAN while this app is served from elsewhere,
   // e.g. over Tailscale, where the app's own proxy could not reach it). Proxy only for mixed content, when the user forces it,
   // or after a network/CORS failure (proxied flag below).
   const [proxied, setProxied] = useState("")
@@ -39,14 +39,18 @@ export function useStream(item: Item, sq: StreamQ, tr: Picked) {
     if (!sc) return
     let on = true
     const key = `${item.id}|${sc.id}`
-    void (plex ? plexSubtitle(plex, sc.id) : jellyfinSubtitle(jf!, item, sc.id)).then((text) => on && setVtt({ key, text }), () => on && setVtt({ key, text: "" }))
+    const set = (text: string) => { if (on) setVtt({ key, text }) }
+    void (plex ? plexSubtitle(plex, item, sc, { alive: () => on, onUpdate: set }) : jellyfinSubtitle(jf!, item, sc.id)).then(set, () => set(""))
     return () => { on = false }
   }, [item.id, sc && sc.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const sidecar = sc && vtt.key === `${item.id}|${sc.id}` ? vtt.text : null
   const burn = { audio: tr.audio, sub: sc ? undefined : tr.sub }
-  const raw = item.url ?? (plex ? plexStreamUrl(plex, item, sq, burn) : jf ? jellyfinStreamUrl(jf, item, sq, burn) : xtreamUrl(src!, live ? "live" : "movie", item.sid!, live ? settings.liveExt : item.ext || "mp4"))
+  // Plex Original: the file itself when this device decodes it; back to the transcoder if the <video> fails on it (noDirect)
+  const [noDirect, setNoDirect] = useState("")
+  const file = plex && noDirect !== item.id ? plexDirectUrl(plex, item, sq, burn) : undefined
+  const raw = item.url ?? file ?? (plex ? plexStreamUrl(plex, item, sq, burn) : jf ? jellyfinStreamUrl(jf, item, sq, burn) : xtreamUrl(src!, live ? "live" : "movie", item.sid!, live ? settings.liveExt : item.ext || "mp4"))
   const mediaServer = !!(plex || jf)
-  const direct = !!jf && !mixed(raw) && !settings.proxyStreams && proxied !== raw
+  const direct = mediaServer && !mixed(raw) && !settings.proxyStreams && proxied !== raw
   const url = direct ? raw : mediaServer && mixed(raw) ? px(raw, settings.proxy) : pxStream(raw, settings)
-  return { tracks, sidecar, live, src, plex, jf, raw, url, direct, mediaServer, setProxied }
+  return { tracks, tracksReady: srv.id === item.id, sidecar, live, src, plex, jf, raw, url, direct, mediaServer, setProxied, fallback: file ? () => setNoDirect(item.id) : undefined }
 }

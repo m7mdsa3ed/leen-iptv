@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { focusFirst } from "@/lib/nav"
+import { focusFirst, useBackStep } from "@/lib/nav"
 import { QrCode } from "@/components/QrCode"
 import { canLink, createLink, linkBase, linkUrl, pollLink, prettyCode, type TvLink } from "@/lib/sync/link"
 import { useSync } from "@/lib/sync"
@@ -159,6 +159,7 @@ export function SignIn() {
 /** Wherever the user is when a password-reset link brings them back, ask for the new password (App renders this once). */
 export function RecoveryGate() {
   const s = useSync()
+  useBackStep(s.recovering, s.cancelRecovery, true)
   useEffect(() => { if (s.recovering) requestAnimationFrame(focusFirst) }, [s.recovering])
   if (!s.recovering) return null
   return (
@@ -177,7 +178,7 @@ export function SetNewPassword() {
   const err = pw && pw.length < 8 ? t("sync.err.short") : pw2 && pw !== pw2 ? t("sync.err.mismatch") : undefined
   return (
     <SectionCard title={t("sync.newPassword.title")} description={t("sync.newPassword.desc")}>
-      <Field label={t("sync.password")} type="password" dir="ltr" value={pw} onChange={setPw} hint={t("sync.hint.password")} />
+      <Field label={t("sync.password")} type="password" dir="ltr" value={pw} onChange={setPw} hint={t("sync.hint.password")} data-autofocus="" />
       <Field label={t("sync.confirmPassword")} type="password" dir="ltr" value={pw2} onChange={setPw2} error={err} />
       <div data-nav-group className="flex flex-wrap gap-2">
         <Pill variant="primary" disabled={a.busy || pw.length < 8 || pw !== pw2} onClick={() => a.run(() => s.setNewPassword(pw))}>{t("sync.newPassword.save")}</Pill>

@@ -4,6 +4,7 @@ import { useCatalogView } from "./use-source-filter"
 import { findInCatalog, usePerson } from "@/lib/meta"
 import type { Credit } from "@/lib/meta/types"
 import { useRoute } from "@/lib/nav"
+import { openSection } from "@/settings/open"
 import type { Item } from "@/lib/types"
 
 /**
@@ -22,7 +23,6 @@ export function usePersonPage(id?: string, name?: string) {
   const { byKind } = useCatalogView()
   const open = useOpen()
   const back = useRoute((s) => s.back)
-  const go = useRoute((s) => s.go)
   const match = (c: Credit) => findInCatalog(byKind, c.kind, c.title, c.year)
   const library = useMemo(() => {
     const out: { item: Item; credit: Credit }[] = []
@@ -37,6 +37,6 @@ export function usePersonPage(id?: string, name?: string) {
     name: info?.name || ref.name, info, loading, error, available, library, known: (info?.credits ?? []).slice(0, 20), filmography, match,
     pseudo: (c: Credit): Item => ({ id: `tmdb|${c.id}`, kind: c.kind, name: c.title, group: "", logo: c.poster }),
     openCredit: (c: Credit) => { const m = match(c); if (m) void open(m) },
-    open: (i: Item) => open(i), openSettings: () => go("settings"), back,
+    open: (i: Item) => open(i), openSettings: () => openSection("metadata"), back,
   }
 }

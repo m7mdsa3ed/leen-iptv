@@ -2,6 +2,8 @@ import type { Dict } from "../../pure.ts"
 
 const d: Dict = {
   "source.availableOn": "Available on",
+  "source.versions": { one: "{n} version", other: "{n} versions" },
+  "source.chooseVariant": "Choose version to play",
   "source.label": "Source",
   "source.all": "All",
   "source.conn.localJf": "Local address (http://host:8096)",

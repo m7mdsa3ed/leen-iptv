@@ -7,22 +7,47 @@ import type { Item } from "@/lib/types"
 import type { SourceMeta } from "@/lib/sources"
 import type { Stats } from "./stats"
 import { isEpisode } from "./util"
+import { publishPlaybackPresence } from "@/lib/sync"
 
 type Meas = { stallTotal: number; errTotal: number; startupMs: number | undefined }
 
 /** Everything that records what was watched: resume point, recents, saved progress, watch history, Plex timeline + scrobble, Jellyfin reports. */
 export function useTracking(o: {
   vref: RefObject<HTMLVideoElement | null>; item: Item; live: boolean; src?: SourceMeta; plex: SourceMeta | null; jf: SourceMeta | null
-  resume: MutableRefObject<number>; meas: MutableRefObject<Meas>; statsRef: MutableRefObject<Stats | null>
+  resume: MutableRefObject<number>; startId: MutableRefObject<string>; meas: MutableRefObject<Meas>; statsRef: MutableRefObject<Stats | null>
 }) {
-  const { vref, item, live, src, plex, jf, resume, meas, statsRef } = o
+  const { vref, item, live, src, plex, jf, resume, startId, meas, statsRef } = o
   const trackHistory = useApp((s) => s.settings.trackHistory)
   const pushRecent = useApp((s) => s.pushRecent)
   const setProgress = useApp((s) => s.setProgress)
 
+  /* cross-device now playing; presence is independent from durable watch progress */
+  useEffect(() => {
+    const v = vref.current
+    const profile = useApp.getState().profiles.find((p) => p.id === useApp.getState().profileId)
+    if (!v || !profile) return
+    const publish = (status: "playing" | "paused" | "stopped") => {
+      void publishPlaybackPresence(item, status, profile.name, v.currentTime, Number.isFinite(v.duration) ? v.duration : 0)
+    }
+    const onPlay = () => publish("playing")
+    const onPause = () => publish("paused")
+    const onEnded = () => publish("stopped")
+    v.addEventListener("play", onPlay)
+    v.addEventListener("pause", onPause)
+    v.addEventListener("ended", onEnded)
+    if (!v.paused) onPlay()
+    return () => {
+      v.removeEventListener("play", onPlay)
+      v.removeEventListener("pause", onPause)
+      v.removeEventListener("ended", onEnded)
+      publish("stopped")
+    }
+  }, [item.id, live]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* resume point + recents */
   useEffect(() => {
     const p = useApp.getState().data[useApp.getState().profileId ?? ""]?.progress[item.id]
+    if (startId.current === item.id) { startId.current = ""; resume.current = 0; pushRecent(item.id); return } // "Play from beginning"
     resume.current = !live && p && p.pos > 30 && p.pos < p.dur * 0.95 ? p.pos : !live && !p && item.resume && item.resume > 30 ? item.resume : 0
     pushRecent(item.id)
   }, [item.id, live, pushRecent]) // eslint-disable-line react-hooks/exhaustive-deps

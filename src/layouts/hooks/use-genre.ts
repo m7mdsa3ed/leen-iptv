@@ -4,6 +4,7 @@ import { useCatalog } from "@/lib/catalog"
 import { useGenreTitles } from "@/lib/meta"
 import { norm } from "@/lib/meta/title"
 import { useRoute } from "@/lib/nav"
+import { openSection } from "@/settings/open"
 import { usePData } from "@/lib/store"
 import type { Item } from "@/lib/types"
 import { onlySource } from "@/lib/merge-pure"
@@ -26,13 +27,13 @@ export function useGenre(id: string) {
   const go = useRoute((s) => s.go)
   const back = useRoute((s) => s.back)
   const { items: all, available, loading, unknown, hasMore, more } = useGenreTitles(kind, genre)
-  const items = useMemo(() => (filter ? onlySource(all, filter) : all), [all, filter])
+  const items = useMemo(() => onlySource(all, filter), [all, filter]) // onlySource returns everything with no source picked
   const related = useMemo(() => groups[kind].filter((g) => norm(g).includes(norm(genre))).slice(0, 8), [groups, kind, genre])
   return {
     kind, genre, status, items, available, loading, unknown, hasMore, more, related, back,
     pct: (i: Item) => d.progress[i.id] && (d.progress[i.id].pos / d.progress[i.id].dur) * 100,
     open: (i: Item) => open(i),
     openCategory: (g: string) => go("category", { id: `${kind}|${g}` }),
-    openSettings: () => go("settings"),
+    openSettings: () => openSection("metadata"),
   }
 }

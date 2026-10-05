@@ -18,4 +18,4 @@ export const redirectTo = () => syncBackend.redirectTo()
 
 export { ApiError } from "../sync/client"
 export * from "./ports"
-export type { SyncConfig as Config, SyncSession as Session } from "./ports"
+export type { PlaybackPresence, SyncConfig as Config, SyncSession as Session } from "./ports"

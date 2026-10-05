@@ -2,12 +2,12 @@ import { useEffect, useRef } from "react"
 import { Info, Star } from "lucide-react"
 import { Card, Pill, SkelGrid } from "@/components/gtv"
 import { useDetail } from "@/layouts/hooks/use-detail"
-import { useT } from "@/lib/i18n"
+import { fmt, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
 import type { Item } from "@/lib/types"
 import type { MoreActions } from "./actions"
 import { useGuard, useSeriesOf } from "./hooks"
-import { CastRail, Chip, Plot, Ratings, Section, SimilarRail } from "./parts"
+import { CastRail, Chip, Plot, Ratings, Section, SimilarRail, StreamFacts } from "./parts"
 
 /** Episode of a series: episodes of the current season (current marked, progress bars, season picker), series overview, cast, more like this. */
 export function EpisodeMore({ item, act }: { item: Item; act: MoreActions }) {
@@ -54,11 +54,13 @@ export function EpisodeMore({ item, act }: { item: Item; act: MoreActions }) {
         </Section>
       ) : series && !D.error ? <SkelGrid variant="wide" n={6} /> : null}
 
+      <StreamFacts facts={item.stream ?? {}} />
       {(plot || D.loading) && (
         <Section title={t("player.more.overview")}>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {D.chips.map((c) => <Chip key={c}><bdi>{c}</bdi></Chip>)}
             <Ratings ratings={D.ratings} name={D.ratingName} />
+            {D.releaseDate && /^\d{4}-\d{2}-\d{2}/.test(D.releaseDate) && <Chip>{t("player.more.releaseDate")}: <bdi>{fmt.date(new Date(`${D.releaseDate.slice(0, 10)}T12:00:00`), { year: "numeric", month: "short", day: "numeric" })}</bdi></Chip>}
             {D.genres.map((g) => <Chip key={g}>{g}</Chip>)}
           </div>
           <Plot text={plot} loading={D.loading} />

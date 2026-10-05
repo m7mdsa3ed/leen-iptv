@@ -115,23 +115,27 @@ export function useBackfillMatches() {
 }
 
 /** Details for a movie/series, cached for META_TTL (30 days); `refresh()` drops this title's cached data and fetches it again. `ready` = the Xtream info has been fetched (or will not be). */
-export function useMeta(item: Item | undefined, xtream: Record<string, unknown> | undefined, ready: boolean, base?: Partial<Meta>) {
+export function useMeta(item: Item | undefined, xtream: Record<string, unknown> | undefined, ready: boolean, base?: Partial<Meta>, identity?: string) {
   const saved = useApp((s) => s.settings.meta)
   const cfgs = useMemo(() => normalizeCfg(saved), [saved])
   const entry = useApp((s) => (item ? s.settings.metaMatch?.[matchKey(item)] : undefined)) // manual match picked by the user
   const matched = matchId(entry)
-  const [meta, setMeta] = useState<Meta | null>(null)
+  const [metaState, setMetaState] = useState<{ key: string; value: Meta } | null>(null)
   const [loading, setLoading] = useState(false)
   const [rev, setRev] = useState(0) // bumped by refresh(): reruns the load (and, through useSeasonMeta, the episode data)
   const keyRef = useRef("")
+  const title = item ? cleanTitle(item.srcName ?? item.name) : undefined
+  const titleKey = title ? `${item!.kind}:${norm(title.title)}:${title.year ?? ""}` : ""
+  const metaKey = identity ?? titleKey
+  const meta = metaState?.key === metaKey ? metaState.value : null
   const online = cfgs.some((c) => c.enabled && c.id !== "xtream" && (c.key || !PROVIDERS.find((p) => p.id === c.id)?.needsKey))
   const sig = sigOf(cfgs)
 
   useEffect(() => {
     if (!item || !ready || item.kind === "live") return
     let live = true
-    setMeta(null)
     const ct = cleanTitle(item.srcName ?? item.name) // the source's name: stable across a matched rename
+    const titleKey = identity ?? `${item.kind}:${norm(ct.title)}:${ct.year ?? ""}`
     const q: Query = { kind: item.kind === "series" ? "series" : "movie", title: ct.title, year: ct.year, ids: matched ? { tmdb: matched } : {}, xtream }
     const run = matched ? cfgs.filter((c) => c.id !== "xtream") : cfgs // the user said the panel's data is wrong for this title
     const xid = String(xtream?.tmdb_id ?? xtream?.tmdb ?? xtream?.imdb_id ?? "")
@@ -140,17 +144,17 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
     ;(async () => {
       setLoading(true)
       const c = online ? await get<{ at: number; v: Meta }>(key).catch(() => undefined) : undefined
-      if (c && live) setMeta(withBase(c.v, matched ? undefined : base)) // stale-while-revalidate: show what we have at once
+      if (c && live) setMetaState({ key: titleKey, value: withBase(c.v, matched ? undefined : base) }) // stale-while-revalidate: show what we have at once
       // fresh entries return without a request; misses/stale go through the shared cache (one in-flight call per title)
       const m = online ? await cached(key, META_TTL, () => loadMeta(q, run), isEmptyMeta) : await loadMeta(q, run)
-      if (live) setMeta(withBase(m, matched ? undefined : base)) // a manual match beats server data too. The cache holds the provider data only: source data (`base`) is merged fresh each time
+      if (live) setMetaState({ key: titleKey, value: withBase(m, matched ? undefined : base) }) // a manual match beats server data too. The cache holds the provider data only: source data (`base`) is merged fresh each time
       // older id-only matches: store what the catalog should show (title, poster, backdrop, year) now that we know it
       const cur = useApp.getState().settings.metaMatch
       const k = matchKey(item)
       if (matched && m.title && typeof cur?.[k] === "string") useApp.getState().setSettings({ metaMatch: { ...cur, [k]: { id: matched, title: m.title, year: m.year, poster: m.poster, backdrop: m.backdrop } } })
     })().finally(() => live && setLoading(false))
     return () => { live = false }
-  }, [item, xtream, ready, sig, base, matched, rev]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [item, xtream, ready, sig, base, matched, rev, identity]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Forget this title's cached provider data (details + its seasons) and load it fresh. A wrong title is fixed with Match metadata, not here. */
   const refresh = async () => {

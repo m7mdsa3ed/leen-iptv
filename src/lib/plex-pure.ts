@@ -1,6 +1,7 @@
 // Pure Plex helpers (no '@/' imports, no DOM) so `node scripts/plex.check.ts` can run them.
-import type { Item } from "./types"
+import type { Item, Watch } from "./types"
 import { plexStream } from "./meta/facts-pure.ts"
+import { day } from "./browse-pure.ts"
 
 export type Conn = { uri: string; local?: boolean; relay?: boolean; protocol?: string }
 export type Ident = Record<string, string>
@@ -85,11 +86,40 @@ export function mapMeta(m: J, o: { sourceId: string; group: string; img: (path: 
     plot: m.summary || undefined,
     rating: rating ? Number(rating).toFixed(1) : undefined,
     year: m.year ? String(m.year) : undefined,
+    released: day(m.originallyAvailableAt),
+    added: Number(m.addedAt) || undefined,
     genres: tagList(m.Genre),
     resume,
     dur: m.duration ? Math.round(m.duration / 1000) : undefined,
-    ext: m.Media?.[0]?.Part?.[0]?.container || m.Media?.[0]?.container || undefined,
+    ...fileOf(m),
   }
+}
+
+/** Plex movie/episode (viewOffset, viewCount, lastViewedAt) -> Watch; undefined when never played. An offset wins over viewCount (a rewatch in progress). */
+export function plexWatch(m: J, sourceId: string): Watch | undefined {
+  const dur = m.duration ? Math.round(m.duration / 1000) : 0
+  const pos = m.viewOffset ? Math.round(m.viewOffset / 1000) : m.viewCount ? dur : 0
+  if (!dur || !pos || (m.type !== "movie" && m.type !== "episode")) return undefined
+  const ep = m.type === "episode"
+  return { id: `${sourceId}|${ep ? "ep" : "movie"}|${m.ratingKey}`, pos, dur, t: (Number(m.lastViewedAt) || 0) * 1000, ...(ep && m.grandparentRatingKey ? { series: `${sourceId}|series|${m.grandparentRatingKey}` } : {}) }
+}
+
+/** The first file of a movie/episode: container, part key and codecs (what direct play needs). */
+export const fileOf = (m: J) => {
+  const md = m.Media?.[0], pt = md?.Part?.[0]
+  return { ext: pt?.container || md?.container || undefined, part: pt?.key || undefined, codecs: md?.videoCodec && md?.audioCodec ? `${md.videoCodec},${md.audioCodec}` : undefined }
+}
+
+const MIME: Record<string, string> = { mp4: "video/mp4", m4v: "video/mp4", mov: "video/mp4", mkv: "video/mp4", /* Chrome/webOS play mkv in <video> but answer "" for video/x-matroska: ask about the codecs; a failure falls back to the transcoder */ webm: "video/webm" }
+const CODEC: Record<string, string> = {
+  h264: "avc1.640033", hevc: "hvc1.2.4.L153.B0", av1: "av01.0.13M.10", vp9: "vp09.02.51.10",
+  aac: "mp4a.40.2", ac3: "ac-3", eac3: "ec-3", mp3: "mp4a.69", opus: "opus", flac: "flac",
+}
+/** canPlayType() string for a Plex file (4K level / 10-bit profiles), or undefined when a part is unknown (dts, truehd, avi, ts...). */
+export function directType(ext?: string, codecs?: string): string | undefined {
+  const [v = "", a = ""] = (codecs ?? "").toLowerCase().split(",")
+  const m = MIME[(ext ?? "").toLowerCase()]
+  return m && CODEC[v] && CODEC[a] ? `${m}; codecs="${CODEC[v]}, ${CODEC[a]}"` : undefined
 }
 
 export const ratingSource = (image: string) =>
@@ -122,7 +152,7 @@ export function mapDetail(m: J, img: (path: string, w: number, h: number) => str
 }
 
 /** Audio / subtitle streams of the first media part (GET /library/metadata/{id}); ids are Plex stream ids. */
-export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean }
+export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean; index?: number; detail?: string; flags?: string[] } // index: embedded in the file (no sidecar `key`), its stream index
 /** Subtitle codecs Plex can hand over as SRT (the rest, PGS / VOBSUB / DVB, are images and must be burned in). */
 const TEXT_SUBS = ["srt", "subrip", "ass", "ssa", "webvtt", "vtt", "mov_text", "text"]
 
@@ -143,6 +173,13 @@ export const mapSegments = (m: J): Seg[] =>
 
 export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
   const st: J[] = m?.Media?.[0]?.Part?.[0]?.Stream ?? []
-  const pick = (type: number) => st.filter((s) => s.streamType === type).map((s) => ({ id: Number(s.id), label: String(s.displayTitle || s.extendedDisplayTitle || s.language || s.codec || s.id), def: !!(s.selected || s.default), lang: s.languageCode || undefined, ...(type === 3 ? { text: TEXT_SUBS.includes(String(s.codec).toLowerCase()) } : {}) }))
+  const pick = (type: number) => st.filter((s) => s.streamType === type).map((s) => {
+    const lang = s.language || s.languageCode || s.languageTag
+    const label = String(s.displayTitle || s.extendedDisplayTitle || lang || s.codec || s.id)
+    const extra = [lang, s.codec ? String(s.codec).toUpperCase() : "", type === 2 && Number(s.channels) > 0 ? `${s.channels}ch` : ""]
+      .filter((v): v is string => !!v && !label.toLowerCase().includes(v.toLowerCase()))
+    const flags = [s.forced ? "forced" : "", s.hearingImpaired ? "sdh" : ""].filter(Boolean)
+    return { id: Number(s.id), label, def: !!(s.selected || s.default), lang: s.languageCode || s.languageTag || undefined, ...(extra.length ? { detail: extra.join(" · ") } : {}), ...(flags.length ? { flags } : {}), ...(type === 3 ? { text: TEXT_SUBS.includes(String(s.codec).toLowerCase()), ...(!s.key && s.index != null ? { index: Number(s.index) } : {}) } : {}) }
+  })
   return { audio: pick(2), subs: pick(3) }
 }

@@ -7,13 +7,15 @@ import { isTv } from "./device"
 import { resolveLang, translate } from "./i18n/pure"
 import { ar, en } from "./i18n/locales"
 import type { LayoutId } from "./layouts"
-import type { MetaMatch, Profile, Source } from "./types"
+import type { MetaMatch, Profile, Source, Watch } from "./types"
 import type { Follow } from "./sports/types"
+import type { SubsCfg } from "./subs-pure"
+import type { More } from "./browse-pure"
 
 /** A user-made group of live channels (name is its key within a profile). */
 export type LiveList = { name: string; items: string[] }
 type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }>; lists?: LiveList[]; follows?: Follow[] }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; colorTheme?: ColorThemeId; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; cardSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series" | "library"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; autoNext?: boolean; noAutoShows?: string[]; meta?: ProviderCfg[]; metaMatch?: Record<string, MetaMatch>; logoMatch?: Record<string, string>; sharedMeta?: boolean; metaPosters?: boolean; sportsNotify?: { enabled: boolean; lead: number } }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; colorTheme?: ColorThemeId; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; cardSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series" | "library"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; miniPlayer?: boolean; autoNext?: boolean; noAutoShows?: string[]; meta?: ProviderCfg[]; metaMatch?: Record<string, MetaMatch>; logoMatch?: Record<string, string>; sharedMeta?: boolean; metaPosters?: boolean; groupMedia?: boolean; groupLive?: boolean; sportsNotify?: { enabled: boolean; lead: number }; subs?: SubsCfg }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
 const empty = (): PData => ({ favs: [], recents: [], progress: {}, lists: [], follows: [] })
@@ -24,7 +26,9 @@ interface S {
   profileId: string | null
   sources: Source[]
   sourceId: string | null
-  sourceFilter: string | null // session only (not persisted); null = All
+  sourceFilter: string[] // session only (not persisted); [] = All
+  catFilter: { movie: string[]; series: string[] } // session only; picked categories per browse page
+  moreFilter: { movie: More; series: More } // session only; watch state / decade / rating per browse page
   data: Record<string, PData>
   settings: Settings
   addProfile: (name: string, pin?: string) => void
@@ -36,7 +40,9 @@ interface S {
   setSource: (id: string) => void
   updateSource: (id: string, p: Partial<Omit<Source, "id">>) => void
   moveSource: (id: string, dir: -1 | 1) => void // priority order
-  setSourceFilter: (id: string | null) => void
+  setSourceFilter: (ids: string[]) => void
+  setCatFilter: (kind: "movie" | "series", cats: string[]) => void
+  setMoreFilter: (kind: "movie" | "series", f: More) => void
   toggleFav: (id: string) => void
   toggleFollow: (f: Follow) => void
   saveList: (name: string, items?: string[]) => void
@@ -46,6 +52,7 @@ interface S {
   pushRecent: (id: string) => void
   setProgress: (id: string, pos: number, dur: number, series?: string) => void
   markSeen: (entries: { id: string; dur?: number }[], seen: boolean) => void
+  pullProgress: (list: Watch[]) => void
   setSettings: (p: Partial<Settings>) => void
 }
 
@@ -61,7 +68,9 @@ export const useApp = create<S>()(
       profileId: null,
       sources: [],
       sourceId: null,
-      sourceFilter: null,
+      sourceFilter: [],
+      catFilter: { movie: [], series: [] },
+      moreFilter: { movie: {}, series: {} },
       data: {},
       settings: { proxy: "", proxyStreams: false, liveExt: "m3u8", tvScale: 1, trackHistory: true, accountChoice: "unset", theme: "system", layout: "googletv", motion: isTv ? "reduced" : "full", sourceBadges: true, language: "auto" },
       addProfile: (name, pin) =>
@@ -80,7 +89,7 @@ export const useApp = create<S>()(
       removeSource: (id) =>
         set((s) => {
           const sources = s.sources.filter((x) => x.id !== id)
-          return { sources, sourceId: s.sourceId === id ? (sources[0]?.id ?? null) : s.sourceId, sourceFilter: s.sourceFilter === id ? null : s.sourceFilter }
+          return { sources, sourceId: s.sourceId === id ? (sources[0]?.id ?? null) : s.sourceId, sourceFilter: s.sourceFilter.filter((x) => x !== id) }
         }),
       setSource: (id) => set({ sourceId: id }),
       updateSource: (id, p) => set((s) => ({ sources: s.sources.map((x) => (x.id === id ? { ...x, ...p } : x)) })),
@@ -91,7 +100,9 @@ export const useApp = create<S>()(
           ;[a[i], a[j]] = [a[j], a[i]]
           return { sources: a }
         }),
-      setSourceFilter: (id) => set({ sourceFilter: id }),
+      setSourceFilter: (ids) => set({ sourceFilter: ids }),
+      setCatFilter: (kind, cats) => set((s) => ({ catFilter: { ...s.catFilter, [kind]: cats } })),
+      setMoreFilter: (kind, f) => set((s) => ({ moreFilter: { ...s.moreFilter, [kind]: f } })),
       toggleFav: (id) => set((s) => upd(s, (d) => ({ ...d, favs: d.favs.includes(id) ? d.favs.filter((x) => x !== id) : [id, ...d.favs] }))),
       // follow/unfollow one team for this profile (synced as a t/ entity, tombstoned when removed)
       toggleFollow: (f) => set((s) => upd(s, (d) => {
@@ -122,12 +133,19 @@ export const useApp = create<S>()(
         for (const e of entries) { const dur = progress[e.id]?.dur || e.dur || 1; progress[e.id] = { pos: seen ? dur : 0, dur, t } }
         return { ...d, progress }
       })),
+      // server watch history (Plex/Jellyfin): replaces only an older local entry (same rule as sync); a series takes its newest episode, like setProgress
+      pullProgress: (list) => set((s) => upd(s, (d) => {
+        const progress = { ...d.progress }
+        const put = (id: string, w: Watch) => { if ((progress[id]?.t ?? -1) < w.t) progress[id] = { pos: w.pos, dur: w.dur, t: w.t } }
+        for (const w of list) { put(w.id, w); if (w.series) put(w.series, w) }
+        return { ...d, progress }
+      })),
       setSettings: (p) => set((s) => ({ settings: { ...s.settings, ...p } })),
     }),
     {
       name: "iptv-app",
       version: 1,
-      partialize: (s) => ({ ...s, profileId: undefined, sourceFilter: undefined }), // always re-pick profile on launch
+      partialize: (s) => ({ ...s, profileId: undefined, sourceFilter: undefined, catFilter: undefined, moreFilter: undefined }), // always re-pick profile on launch
       // the picked profile survives a refresh (sessionStorage) but a fresh launch asks again
       merge: (saved, cur) => {
         const m = { ...cur, ...(saved as object) } as S
@@ -135,7 +153,9 @@ export const useApp = create<S>()(
         if (!LAYOUT_IDS.includes(m.settings.layout)) m.settings.layout = "googletv" // removed layouts
         let id: string | null = null
         try { id = sessionStorage.getItem("iptv-profile") } catch { /* ignore */ }
-        m.sourceFilter = null
+        m.sourceFilter = []
+        m.catFilter = { movie: [], series: [] }
+        m.moreFilter = { movie: {}, series: {} }
         return { ...m, profileId: m.profiles.some((p) => p.id === id) ? id : null }
       },
     },

@@ -7,6 +7,7 @@ import { usePData } from "@/lib/store"
 import { FAV } from "@/components/tv/groups"
 import type { Item } from "@/lib/types"
 import { useTick } from "../more/hooks"
+import { ProgrammeInfo } from "../more/programme"
 
 const CAP = 60 // tiles mounted around the watched channel (a category can hold hundreds)
 const IDLE_MS = 8000
@@ -57,7 +58,7 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
       <div aria-hidden className="absolute inset-0 z-[11]" onClick={close} />
       <section
         ref={ref} data-modal data-strip role="dialog" aria-label={t("player.channels")}
-        className="pl-strip pl-strip-in absolute inset-x-0 bottom-0 z-[12] px-[var(--gx)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-16"
+        className="pl-strip pl-strip-in absolute inset-x-0 bottom-0 z-[12] px-[var(--gx)] pb-[max(1rem,var(--safe-b))] pt-16"
         onKeyDown={(e) => {
           bump()
           if (e.keyCode === 38 || e.keyCode === 40) { e.preventDefault(); e.stopPropagation(); cycle(e.keyCode === 40 ? 1 : -1) }
@@ -67,6 +68,7 @@ export const ChannelStrip = memo(function ChannelStrip({ item, tune, close }: { 
         <button tabIndex={-1} aria-label={t("player.strip.category")} onClick={() => cycle(1)} className="pl-chip mb-3">
           <ChevronsUpDown /><bdi dir="auto">{groupLabel(g, t)}</bdi>
         </button>
+        <ProgrammeInfo item={item} compact />
         <div key={g} data-nav-group className="rail !mb-0 !gap-3 !pb-3">
           {shown.map((c) => {
             const cur = c.id === item.id

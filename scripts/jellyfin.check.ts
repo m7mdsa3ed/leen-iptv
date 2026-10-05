@@ -15,12 +15,12 @@ assert.equal(imageUrl("http://h", "abc", "Primary", 300, "t1"), "http://h/Items/
 
 const img = (id: string, type: string, w: number, tag?: string) => `IMG/${id}/${type}/${w}/${tag}`
 const movie = mapItem(
-  { Id: "42", Type: "Movie", Name: "Heat", ProductionYear: 1995, Overview: "s", CommunityRating: 8.25, ImageTags: { Primary: "p" }, BackdropImageTags: ["b"],
+  { Id: "42", Type: "Movie", Name: "Heat", ProductionYear: 1995, PremiereDate: "1995-12-15T00:00:00.0000000Z", DateCreated: "2023-11-14T22:13:20.0000000Z", Overview: "s", CommunityRating: 8.25, ImageTags: { Primary: "p" }, BackdropImageTags: ["b"],
     UserData: { PlaybackPositionTicks: 610000000, Played: false }, RunTimeTicks: 72000000000, Genres: ["Crime"], Container: "mkv,webm" },
   { sourceId: "s1", group: "Movies", img },
 )
 assert.deepEqual(movie, { id: "s1|movie|42", kind: "movie", sid: "42", name: "Heat", group: "Movies", logo: "IMG/42/Primary/300/p", backdrop: "IMG/42/Backdrop/1280/b",
-  plot: "s", rating: "8.3", year: "1995", genres: ["Crime"], resume: 61, dur: 7200, ext: "mkv" })
+  plot: "s", rating: "8.3", year: "1995", released: "1995-12-15", added: 1700000000, genres: ["Crime"], resume: 61, dur: 7200, ext: "mkv" })
 const show = mapItem({ Id: "7", Type: "Series", Name: "X" }, { sourceId: "s1", group: "TV", img })
 assert.equal(show.kind, "series")
 assert.equal(show.logo, undefined)
@@ -73,3 +73,12 @@ assert.equal(jfActiveKind({ server: "http://10.0.0.5:8096" }), "local")
 assert.deepEqual(mapSegments({ Items: [{ Type: "Recap", StartTicks: 0, EndTicks: 150000000 }, { Type: "Intro", StartTicks: 150000000, EndTicks: 450000000 }, { Type: "Commercial", StartTicks: 0, EndTicks: 9 }] }), [{ kind: "recap", start: 0, end: 15 }, { kind: "intro", start: 15, end: 45 }])
 assert.deepEqual(mapIntroSkipper({ Valid: true, IntroStart: 5, IntroEnd: 50 }), [{ kind: "intro", start: 5, end: 50 }]); assert.deepEqual(mapIntroSkipper({ Valid: false }), [])
 console.log("jellyfin segments ok")
+
+// watch history -> Watch entries
+import { jfWatch } from "../src/lib/jellyfin-pure.ts"
+assert.deepEqual(jfWatch({ Id: "m", Type: "Movie", RunTimeTicks: 72000000000, UserData: { Played: true, LastPlayedDate: "2024-01-02T03:04:05.000Z" } }, "s1"),
+  { id: "s1|movie|m", pos: 7200, dur: 7200, t: Date.parse("2024-01-02T03:04:05.000Z") })
+assert.deepEqual(jfWatch({ Id: "e", Type: "Episode", SeriesId: "sr", RunTimeTicks: 24000000000, UserData: { PlaybackPositionTicks: 6000000000 } }, "s1"),
+  { id: "s1|ep|e", pos: 600, dur: 2400, t: 0, series: "s1|series|sr" })
+assert.equal(jfWatch({ Id: "m", Type: "Movie", RunTimeTicks: 1e10, UserData: {} }, "s1"), undefined)
+console.log("jellyfin watch ok")

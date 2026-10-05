@@ -1,14 +1,13 @@
 import { useEffect } from "react"
 import { isTv } from "@/lib/device"
-import { KEY, navState } from "@/lib/nav"
-import { usePinAsk } from "@/components/tv/ui"
-import { useTrailer } from "@/components/TrailerModal"
+import { dialogOutside, KEY, navState } from "@/lib/nav"
 import type { MenuKind } from "./menus"
 import { fsEl } from "./util"
 
 export type KeyCtx = {
   live: boolean; show: boolean; menu: MenuKind | null; err: string; help: boolean; more: "closed" | "open" | "closing"; nextShow: boolean; canPip: boolean; overlay: "none" | "strip"
-  back: () => void; hide: () => void; closeMenu: () => void; closeHelp: () => void; toggleHelp: () => void
+  off?: boolean // mini player: the page owns the keys
+  back: () => void; stop: () => void; hide: () => void; closeMenu: () => void; closeHelp: () => void; toggleHelp: () => void
   closeMore: () => void; openMore: () => void; cancelNext: () => void; skipSeg?: () => void
   closeOverlay: () => void; openStrip: () => void
   play: () => void; pause: () => void; toggle: () => void; seek: (d: number) => void; zap: (d: number) => void
@@ -39,9 +38,15 @@ function panelAtTop() {
 export function useKeys(c: KeyCtx) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (usePinAsk.getState().ask || useTrailer.getState().cur) return // those dialogs own the keys (App's Back handler closes them)
+      if (dialogOutside(".pl-root")) return // a PIN prompt, card menu, trailer, keyboard... over the player owns the keys (App's Back handler closes it)
       const k = e.keyCode
       const stop = () => (e.preventDefault(), e.stopPropagation())
+      if (c.off) { // mini player: the page owns the keys, only the media keys still drive the video (Stop ends it for good)
+        if (k === KEY.play) return stop(), c.play()
+        if (k === KEY.pause) return stop(), c.pause()
+        if (k === KEY.stop) return stop(), c.stop()
+        return
+      }
       const locked = navState.lock
       if (k === KEY.back || k === KEY.esc || (k === KEY.bksp && isTv)) {
         stop()
@@ -58,7 +63,7 @@ export function useKeys(c: KeyCtx) {
       }
       if (k === KEY.play) return stop(), c.play()
       if (k === KEY.pause) return stop(), c.pause()
-      if (k === KEY.stop) return stop(), void c.back()
+      if (k === KEY.stop) return stop(), c.stop()
       if (k === KEY.ff) return stop(), c.seek(30), c.poke()
       if (k === KEY.rw) return stop(), c.seek(-10), c.poke()
       if (c.overlay !== "none") {
@@ -68,6 +73,7 @@ export function useKeys(c: KeyCtx) {
         }
         return
       }
+      if ((c.menu || c.help) && (k === KEY.chUp || k === KEY.chDown || k === KEY.red || k === KEY.green || k === KEY.yellow || (k >= 48 && k <= 57))) return // a sheet is open: no zapping or toggling behind it
       if (k === KEY.chUp || (locked && c.live && k === KEY.up)) return stop(), c.zap(1)
       if (k === KEY.chDown || (locked && c.live && k === KEY.down)) return stop(), c.zap(-1)
       if (k === KEY.red) return stop(), c.toggleFav()
@@ -103,7 +109,7 @@ export function useKeys(c: KeyCtx) {
         c.poke()
         return
       }
-      c.poke()
+      if (!c.nextShow) c.poke() // the Next card is up: arrows move inside it, they do not pull the controls over it
       // while controls are up, the seek bar eats left/right
       if ((document.activeElement as HTMLElement)?.dataset.seek !== undefined && (k === KEY.left || k === KEY.right)) { stop(); c.seek(k === KEY.left ? -10 : 30) }
     }

@@ -41,13 +41,8 @@ export default function Live() {
               }} />
           )
           // mobile: filters + grid scroll together and start under the top bar (content fades under both bar gradients)
-          if (items.length) return grid(<div className="flex flex-col gap-2">{filters}</div>, "-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]")
-          return (
-            <div className="flex h-full flex-col gap-2">
-              {filters}
-              <div className="min-h-0 flex-1">{items.length ? grid() : <Empty>{t("gtv.live.empty")}</Empty>}</div>
-            </div>
-          )
+          // one tree whether or not the category has channels: a different root would remount the focused group chip (an empty Favorites)
+          return grid(<div className="flex flex-col gap-2">{filters}{!items.length && <div className="h-[50vh]"><Empty>{t("gtv.live.empty")}</Empty></div>}</div>, "under-top")
         })()
       )}
     </Shell>

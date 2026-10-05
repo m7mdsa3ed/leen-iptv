@@ -27,7 +27,7 @@ export default function GenrePage({ id }: { id: string }) {
           </div>
           <SourceFilter />
           </>)
-          if (available && items.length) return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => void open(i)} />} head={head} className="-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]" />
+          if (available && items.length) return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => void open(i)} />} head={head} className="under-top" />
           return (
             <div className="flex h-full flex-col">
               {head}

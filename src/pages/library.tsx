@@ -13,7 +13,7 @@ export default function Library() {
   const empty = !continueWatching.length && !favorites.length && !history.length
   return (
     <Shell page="library" title={t("pages.library.title")}>
-      <div data-under className="no-scrollbar -mx-[var(--gx)] -mt-[var(--hdr)] h-full overflow-y-auto px-[var(--gx)] pt-[var(--hdr)] [--up:var(--hdr)]">
+      <div className="under-top under-bottom no-scrollbar -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
         <SourceFilter className="pt-2" />
         {status !== "ready" ? <Pending /> : (
           <>

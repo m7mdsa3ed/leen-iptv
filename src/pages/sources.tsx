@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Pill } from "@/components/gtv"
 import { fmt, t, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
-import { useRoute } from "@/lib/nav"
+import { useBackStep, useRoute } from "@/lib/nav"
 import { explain } from "@/lib/net"
 import { QrCode } from "@/components/QrCode"
 import { checkPin, createPin, detectPlex, pickConnection, plexAuthUrl, plexServers, type Pin, type PlexServer } from "@/lib/plex"
@@ -28,6 +28,13 @@ export default function Sources() {
   const [err, setErr] = useState("")
   // Jellyfin: username/password, or Quick Connect (code approved in another Jellyfin app, polled here)
   const [qc, setQc] = useState<{ server: string; secret: string; code: string } | null>(null)
+  // Back closes the inner step (Plex code, server list, manual form, Jellyfin Quick Connect) before it leaves the page
+  useBackStep(!!(pin || qc || servers || manual), () => {
+    if (pin) { setPin(null); setBusy("") }
+    else if (qc) { setQc(null); setBusy("") }
+    else if (servers) { setServers(null); setErr("") }
+    else { setManual(false); setErr("") }
+  })
   const ok = type === "Jellyfin" ? f.server && f.user : type === "Plex" ? /^https?:\/\//.test(f.server) && f.token : f.name && (type === "M3U" ? /^https?:\/\//.test(f.url) : /^https?:\/\//.test(f.server) && f.user && f.pass)
 
   useEffect(() => {
@@ -147,13 +154,13 @@ export default function Sources() {
   const conn = (s: PlexServer) => fmt.plural(s.owned ? "pages.sources.connOwned" : "pages.sources.connShared", s.connections.length)
 
   return (
-    <div className="flex h-full flex-col items-center gap-6 overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] md:justify-center">
+    <div className="flex h-full flex-col items-center gap-6 overflow-y-auto bg-background p-4 pt-[max(1rem,var(--safe-t))] pb-[max(1rem,var(--safe-b))] md:justify-center">
       <div className="flex w-full max-w-[40rem] flex-col gap-3 rounded-[28px] bg-surface p-6">
         <h1 className="text-3xl font-medium tracking-tight md:text-5xl">{tr("pages.sources.title")}</h1>
         <p className="text-muted-foreground">{tr("pages.sources.pick")}</p>
         <div role="radiogroup" aria-label={tr("pages.sources.title")} data-nav-group className="grid grid-cols-2 gap-2 pb-2">
           {(["Xtream", "M3U", "Plex", "Jellyfin"] as const).map((k) => (
-            <button key={k} type="button" role="radio" aria-checked={type === k} data-nav data-pill className={`flex min-h-16 flex-col items-start justify-center gap-0.5 rounded-2xl px-4 py-2 text-start transition-colors ${type === k ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground"}`} onClick={() => { setType(k); setErr(""); setQc(null); setBusy(""); setFound(null) }}>
+            <button key={k} type="button" role="radio" aria-checked={type === k} data-nav data-pill className={`flex min-h-16 flex-col items-start justify-center gap-0.5 rounded-2xl px-4 py-2 text-start transition-colors ${type === k ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground"}`} onClick={() => { setType(k); setErr(""); setQc(null); setBusy(""); setFound(null); setPin(null); setServers(null); setManual(false) }}>
               <span className="flex items-center gap-2 text-lg font-medium">{(k === "Plex" || k === "Jellyfin") && <SourceMark type={k === "Plex" ? "plex" : "jellyfin"} color={k === "Plex" ? "#e5a00d" : "#aa5cc3"} className="size-5" />}{k}</span>
               <span className="text-sm opacity-70">{tr(`pages.sources.kind.${k}`)}</span>
             </button>

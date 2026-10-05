@@ -6,6 +6,7 @@ import { useApp, useLists, usePData } from "@/lib/store"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { closeListModal, useListModal } from "./lists"
+import { isSubmit } from "./keyboard"
 import { openLogoMatch } from "./match"
 import { logoKey } from "@/lib/logos-pure"
 
@@ -58,7 +59,7 @@ export function ListModal() {
           })}
         </div>
         <div className="flex items-center gap-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.keyCode === 13) create() }} placeholder={t("nav.lists.name")} aria-label={t("nav.lists.name")} dir="auto" className="min-h-11 flex-1 rounded-full bg-surface-2 px-4 text-base outline-none" />
+          <input data-nav value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (isSubmit(e)) create() }} placeholder={t("nav.lists.name")} aria-label={t("nav.lists.name")} dir="auto" className="min-h-11 flex-1 rounded-full bg-surface-2 px-4 text-base outline-none" />
           <Pill data-nav variant="primary" onClick={create}><Plus className="size-4" />{t("nav.lists.create")}</Pill>
         </div>
         <Pill data-nav className="w-full" onClick={closeListModal}>{t("common.cancel")}</Pill>

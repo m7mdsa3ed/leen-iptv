@@ -35,7 +35,7 @@ export type DetailRating = { source: string; value: string; votes?: string }
  *  episodes (the selected season's gaps filled from TMDB: generic titles, stills, plots; after a manual match TMDB replaces them), epMeta(e) (TMDB air date/rating/guests/crew of an episode of the selected season), openEpisode(e) (episode page), markItems(items, seen) (single items, server too), seasons (numbers), season (selected, null = none), setSeason, shown (episodes of the season),
  *  progress(x) -> {pos,dur,t}|undefined, pct(x) -> 0..100, watched(x), epLabel(e) -> "E3  ·  45m  ·  Watched",
  *  resumeIdx, resumeLabel (localised "Resume"|"Play"), resuming (true = Resume; compare this, not the label), ratingName(source) (localises the generic "Rating" source name), canPlay, play(queue|null, index) -> opens the player, playMain() (resume/play button),
- *  trailer ({key,name}|undefined, TMDB/YouTube), trailerLoading,
+ *  trailer ({key,name}|undefined, TMDB/YouTube), trailers (all of them: trailers, teasers, featurettes), trailerLoading,
  *  fav, toggleFav(), similar: Item[], open(item) (PIN-aware, live -> player), openCategory(), openGenre(g), openPerson(castMember), back()
  * }
  */
@@ -84,7 +84,8 @@ export function useDetail(id: string) {
     return () => { live = false }
   }, [selId, src, proxy]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { meta, loading, matched, online, refresh: refreshMeta, rev } = useMeta(selected, info, loaded, base)
+  const metaIdentity = primary ? `${primary.kind}:${srcOfId(primary.id)}:${primary.id}` : id
+  const { meta, loading, matched, online, refresh: refreshMeta, rev } = useMeta(selected, info, loaded, base, metaIdentity)
   const similar = useSimilar(item, meta)
   const seasonMeta = useSeasonMeta(item?.kind === "series" ? meta?.ids.tmdb : undefined, season, rev)
   const seriesName = useMemo(() => (item ? cleanTitle(item.srcName ?? item.name).title : ""), [item]) // panel episode names repeat the panel's series name
@@ -109,13 +110,16 @@ export function useDetail(id: string) {
     const s = episodes[resumeIdx]?.season
     if (s != null && s !== season) setSeason(s)
   }, [rawEps]) // eslint-disable-line react-hooks/exhaustive-deps
-  const play = (queue: Episode[] | null, i: number) => selected && go("player", { queue: queue ? queue.map((e) => e.item) : [selected], index: i })
+  // where the player resumes an item (same rule as player/use-tracking): unfinished local progress, else the server's offset; 0 = from the start
+  const resumeOf = (x?: Item) => { const q = x && progress(x); return q && q.pos > 30 && q.pos / q.dur < 0.95 ? q.pos : !q && x?.resume && x.resume > 30 ? x.resume : 0 }
+  const play = (queue: Episode[] | null, i: number, fromStart?: boolean) => selected && go("player", { queue: queue ? queue.map((e) => e.item) : [selected], index: i, start: fromStart || undefined })
   const dur = (d?: string | number) => (typeof d === "number" ? fmt.duration(d) : d)
   const text = (k: string) => (info[k] ? String(info[k]) : "")
   const named = (prefix: string, raw: string) => { const k = `gtv.${prefix}.${raw.toLowerCase().replace(/\W+/g, "-")}`; const v = t(k); return v === k ? raw : v } // localised when a key exists, else TMDB's English
   const crew = (meta?.crew?.length ? meta.crew : (meta?.directors ?? []).map((name) => ({ name, role: isSeries ? "Creator" : "Director" }))).map((c) => ({ ...c, role: c.role?.split(", ").map((r) => named("role", r)).join(", ") }))
   const plot = meta?.plot || text("plot") || text("description") || item?.plot
-  const chips = [meta?.year || text("releasedate").slice(0, 4) || text("releaseDate").slice(0, 4) || text("year"), dur(meta?.runtime) || text("duration"), meta?.cert].filter(Boolean) as string[]
+  const releaseDate = text("releasedate") || text("releaseDate") || text("PremiereDate")
+  const chips = [meta?.year || releaseDate.slice(0, 4) || text("year"), dur(meta?.runtime) || text("duration"), meta?.cert].filter(Boolean) as string[]
   const genres = (meta?.genres.length ? meta.genres : text("genre").split(/\s*[,/]\s*/)).filter(Boolean).slice(0, 4)
   const ratings: DetailRating[] = meta?.ratings.length ? meta.ratings : [text("rating") || item?.rating].filter(Boolean).map((v) => ({ source: "Rating", value: String(v), votes: undefined }))
   const poster = item && ({ ...item, logo: item.mposter ? item.logo : meta?.poster || item.logo } as Item) // identified or matched: the metadata poster replaces the panel's (Plex/Jellyfin: their own art is already in meta)
@@ -147,7 +151,7 @@ export function useDetail(id: string) {
   const hasProgress = isSeries ? episodes.some((e) => progress(e.item)) : !!p && p.pos > 30
 
   return {
-    logo: meta?.logo, awards: meta?.awards, markItems,
+    logo: meta?.logo, awards: meta?.awards, releaseDate, markItems,
     epMeta: (e: Episode): EpisodeMeta | undefined => (e.season === season ? seasonMeta?.find((x) => x.num === e.num) : undefined),
     openEpisode: (e: Episode) => go("episode", { id: `${id}~${e.item.id}` }),
     item, selected, title: (matched && meta?.title) || item?.name || "", alternatives, selectSource: (i: Item) => setPickId(i.id), isSeries, meta, loading, error, plot, chips, genres, ratings, poster, backdrop: meta?.backdrop || item?.logo,
@@ -160,7 +164,9 @@ export function useDetail(id: string) {
     epDur: dur,
     epLabel: (e: Episode) => [t("hooks.detail.ep", { n: e.num }), dur(e.dur), watched(e.item) ? t("hooks.detail.watched") : ""].filter(Boolean).join("  ·  "),
     resumeIdx, resumeLabel: t(hasProgress ? "hooks.detail.resume" : "hooks.detail.play"), resuming: hasProgress, ratingName: (s: string) => (s === "Rating" ? t("hooks.detail.rating") : s), canPlay: !isSeries || episodes.length > 0, play,
-    playMain: () => (isSeries ? episodes.length && play(episodes, resumeIdx) : play(null, 0)),
+    playMain: (fromStart?: boolean) => (isSeries ? episodes.length && play(episodes, resumeIdx, fromStart) : play(null, 0, fromStart)),
+    /** where the main button resumes (seconds; 0 = nothing to resume): the Detail page then offers Resume / Play from beginning */
+    resumeAt: resumeOf(isSeries ? episodes[resumeIdx]?.item : selected), resumeOf,
     /** watch-state buttons: [Mark watched | Mark unwatched], while something is in progress [Remove from Continue watching], with a TMDB key [Match metadata], with an online provider [Refresh metadata]; shown in the layout's overflow menu */
     marks: [
       { label: t(allWatched ? "hooks.detail.markUnwatched" : "hooks.detail.markWatched"), run: () => markAll(!allWatched) },
@@ -168,7 +174,9 @@ export function useDetail(id: string) {
       ...(canMatch && selected ? [{ label: t("hooks.detail.match"), run: () => openMatch(selected) }] : []),
       ...(online ? [{ label: t("hooks.detail.refreshMeta"), run: () => void refreshMeta() }] : []), // cached for 30 days; this fetches now
     ],
+    allWatched, toggleWatched: () => markAll(!allWatched), // the same action as marks[0], for a dedicated button
     fav: !!item && d.favs.includes(item.id), toggleFav: () => item && toggleFavStore(item.id),
+    trailers: meta?.trailers ?? [],
     trailer: meta?.trailers?.[0] ? { key: meta.trailers[0].key, name: meta.trailers[0].name } : undefined, trailerLoading: loading,
     similar, open: (i: Item) => open(i),
     openCategory: () => item && go("category", { id: `${item.kind}|${item.group}` }),

@@ -27,26 +27,24 @@ export default function GenrePage({ id }: { id: string }) {
           </div>
           <SourceFilter />
           </>)
-          if (available && items.length) return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => void open(i)} />} head={head} className="-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]" />
-          return (
-            <div className="flex h-full flex-col">
-              {head}
-              <div className="m-fade min-h-0 flex-1" style={{ "--i": 1 } as React.CSSProperties}>
-            {!available ? (
-              <Empty>
-                <div className="flex max-w-xl flex-col items-center gap-4 px-6 text-center">
-                  <p>{t("gtv.genre.needKey", { genre })}</p>
-                  <Pill variant="primary" data-autofocus="" onClick={() => openSettings()}>{t("gtv.genre.openSettings")}</Pill>
-                </div>
-              </Empty>
-                        ) : loading ? (
-              <SkelGrid />
-            ) : (
-              <Empty>{unknown ? t(kind === "movie" ? "gtv.genre.unknownMovie" : "gtv.genre.unknownSeries", { genre }) : hasMore ? t("gtv.genre.noneYet") : t("gtv.genre.noneInLibrary")}</Empty>
-            )}
-              </div>
+          // one tree for results, loading and the empty states: a different root would remount the focused "Find more" pill when its results arrive
+          const empty = !(available && items.length)
+          return <VGrid items={available ? items : []} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => void open(i)} />} className="under-top" head={<>{head}{empty && (
+            <div className="h-[50vh] overflow-hidden">
+              {!available ? (
+                <Empty>
+                  <div className="flex max-w-xl flex-col items-center gap-4 px-6 text-center">
+                    <p>{t("gtv.genre.needKey", { genre })}</p>
+                    <Pill variant="primary" data-autofocus="" onClick={() => openSettings()}>{t("gtv.genre.openSettings")}</Pill>
+                  </div>
+                </Empty>
+              ) : loading ? (
+                <SkelGrid />
+              ) : (
+                <Empty>{unknown ? t(kind === "movie" ? "gtv.genre.unknownMovie" : "gtv.genre.unknownSeries", { genre }) : hasMore ? t("gtv.genre.noneYet") : t("gtv.genre.noneInLibrary")}</Empty>
+              )}
             </div>
-          )
+          )}</>} />
         })()
       )}
     </Shell>

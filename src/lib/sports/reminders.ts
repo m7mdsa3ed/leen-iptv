@@ -2,6 +2,7 @@ import { useApp } from "@/lib/store"
 import { notify } from "@/lib/notify"
 import { fmt, t } from "@/lib/i18n"
 import { upcomingGames } from "./games"
+import { teamKey } from "./pure"
 
 /* Fired reminders are device-local (in localStorage, never synced) so two devices each get their own heads-up. */
 const FKEY = "leen-sports-fired"
@@ -33,7 +34,7 @@ export async function reminderTick() {
     if (g.status !== "scheduled" || f[g.id]) continue
     if (g.startMs - lead <= now && now < g.startMs) {
       f[g.id] = now; changed = true
-      const mine = follows.find((x) => x.teamId === g.home.id || x.teamId === g.away.id)
+      const mine = follows.find((x) => teamKey(x.teamId) === teamKey(g.home.id) || teamKey(x.teamId) === teamKey(g.away.id))
       notify(t("pages.sports.notifyTitle", { team: mine?.kind === "league" || !mine ? g.home.name : mine.name }), t("pages.sports.notifyBody", { home: g.home.name, away: g.away.name, time: fmt.time(g.startMs) }))
     }
   }

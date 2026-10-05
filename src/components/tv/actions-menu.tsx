@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Check } from "lucide-react"
 import { KEY } from "@/lib/nav"
 
-export type Act = { label: string; run: () => void }
+export type Act = { label: string; run: () => void; icon?: ReactNode; detail?: string; checked?: boolean } // checked set = a pick list (radio rows; focus starts on the checked one)
 type Trigger = { open: boolean; toggle: (e: React.MouseEvent<HTMLElement>) => void }
 
 /**
@@ -23,7 +24,7 @@ export function ActionsMenu({ items, trigger }: { items: Act[]; trigger: (t: Tri
   }
   useEffect(() => {
     if (!pos) return
-    requestAnimationFrame(() => box.current?.querySelector<HTMLElement>("[data-nav]")?.focus())
+    requestAnimationFrame(() => (box.current?.querySelector<HTMLElement>("[aria-checked=true]") ?? box.current?.querySelector<HTMLElement>("[data-nav]"))?.focus())
     const down = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node) && !trig.current?.contains(e.target as Node)) close(false) }
     document.addEventListener("pointerdown", down)
     return () => document.removeEventListener("pointerdown", down)
@@ -41,9 +42,14 @@ export function ActionsMenu({ items, trigger }: { items: Act[]; trigger: (t: Tri
           // Back / Esc close the menu only: stop it before the app-level handler (on window) navigates back
           onKeyDown={(e) => { if (e.keyCode === KEY.back || e.keyCode === KEY.esc || e.keyCode === KEY.bksp) { e.preventDefault(); e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); close() } }}
         >
-          {items.map((a) => (
-            <button key={a.label} data-nav role="menuitem" onClick={() => { close(); a.run() }} className="flex min-h-11 items-center rounded-xl px-4 text-start text-base hover:bg-foreground/10 focus-visible:bg-foreground/10">
-              {a.label}
+          {items.map((a, i) => (
+            <button key={i} data-nav role={a.checked === undefined ? "menuitem" : "menuitemradio"} aria-checked={a.checked} onClick={() => { close(); a.run() }} className="flex min-h-11 items-center gap-3 rounded-xl px-4 py-2 text-start text-base hover:bg-foreground/10 focus-visible:bg-foreground/10">
+              {a.icon}
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span dir="auto">{a.label}</span>
+                {a.detail && <span dir="auto" className="max-w-[min(28rem,70vw)] truncate text-sm text-muted-foreground">{a.detail}</span>}
+              </span>
+              {a.checked && <Check aria-hidden className="size-5 shrink-0" />}
             </button>
           ))}
         </div>

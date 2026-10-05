@@ -5,6 +5,7 @@ import { Logo } from "@/components/tv/ui"
 import { useSearch } from "@/layouts/hooks/use-search"
 import { useT } from "@/lib/i18n"
 import { navHooks } from "@/lib/nav"
+import { isSubmit } from "./keyboard"
 import { useSearchHistory } from "@/lib/search-history"
 import type { Item } from "@/lib/types"
 
@@ -31,13 +32,13 @@ function Panel() {
   const pick = (i: Item) => { S.open(i, S.live); closePalette() }
   const kind = (i: Item) => t(i.kind === "live" ? "search.live" : i.kind === "movie" ? "search.movie" : "search.series")
   return (
-    <div data-modal role="dialog" aria-modal="true" aria-label={t("common.search")} className="fixed inset-0 z-[55] flex justify-center bg-background/85 px-[var(--gx)] pb-[env(safe-area-inset-bottom)] pt-[max(5vh,env(safe-area-inset-top))]" onClick={closePalette}>
+    <div data-modal role="dialog" aria-modal="true" aria-label={t("common.search")} className="fixed inset-0 z-[55] flex justify-center bg-background/85 px-[var(--gx)] pb-[var(--safe-b)] pt-[max(5vh,var(--safe-t))]" onClick={closePalette}>
       <div className="flex h-full w-full max-w-[48rem] flex-col text-foreground" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 border-b border-[var(--fg-10)]">
           <SearchIcon className="size-6 shrink-0 text-muted-foreground" />
           <input ref={ref} dir="auto" data-nav data-autofocus="" type="search" enterKeyHint="search" autoComplete="off" value={S.q} placeholder={t("common.search")}
             onChange={(e) => S.setQ(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { if (list[0]) pick(list[0]); else H.add(S.q) } }}
+            onKeyDown={(e) => { if (isSubmit(e)) { if (list[0]) pick(list[0]); else H.add(S.q) } }}
             style={{ outline: "none", boxShadow: "none" }} className="h-20 min-w-0 flex-1 bg-transparent text-3xl outline-none placeholder:text-muted-foreground [html[data-mode=mobile]_&]:text-[16px] [&::-webkit-search-cancel-button]:hidden" />
           <button data-nav data-pill aria-label={t("common.close")} onClick={closePalette} className="grid size-11 place-items-center rounded-full text-muted-foreground"><X className="size-5" /></button>
         </div>

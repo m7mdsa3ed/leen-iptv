@@ -1,18 +1,38 @@
+import { useMemo } from "react"
 import { List, ListPlus, Lock, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { KEY } from "@/lib/nav"
-import { useApp, useLists, useProfile } from "@/lib/store"
+import { useApp, useLists, usePData, useProfile } from "@/lib/store"
+import { useCatalog } from "@/lib/catalog"
+import { useActiveFilter, useCatalogView, inSource } from "@/layouts/hooks/use-source-filter"
 import { findLock } from "@/lib/merge-pure"
 import type { Kind } from "@/lib/types"
 import { useMode } from "@/lib/device"
 import { useT } from "@/lib/i18n"
-import { askPin, groupLabel, useCatSide } from "./ui"
+import { askPin, CatCount, groupLabel, useCatSide } from "./ui"
 import { openListModal } from "./lists"
 
 export { liveRowMenu } from "./lists"
 
 export const FAV = "Favorites"
 export const ALL = "All"
+
+/** Titles behind each category pill, counted like the pages list them (picked sources only): All, Favorites, the user's live lists, categories. undefined = no count (genre pills). Shown in the sidebar. */
+export function useGroupCount(kind: Kind) {
+  const { byKind } = useCatalogView()
+  const byId = useCatalog((s) => s.byId)
+  const favs = usePData().favs
+  const lists = useLists()
+  const filter = useActiveFilter()
+  const m = useMemo(() => {
+    const m = new Map<string, number>([[ALL, byKind[kind].length]])
+    for (const i of byKind[kind]) m.set(i.group, (m.get(i.group) ?? 0) + 1)
+    m.set(FAV, favs.filter((id) => { const i = byId.get(id); return i?.kind === kind && inSource(i, filter) }).length) // via byId, like the pages: favorites of merged copies count
+    if (kind === "live") { const ids = new Set(byKind.live.map((i) => i.id)); for (const l of lists) m.set(l.name, l.items.filter((id) => ids.has(id)).length) }
+    return m
+  }, [byKind, kind, byId, favs, lists, filter])
+  return (g: string) => m.get(g)
+}
 
 /** Category pill row (all modes). Yellow key toggles the parental lock on the focused category. */
 export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups: string[]; active: string; onPick: (g: string) => void }) {
@@ -25,6 +45,7 @@ export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups
   const lockKey = (g: string) => findLock(p?.locked ?? [], kind, g)
   const mode = useMode()
   const ref = useCatSide()
+  const count = useGroupCount(kind)
   const toggle = async (g: string) => {
     if (g === FAV || g === ALL || !p?.pin) return
     const k = lockKey(g)
@@ -44,6 +65,7 @@ export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups
             {isList(g) && <List className="size-4" />}
             {lockKey(g) && <Lock className="size-4" />}
             <bdi>{groupLabel(g, t)}</bdi>
+            <CatCount n={count(g)} />
           </button>
         ))}
         {kind === "live" && (

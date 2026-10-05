@@ -56,5 +56,6 @@ const d: Dict = {
   "search.hint": "Type to search channels, movies and shows",
   "search.none": "No matches",
   "common.moreOptions": "More options",
+  "common.alpha": "Jump to letter",
 }
 export default d

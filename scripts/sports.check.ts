@@ -1,6 +1,6 @@
 // node scripts/sports.check.ts
 import assert from "node:assert/strict"
-import { LEAGUES, espnTeamId, splitTeamId, parseTeams, parseEvents, involving, norm, monthsBetween, competitionId, leagueOfId } from "../src/lib/sports/pure.ts"
+import { LEAGUES, espnTeamId, splitTeamId, parseTeams, parseEvents, involving, norm, monthsBetween, competitionId, leagueOfId, refFor, registerLeague, isWomenLeague, teamKey, EXTRA_LEAGUES, parseMatch } from "../src/lib/sports/pure.ts"
 
 const pl = LEAGUES.find((l) => l.league === "eng.1")!
 
@@ -58,13 +58,51 @@ assert.equal(involving(live, ["soccer/eng.1/999"]).length, 0)
 // competition ids are "sport/league"
 assert.equal(competitionId(pl), "soccer/eng.1")
 assert.equal(leagueOfId("soccer/eng.1")!.name, "Premier League")
-assert.equal(leagueOfId("soccer/nope"), undefined)
+assert.equal(leagueOfId("soccer/nope")!.name, "nope") // an unknown league falls back to its slug
 assert.equal(leagueOfId("soccer/eng.1/364"), undefined) // a team id is not a league
+assert.equal(refFor("soccer", "fifa.world").name, "World Cup")
+assert.equal(registerLeague({ sport: "soccer", league: "conmebol.america", name: "Copa America" }).name, "Copa America")
+assert.equal(refFor("soccer", "conmebol.america").name, "Copa America") // remembered
 
 // month buckets for the scoreboard query (inclusive of both ends)
 assert.deepEqual(monthsBetween(Date.UTC(2026, 9, 4), Date.UTC(2026, 11, 3)), ["202610", "202611", "202612"])
 assert.deepEqual(monthsBetween(Date.UTC(2026, 9, 1), Date.UTC(2026, 9, 31)), ["202610"])
 assert.deepEqual(monthsBetween(Date.UTC(2026, 9, 5), Date.UTC(2026, 9, 5)), ["202610"])
+
+// a match summary: header teams/scores + team-stat comparison
+{
+  const mm = parseMatch({ header: { competitions: [{ competitors: [
+    { homeAway: "home", team: { id: "349", displayName: "Ipswich Town" }, score: "0" },
+    { homeAway: "away", team: { id: "364", displayName: "Liverpool" }, score: "2", winner: true },
+  ], status: { type: { state: "post", detail: "FT" } }, date: "2026-09-04T19:00:00Z" }] },
+  boxscore: { teams: [
+    { homeAway: "home", statistics: [{ name: "possessionPct", label: "Possession", displayValue: "45.1" }, { name: "totalShots", label: "SHOTS", displayValue: "14" }] },
+    { homeAway: "away", statistics: [{ name: "possessionPct", label: "Possession", displayValue: "54.9" }, { name: "totalShots", label: "SHOTS", displayValue: "11" }] },
+  ] },
+  gameInfo: { venue: { fullName: "Portman Road" }, attendance: 29000, officials: [{ displayName: "A. Ref" }] } }, LEAGUES.find((l) => l.league === "eng.1")!, "401879288")
+  assert.equal(mm.status, "final")
+  assert.equal(mm.detail, "FT")
+  assert.equal(mm.home.team.name, "Ipswich Town")
+  assert.equal(mm.away.score, 2)
+  assert.equal(mm.away.winner, true)
+  assert.equal(mm.venue, "Portman Road")
+  assert.deepEqual(mm.stats, [{ label: "Possession", home: "45.1", away: "54.9" }, { label: "SHOTS", home: "14", away: "11" }])
+}
+
+// a team is the same team across competitions (a follow in one league sees its cup/foreign games)
+assert.equal(teamKey("soccer/caf.nations_qual/2620"), "soccer:2620")
+assert.equal(teamKey("soccer/fifa.friendly/2620"), "soccer:2620")
+const fr = parseEvents({ events: [{ id: "x", date: "2026-10-04T18:00:00Z", competitions: [{ competitors: [
+  { homeAway: "home", team: { id: "2620", displayName: "Egypt" } },
+  { homeAway: "away", team: { id: "467", displayName: "South Africa" } },
+] }] }] }, EXTRA_LEAGUES[0])
+assert.equal(involving(fr, ["soccer/caf.nations_qual/2620"]).length, 1)
+
+// women's leagues are told apart by their slug (eng.w.1 vs eng.1)
+assert.equal(isWomenLeague("eng.w.1"), true)
+assert.equal(isWomenLeague("caf.w.nations"), true)
+assert.equal(isWomenLeague("eng.1"), false)
+assert.equal(isWomenLeague("usa.nwsl"), false)
 
 // loose name matching
 assert.equal(norm("Atlético"), "atletico")

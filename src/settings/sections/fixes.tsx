@@ -3,7 +3,7 @@ import { ConfirmButton, Field, Pill, Row, SectionCard, Segmented } from "../cont
 import { Logo } from "@/components/tv/ui"
 import { openLogoMatch, openMatch } from "@/components/tv/match"
 import { logoState, useCatalog } from "@/lib/catalog"
-import { autoPick, exportFixes, failedKey, logoFixes, mergeFixes, metaFixes, parseFixes } from "@/lib/fixes-pure"
+import { autoPick, exportFixes, failedKey, logoFixes, mergeFixes, metaFixes, newestMetaFixes, parseFixes } from "@/lib/fixes-pure"
 import { fmt, useT } from "@/lib/i18n"
 import { loadLogoIndex } from "@/lib/logos"
 import type { LogoIndex } from "@/lib/logos-pure"
@@ -13,6 +13,7 @@ import { tmdbSearch } from "@/lib/meta/providers"
 import { matchKeyOf } from "@/lib/meta/title"
 import { allLookups, emptyLookups } from "@/lib/meta/cache"
 import { useApp, useProfile } from "@/lib/store"
+import { srcOfId } from "@/lib/merge-pure"
 import { useSync } from "@/lib/sync"
 import type { Item, MetaMatch } from "@/lib/types"
 
@@ -56,7 +57,11 @@ export default function FixesSection() {
     const live = sources.filter((s) => s.enabled !== false).flatMap((s) => st.raw(s.id).filter((i) => i.kind === "live" && open(i)))
     return logoFixes(live, ix, settings.logoMatch)
   }, [byKind, ix, settings.logoMatch, sources, profile]) // eslint-disable-line react-hooks/exhaustive-deps
-  const metaAll = useMemo(() => metaFixes([...byKind.movie, ...byKind.series].filter(open), failed, settings.metaMatch, looked), [byKind, failed, looked, settings.metaMatch, profile]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Plex / Jellyfin titles carry the server's own metadata (poster, plot, cast): nothing to fix here, fix it on the server
+  const metaAll = useMemo(() => {
+    const server = new Set(sources.filter((x) => x.type === "plex" || x.type === "jellyfin").map((x) => x.id))
+    return metaFixes([...byKind.movie, ...byKind.series].filter((i) => open(i) && !server.has(srcOfId(i.id))), failed, settings.metaMatch, looked)
+  }, [byKind, failed, looked, settings.metaMatch, profile, sources]) // eslint-disable-line react-hooks/exhaustive-deps
   const metas = useMemo(() => metaAll.filter((m) => m.reason !== "unchecked"), [metaAll])
   const unchecked = useMemo(() => metaAll.filter((m) => m.reason === "unchecked"), [metaAll])
   const hasTmdb = !!normalizeCfg(settings.meta).find((c) => c.id === "tmdb")?.key
@@ -90,7 +95,7 @@ export default function FixesSection() {
     const cfgs = normalizeCfg(useApp.getState().settings.meta)
     const tm = cfgs.find((c) => c.id === "tmdb" && c.enabled && c.key)
     if (!tm) return
-    const items = list.map((r) => r.item)
+    const items = newestMetaFixes(list).map((r) => r.item)
     const probe = tab === "unchecked"
     let pending: Record<string, MetaMatch> = {}
     const flush = () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Trash2 } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { ConfirmButton } from "@/settings/controls"
@@ -36,6 +36,14 @@ export default function HistoryPage() {
   const go = useRoute((s) => s.go)
   const [filter, setFilter] = useState<Filter>("all")
   const [shown, setShown] = useState(PAGE)
+  // "Load more" inserts rows above its own pill, which would sit far off-screen with focus on it: focus the first new row instead
+  const list = useRef<HTMLDivElement>(null), focusRow = useRef(-1)
+  const more = () => { focusRow.current = shown; setShown(shown + PAGE) }
+  useEffect(() => {
+    if (focusRow.current < 0) return
+    list.current?.querySelectorAll<HTMLElement>("[data-row]")[focusRow.current]?.focus()
+    focusRow.current = -1
+  }, [shown])
 
   useEffect(() => { if (profileId) void useHistory.getState().load(profileId) }, [profileId])
 
@@ -70,7 +78,7 @@ export default function HistoryPage() {
             <ConfirmButton confirmLabel={t("pages.history.pressAgain")} onConfirm={() => useHistory.getState().clear()}>{t("pages.history.clear")}</ConfirmButton>
           )}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pb-6 [--s:1.02]">
+        <div ref={list} className="min-h-0 flex-1 overflow-y-auto pb-6 [--s:1.02]">
           {!total ? <Empty>{track ? t("pages.history.empty") : t("pages.history.emptyOff")}</Empty> : days.map(([k, rows]) => {
             if (budget <= 0) return null
             const part = rows.slice(0, budget)
@@ -84,7 +92,7 @@ export default function HistoryPage() {
                     const pct = r.s.dur && r.s.pos ? Math.min(100, (r.s.pos / r.s.dur) * 100) : 0
                     return (
                       <div key={r.key} className="flex items-center gap-3 rounded-2xl bg-surface p-2 pe-3">
-                        <button data-nav disabled={!tg} onClick={() => tg && void open(tg, [tg])} className="flex min-w-0 flex-1 items-center gap-4 rounded-2xl p-1 text-start disabled:opacity-60">
+                        <button data-nav data-row disabled={!tg} onClick={() => tg && void open(tg, [tg])} className="flex min-w-0 flex-1 items-center gap-4 rounded-2xl p-1 text-start disabled:opacity-60">
                           <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-2xl bg-surface-2 md:w-40">
                             {r.s.logo && <img src={r.s.logo} alt="" loading="lazy" decoding="async" className={r.s.kind === "live" ? "size-full object-contain p-3" : "size-full object-cover"} />}
                             {pct > 0 && pct < 97 && <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} /></div>}
@@ -104,7 +112,7 @@ export default function HistoryPage() {
               </section>
             )
           })}
-          {total > shown && <div className="flex justify-center pb-4"><Pill onClick={() => setShown(shown + PAGE)}>{t("pages.history.more")}</Pill></div>}
+          {total > shown && <div className="flex justify-center pb-4"><Pill onClick={more}>{t("pages.history.more")}</Pill></div>}
         </div>
       </div>
     </Shell>

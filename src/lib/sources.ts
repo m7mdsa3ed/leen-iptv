@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { useApp } from "./store"
+import { useCatalog } from "./catalog"
 import type { Source } from "./types"
 import { srcOfId } from "./merge-pure"
 
@@ -36,5 +37,9 @@ export function useSources(): SourceMeta[] {
 /** Readable text color (dark or white) for a chip with 6-digit hex background. */
 export const onColor = (hex: string) => { const n = parseInt(hex.slice(1, 7), 16) || 0; return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150 ? "#111111" : "#ffffff" }
 
-/** One boolean selector: badges show with more than one enabled source and settings.sourceBadges on. Cheap per tile. */
-export const useBadges = () => useApp((s) => s.settings.sourceBadges !== false && s.sources.filter((x) => x.enabled !== false).length > 1)
+/** Badges show with more than one connected source (enabled, loading or loaded; one that failed to load does not count) and settings.sourceBadges on. Two primitive selectors, cheap per tile. */
+export const useBadges = () => {
+  const on = useApp((s) => s.settings.sourceBadges !== false)
+  const connected = useCatalog((c) => Object.values(c.sources).filter((x) => x.status !== "error").length) // catalog.sources only holds enabled sources (loadAll drops the rest)
+  return on && connected > 1
+}

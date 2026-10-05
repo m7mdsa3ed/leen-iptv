@@ -23,7 +23,7 @@ export default function Profiles() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center gap-8 overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] md:justify-center md:gap-12">
+    <div className="flex h-full flex-col items-center gap-8 overflow-y-auto bg-background p-4 pt-[max(1rem,var(--safe-t))] pb-[max(1rem,var(--safe-b))] md:justify-center md:gap-12">
       <div className="flex flex-col items-center gap-3"><LeenMark className="size-16" /><div className="text-muted-foreground"><span className="wordmark text-3xl text-foreground">Leen</span> TV</div></div>
       <h1 className="text-3xl font-medium tracking-tight md:text-5xl">{t("pages.profiles.who")}</h1>
       <div className="flex flex-wrap justify-center gap-4 md:gap-8">

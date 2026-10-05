@@ -29,7 +29,7 @@ export default function CategoryPage({ id }: { id: string }) {
           </div>
           <SourceFilter />
           </>)
-          if (items.length) return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => open(i)} />} head={head} className="-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]" />
+          if (items.length) return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => open(i)} />} head={head} className="under-top" />
           return (
             <div className="flex h-full flex-col">
               {head}

@@ -7,10 +7,11 @@ import Browse from "./pages/browse"
 import Live from "./pages/live"
 import Library from "./pages/library"
 import Detail from "./pages/detail"
+import Episode from "./pages/episode"
 import Profiles from "./pages/profiles"
 import Category from "./pages/category"
 import Genre from "./pages/genre"
 import Settings from "./pages/settings"
 
-const def: LayoutDef = { id: "googletv", Shell, Home, tabs: TABS_GOOGLETV, pages: { movies: Browse, series: Browse, live: Live, library: Library, detail: Detail, profiles: Profiles, category: Category, genre: Genre, settings: Settings } }
+const def: LayoutDef = { id: "googletv", Shell, Home, tabs: TABS_GOOGLETV, pages: { movies: Browse, series: Browse, live: Live, library: Library, detail: Detail, episode: Episode, profiles: Profiles, category: Category, genre: Genre, settings: Settings } }
 export default def

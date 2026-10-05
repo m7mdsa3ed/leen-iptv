@@ -17,7 +17,7 @@ export default function Detail({ id }: { id: string }) {
   const genreList = D.genres
   if (!item) return null
   return (
-    <div className="relative h-full overflow-y-auto bg-background px-[var(--gx)] pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
+    <div className="relative h-full overflow-y-auto bg-background px-[var(--gx)] pb-[max(2.5rem,var(--safe-b))] pt-[max(1.5rem,var(--safe-t))]">
       {backdrops.length > 0 && <Backdrop srcs={backdrops} className="absolute inset-x-0 top-0 h-[34rem] opacity-30" />}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-r rtl:bg-gradient-to-l from-background via-background/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-t from-background via-transparent to-transparent" />
@@ -47,7 +47,7 @@ export default function Detail({ id }: { id: string }) {
             )}
             {err && <p role="alert" className="mt-3 text-sm text-destructive">{err}</p>}
             <div className="-ms-1 mt-6 flex flex-wrap items-center gap-3 p-1">
-              <Pill variant="primary" data-autofocus="" onClick={D.playMain} disabled={!D.canPlay}>
+              <Pill variant="primary" data-autofocus="" onClick={() => D.playMain()} disabled={!D.canPlay}>
                 <Play className="fill-current" />{D.resumeLabel}
               </Pill>
               <RoundButton label={fav ? t("pages.detail.removeFav") : t("pages.detail.addFav")} active={fav} onClick={toggleFav}>

@@ -1,10 +1,10 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Lock, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Avatar, LeenMark, Pill } from "@/components/gtv"
 import { askPin } from "@/components/tv/ui"
 import { useApp } from "@/lib/store"
-import { startPage, useRoute } from "@/lib/nav"
+import { startPage, useBackStep, useRoute } from "@/lib/nav"
 import { useT } from "@/lib/i18n"
 
 export default function Profiles() {
@@ -14,6 +14,9 @@ export default function Profiles() {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState("")
   const [pin, setPin] = useState("")
+  useBackStep(adding, () => setAdding(false)) // Back closes the new-profile form, not the exit prompt
+  const nameRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (adding) nameRef.current?.focus({ preventScroll: true }) }, [adding]) // the "+" button unmounts: focus goes to the form, not the neighbouring profile
 
   const pick = async (id: string) => {
     const p = profiles.find((x) => x.id === id)!
@@ -23,7 +26,7 @@ export default function Profiles() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center gap-8 overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] md:justify-center md:gap-12">
+    <div className="flex h-full flex-col items-center gap-8 overflow-y-auto bg-background p-4 pt-[max(1rem,var(--safe-t))] pb-[max(1rem,var(--safe-b))] md:justify-center md:gap-12">
       <LeenMark className="size-12" />
       <h1 className="text-3xl font-medium tracking-tight md:text-4xl">{t("gtv.profiles.title")}</h1>
       <div data-nav-group data-nav-wrap className="flex max-w-full justify-center gap-4 overflow-x-auto p-4 no-scrollbar md:gap-8">
@@ -45,10 +48,10 @@ export default function Profiles() {
       </div>
       {adding && (
         <div className="flex w-full max-w-[34rem] flex-col gap-3 rounded-[28px] bg-surface p-6">
-          <Input data-nav className="h-12 rounded-2xl text-base md:h-14 md:text-xl" dir="auto" placeholder={t("gtv.profiles.name")} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input ref={nameRef} data-nav className="h-12 rounded-2xl text-base md:h-14 md:text-xl" dir="auto" placeholder={t("gtv.profiles.name")} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
           <Input data-nav className="h-12 rounded-2xl text-base md:h-14 md:text-xl" dir="ltr" placeholder={t("gtv.profiles.pin")} type="password" autoComplete="off" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} />
           <div className="flex gap-3 pt-1">
-            <Pill variant="primary" disabled={!name.trim()} onClick={() => { addProfile(name.trim(), pin.length === 4 ? pin : undefined); setAdding(false); setName(""); setPin("") }}>{t("gtv.profiles.save")}</Pill>
+            <Pill variant="primary" disabled={!name.trim() || (pin.length > 0 && pin.length !== 4)} onClick={() => { addProfile(name.trim(), pin.length === 4 ? pin : undefined); setAdding(false); setName(""); setPin("") }}>{t("gtv.profiles.save")}</Pill>
             <Pill variant="ghost" onClick={() => setAdding(false)}>{t("gtv.profiles.cancel")}</Pill>
           </div>
         </div>

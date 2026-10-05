@@ -6,6 +6,8 @@ const d: Dict = {
   "hooks.sort.default": "Default",
   "hooks.sort.az": "A-Z",
   "hooks.sort.rating": "Top rated",
+  "hooks.sort.added": "Recently added",
+  "hooks.sort.year": "Newest",
   "hooks.detail.resume": "Resume",
   "hooks.detail.play": "Play",
   "hooks.detail.watched": "Watched",

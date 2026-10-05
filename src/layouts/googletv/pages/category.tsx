@@ -29,15 +29,8 @@ export default function CategoryPage({ id }: { id: string }) {
           </div>
           <SourceFilter />
           </>)
-          if (items.length) return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => open(i)} />} head={head} className="-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]" />
-          return (
-            <div className="flex h-full flex-col">
-              {head}
-              <div className="m-fade min-h-0 flex-1" style={{ "--i": 1 } as React.CSSProperties}>
-            <Empty>{t("gtv.category.noMatch")}</Empty>
-              </div>
-            </div>
-          )
+          // one tree whether or not anything matches: a different root would remount the filter input mid-typing
+          return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => open(i)} />} head={<>{head}{!items.length && <div className="h-[50vh]"><Empty>{t("gtv.category.noMatch")}</Empty></div>}</>} className="under-top" />
         })()
       )}
     </Shell>

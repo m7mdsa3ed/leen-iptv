@@ -1,10 +1,9 @@
 import { useEffect, useState, type ReactNode, type RefObject } from "react"
-import { Expand, Info, ListVideo, MessageSquareText, Minimize, MoonStar, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Settings2, SkipBack, SkipForward, Star, Volume2, VolumeX } from "lucide-react"
+import { Expand, Info, ListVideo, MessageSquareText, Minimize, MoonStar, Pause, Play, RotateCcw, RotateCw, Settings2, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
 import { useVideoTime } from "./use-time"
 import { mmss } from "./util"
-import { QualityBadge, qualityDetail, type Stats } from "./stats"
 import type { MenuKind } from "./menus"
 
 /** Time + seek bar. Owns the timeupdate subscription so the rest of the player never re-renders for it. */
@@ -37,10 +36,10 @@ export type ControlsProps = {
   on: boolean; live: boolean; tv: boolean; touch: boolean; vref: RefObject<HTMLVideoElement | null>
   paused: boolean; queueLen: number
   sleepAt: number | null // active sleep timer: the wall-clock time it fires, else null
-  canPip: boolean; pip: boolean; fs: boolean; isFav: boolean; stats: Stats | null; vol: number; muted: boolean
+  fs: boolean; vol: number; muted: boolean
   onPrev: () => void; onNext: () => void; onToggle: () => void; onSeek: (d: number) => void; onSeekFrac: (f: number) => void
-  onMute: () => void; onVolume: (x: number) => void; onFav: () => void; onMenu: (m: MenuKind) => void
-  onPip: () => void; onFs: () => void; onMore: () => void; onChannels: () => void
+  onMute: () => void; onVolume: (x: number) => void; onMenu: (m: MenuKind) => void
+  onFs: () => void; onMore: () => void; onChannels: () => void
 }
 
 /** Minutes left on an active sleep timer ("30 min", "1 min"). Ticks on its own so Player never re-renders every second. */
@@ -64,18 +63,17 @@ function Tool({ label, text, active, more, onClick, children }: { label: string;
   )
 }
 
-/** Bottom block: seek bar + times (VOD), then transport (left) and a short tools row (right): options are grouped into Audio & subtitles and Settings sheets; More (series info, episodes, cast) is the last tool. Sizes come from --pl-h (player.css), so phone, desktop and TV share one layout. */
+/** Bottom block: seek bar + times (VOD), then transport (left) and a short tools row (right): Audio & subtitles, Settings (quality, speed, aspect, sleep, favorite, picture in picture, playback info), More (series info, episodes, cast); the sleep chip only while a timer runs. Sizes come from --pl-h (player.css), so phone, desktop and TV share one layout. */
 export function Controls(c: ControlsProps) {
   const t = useT()
   return (
-    <div data-on={c.on ? "" : undefined} data-controls className="pl-layer pl-bottom pointer-events-none px-[var(--gx)] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div data-on={c.on ? "" : undefined} data-controls className="pl-layer pl-bottom pointer-events-none px-[var(--gx)] pb-[max(0.75rem,var(--safe-b))]">
       {!c.live && <SeekRow vref={c.vref} on={c.on} onSeekFrac={c.onSeekFrac} onToggle={c.onToggle} />}
-      {c.stats && <div className="mb-1 hidden text-end text-sm text-white/60 sm:block">{qualityDetail(c.stats)}</div>}
       <div className="pl-bar-row pointer-events-auto">
         <div dir="ltr" data-ltr className="pl-transport">
           {c.queueLen > 1 && <RoundButton label={t("player.previous")} className="pl-btn pl-rb" onClick={c.onPrev}><SkipBack /></RoundButton>}
           {!c.live && <RoundButton label={t("player.back10")} className="pl-btn pl-rb" onClick={() => c.onSeek(-10)}><RotateCcw /></RoundButton>}
-          <RoundButton data-play data-primary label={c.paused ? t("player.play") : t("player.pause")} className="pl-primary pl-rb pl-rb-main [&_svg]:size-7" onClick={c.onToggle}>{c.paused ? <Play className="fill-current" /> : <Pause className="fill-current" />}</RoundButton>
+          <RoundButton data-play data-autofocus="" label={c.paused ? t("player.play") : t("player.pause")} className="pl-btn pl-rb pl-rb-main [&_svg]:size-7" onClick={c.onToggle}>{c.paused ? <Play className="fill-current" /> : <Pause className="fill-current" />}</RoundButton>
           {!c.live && <RoundButton label={t("player.forward10")} className="pl-btn pl-rb" onClick={() => c.onSeek(10)}><RotateCw /></RoundButton>}
           {c.queueLen > 1 && <RoundButton label={t("player.next")} className="pl-btn pl-rb" onClick={c.onNext}><SkipForward /></RoundButton>}
           {!c.tv && (
@@ -86,14 +84,11 @@ export function Controls(c: ControlsProps) {
           )}
         </div>
         <div className="pl-tools">
-          {!c.touch && <Tool label={t("player.favorite")} active={c.isFav} onClick={c.onFav}><Star className={c.isFav ? "fill-yellow-400 text-yellow-400" : ""} /></Tool>}
           {c.live && <Tool label={t("player.channels")} text={t("player.channels")} onClick={c.onChannels}><ListVideo /></Tool>}
           <Tool label={t("player.av")} text={t("player.av")} onClick={() => c.onMenu("av")}><MessageSquareText /></Tool>
           <Tool label={t("player.settings")} text={t("player.settings")} onClick={() => c.onMenu("settings")}><Settings2 /></Tool>
           {c.sleepAt && <Tool label={t("player.sleep.title")} text={<SleepLeft at={c.sleepAt} />} active onClick={() => c.onMenu("sleep")}><MoonStar /></Tool>}
-          {c.canPip && <Tool label={t("player.pip")} active={c.pip} onClick={c.onPip}><PictureInPicture2 /></Tool>}
           {!c.tv && <Tool label={t("player.fullscreen")} onClick={c.onFs}>{c.fs ? <Minimize /> : <Expand />}</Tool>}
-          {c.stats && <QualityBadge s={c.stats} />}
           <Tool more label={t("player.moreOpen")} text={t("player.more")} onClick={c.onMore}><Info /></Tool>
         </div>
       </div>

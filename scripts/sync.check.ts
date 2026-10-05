@@ -1,6 +1,6 @@
 // node scripts/sync.check.ts
 import assert from "node:assert/strict"
-import { applySnapshot, buildSnapshot, emptySnap, flatten, merge, stable, stamp, type AppSlice, type Stamp } from "../src/lib/sync/merge.ts"
+import { applySnapshot, buildSnapshot, clockSkewMin, dupSources, emptySnap, mergeSummary, flatten, merge, stable, stamp, type AppSlice, type Stamp } from "../src/lib/sync/merge.ts"
 
 const slice = (o: Partial<AppSlice> = {}): AppSlice => ({ profiles: [{ id: "p1", name: "Me" } as never], sources: [], data: { p1: { favs: [], recents: [], progress: {} } }, settings: { theme: "system", trackHistory: true }, ...o })
 const same = (a: unknown, b: unknown) => assert.equal(stable(a), stable(b))
@@ -125,3 +125,41 @@ console.log("logo match ok")
   assert.deepEqual(applySnapshot(ap.slice, M2).slice.data.p1.follows, [liv])
 }
 console.log("follows ok")
+
+// clock skew: within 2 min = fine, beyond = minutes off (either direction)
+assert.equal(clockSkewMin(1e9, 1e9 + 119000), 0)
+assert.equal(clockSkewMin(1e9, 1e9 + 600000), 10)
+assert.equal(clockSkewMin(1e9 + 3600000, 1e9), 60)
+console.log("clock skew ok")
+
+// merge summary: counts what the other device changed, by kind
+{
+  const a = slice({ sources: [{ id: "s1" }] as never })
+  const b = slice({ sources: [{ id: "s1" }, { id: "s2" }] as never, data: { p1: { favs: ["x"], recents: [], progress: {} } } })
+  const la = buildSnapshot(a, stamp({}, flatten(a), 10), {}, 20)
+  const lb = buildSnapshot(b, stamp({}, flatten(b), 30), {}, 40)
+  const n = mergeSummary(la, merge(la, lb))
+  assert.equal(n.sources, 2) // s2 is new and s1 was re-stamped later by b; ponytail: counts any entity that differs
+  assert.equal(mergeSummary(la, la).sources + mergeSummary(la, la).other, 0)
+}
+console.log("merge summary ok")
+
+// per-device server pick: changing only `server` on a multi-address source is not a change, and a merge keeps this device's pick
+{
+  const jf = (server: string) => ({ id: "j1", type: "jellyfin", server, localServer: "http://192.168.1.5:8096", remoteServer: "https://jf.example.com", serverId: "abc", userId: "u" })
+  const a = slice({ sources: [jf("http://192.168.1.5:8096")] as never })
+  const st = stamp({}, flatten(a), 10)
+  const a2 = slice({ sources: [jf("https://jf.example.com")] as never })
+  assert.equal(stamp(st, flatten(a2), 99), st) // no restamp, so no ping-pong between devices
+  const remote = buildSnapshot(a, st, {}, 20)
+  const b = slice({ sources: [jf("https://jf.example.com")] as never })
+  const ap = applySnapshot(b, remote)
+  assert.equal((ap.slice.sources[0] as { server?: string }).server, "https://jf.example.com") // B keeps its own active address
+  assert.equal(stamp(ap.stamps, flatten(ap.slice), 99), ap.stamps)
+  // a plain source (single address) still syncs its server
+  const x1 = slice({ sources: [{ id: "x", type: "xtream", server: "http://a" }] as never }), x2 = slice({ sources: [{ id: "x", type: "xtream", server: "http://b" }] as never })
+  assert.notEqual(flatten(x1)["s/x"].h, flatten(x2)["s/x"].h)
+}
+// duplicate sources: same account on the same server under two ids
+assert.equal(dupSources([{ id: "1", type: "xtream", server: "http://h/", user: "u" }, { id: "2", type: "xtream", server: "http://H", user: "u" }, { id: "3", type: "xtream", server: "http://h", user: "v" }] as never), 1)
+console.log("server pick + dupes ok")

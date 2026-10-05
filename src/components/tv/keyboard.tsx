@@ -22,6 +22,10 @@ const TEXT = /^(text|search|email|password|url|tel|number)$/
 const isText = (t: EventTarget | null): t is El => t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && TEXT.test(t.type))
 const enabled = () => { const k = useApp.getState().settings.keyboard ?? "auto"; return k === "on" || (k === "auto" && isTv) }
 
+/** Enter in a text field means submit, except OK on the remote while the on-screen keyboard is on: that opens the keyboard (nav.ts) and must not also submit.
+    The keyboard's Done key sends an untrusted Enter, which does submit. */
+export const isSubmit = (e: React.KeyboardEvent) => e.keyCode === 13 && !(e.nativeEvent.isTrusted && enabled())
+
 let lastLang: "en" | "ar" | null = null
 const NUMS = "1234567890".split("")
 const MARKS = ["َ", "ً", "ُ", "ٌ", "ِ", "ٍ", "ّ", "ْ"] // fatha .. sukun
@@ -77,8 +81,13 @@ export function OnScreenKeyboard() {
     return [...starts, ...has].slice(0, 6)
   }, [isSearch, q, items, history])
   if (!el) return null
-  const apply = (v: string, p: number) => { setText(v); setPos(p); write(el, v) }
-  const type = (s: string) => { apply(text.slice(0, pos) + s + text.slice(pos), pos + s.length); if (layer === "up" && lang === "en") setLayer("low") }
+  // the field is the truth: a form that filters what is typed (PIN: digits only) must not leave the keyboard's own copy out of step
+  const apply = (v: string, p: number) => { write(el, v); const cur = el.value; setText(cur); setPos(cur === v ? p : cur.length) }
+  const type = (s: string) => {
+    if (el.maxLength > 0 && el.value.length + s.length > el.maxLength) return // e.g. the 4-digit profile PIN
+    apply(text.slice(0, pos) + s + text.slice(pos), pos + s.length)
+    if (layer === "up" && lang === "en") setLayer("low")
+  }
   const back = () => pos > 0 && apply(text.slice(0, pos - 1) + text.slice(pos), pos - 1)
   const enter = () => {
     if (el instanceof HTMLTextAreaElement) return type("\n")
@@ -95,7 +104,7 @@ export function OnScreenKeyboard() {
 
   return (
     <div data-modal data-kbd role="dialog" aria-modal="true" aria-label={t("kb.title")} className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/50 sm:items-center sm:pb-6" onClick={closeKeyboard}>
-      <div dir="ltr" className="flex w-full max-w-[64rem] flex-col gap-1.5 rounded-t-[28px] bg-surface p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:gap-2 sm:rounded-[28px] sm:p-4 md:p-6" onClick={(e) => e.stopPropagation()}>
+      <div dir="ltr" className="flex w-full max-w-[64rem] flex-col gap-1.5 rounded-t-[28px] bg-surface p-2 pb-[max(0.5rem,var(--safe-b))] shadow-2xl sm:gap-2 sm:rounded-[28px] sm:p-4 md:p-6" onClick={(e) => e.stopPropagation()}>
         <div dir="auto" className="mb-1 flex min-h-12 min-w-0 items-center overflow-hidden rounded-2xl bg-surface-2 px-4 text-xl ring-2 ring-primary/60 md:min-h-14 md:text-2xl">
           {lit(shownText.slice(0, pos))}<span aria-hidden className="mx-px inline-block h-7 w-0.5 animate-pulse bg-foreground" />{lit(shownText.slice(pos))}
           {!text && <span className="text-muted-foreground">{el.placeholder || el.getAttribute("aria-label") || ""}</span>}
@@ -116,7 +125,7 @@ export function OnScreenKeyboard() {
           return (
             <div key={i} className={`flex gap-1 sm:gap-2 ${i === 1 ? "px-[3%]" : ""}`}>
               {i === 2 && layer !== "sym" && <Key kind="fn" wide={1.6} on={layer === "up"} label={t("kb.shift")} onClick={() => setLayer(layer === "up" ? "low" : "up")}><ArrowBigUp /></Key>}
-              {cs.map((c, k) => <Key key={c + k} auto={i === 1 && k === 3} onClick={() => type(c)}>{shown(c)}</Key>)}
+              {cs.map((c, k) => <Key key={k} auto={i === 1 && k === 3} onClick={() => type(c)}>{shown(c)}</Key>)}
               {i === 2 && <Key kind="fn" wide={1.6} label={t("kb.backspace")} onClick={back}><Delete /></Key>}
             </div>
           )
@@ -138,7 +147,7 @@ export function OnScreenKeyboard() {
 
 /** Wire the keyboard into the app: OK/click in a text field opens it; inputmode=none keeps the system keyboard away. Call once. */
 export function installKeyboard() {
-  navHooks.text = (el) => { if (!enabled() || el.readOnly || el.disabled) return false; useKbd.setState({ el }); return true }
+  navHooks.text = (el) => { if (!el.isConnected || !enabled() || el.readOnly || el.disabled) return false; useKbd.setState({ el }); return true }
   const onFocusIn = (e: FocusEvent) => { if (enabled() && isText(e.target) && e.target instanceof HTMLInputElement) e.target.inputMode = "none" }
   const onClick = (e: MouseEvent) => {
     const el = e.target

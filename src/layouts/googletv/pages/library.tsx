@@ -21,7 +21,7 @@ export default function Library() {
   const tile = "flex h-28 w-64 shrink-0 flex-col justify-between rounded-2xl p-4 text-start"
   return (
     <Shell page="library" title={t("gtv.library.title")}>
-      <div data-under className="no-scrollbar -mx-[var(--gx)] -mt-[var(--hdr)] h-full overflow-y-auto px-[var(--gx)] pt-[var(--hdr)] [--up:var(--hdr)]">
+      <div className="under-top under-bottom no-scrollbar -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
         <SourceFilter className="mb-2" />
         {status !== "ready" ? <><SkelRail variant="wide" /><SkelRail /></> : (
           <>

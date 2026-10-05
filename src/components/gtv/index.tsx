@@ -33,7 +33,7 @@ export function useStaged(children: ReactNode) {
   const kids = Children.toArray(children)
   const [all, setAll] = useState(!isTv || kids.length <= HEAD)
   useEffect(() => { if (all) return; const id = setTimeout(() => setAll(true), 250); return () => clearTimeout(id) }, [all])
-  return all ? children : kids.slice(0, HEAD)
+  return all ? kids : kids.slice(0, HEAD) // both lists come from toArray (same keys): the first cards are not remounted, and so not stripped of focus, when the rest arrives
 }
 function RailBody({ title, children, className, onSeeAll }: { title?: ReactNode; children: ReactNode; className?: string; onSeeAll?: () => void }) {
   const t = useT()

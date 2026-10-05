@@ -5,6 +5,11 @@
 export type SyncConfig = { url: string; anonKey: string }
 /** A signed-in session (GoTrue shape; another adapter maps its own onto it). */
 export type SyncSession = { access: string; refresh: string; exp: number; id: string; email: string }
+export type PlaybackPresence = {
+  device_id: string; device_name: string; profile_name: string; item_id: string; item_name: string
+  item_kind: "live" | "movie" | "episode"; status: "playing" | "paused"
+  position: number; duration: number; updated_at: string
+}
 
 /** The persistence + auth backend. Everything src/lib/sync does goes through this port. */
 export interface SyncBackend {
@@ -25,14 +30,18 @@ export interface SyncBackend {
   refresh(c: SyncConfig, s: SyncSession): Promise<SyncSession | null>
   rpc(c: SyncConfig, name: string, body: unknown, token?: string): Promise<unknown>
   logout(c: SyncConfig, s: SyncSession): Promise<unknown>
-  pull(c: SyncConfig, s: SyncSession): Promise<{ data: string; updated_at: string } | null>
+  pull(c: SyncConfig, s: SyncSession): Promise<{ row: { data: string; updated_at: string } | null; serverTime?: number }>
   push(c: SyncConfig, s: SyncSession, data: string, base: string | null, at: string): Promise<boolean>
   del(c: SyncConfig, s: SyncSession): Promise<unknown>
   /** shared metadata cache (server table meta_cache) */
   metaGet(c: SyncConfig, s: SyncSession, key: string): Promise<{ data: unknown; fetched_at: string } | null>
   metaCount(c: SyncConfig, s: SyncSession): Promise<{ total: number; ids: number }>
   metaPut(c: SyncConfig, s: SyncSession, key: string, data: unknown): Promise<unknown>
+  presencePut(c: SyncConfig, s: SyncSession, presence: PlaybackPresence): Promise<unknown>
+  presenceGet(c: SyncConfig, s: SyncSession): Promise<PlaybackPresence[]>
+  presenceRemove(c: SyncConfig, s: SyncSession, deviceId: string, itemId: string): Promise<unknown>
+  presencePrune(c: SyncConfig, s: SyncSession, before: string): Promise<unknown>
 }
 
 // Sports ports live with the sports mappers (kept alias-free so the pure module stays node-runnable).
-export type { Follow, GameStatus, LeagueRef, SportsCompetition, SportsConfig, SportsGame, SportsProvider, SportsTeam } from "../sports/types"
+export type { Follow, GameStatus, LeagueRef, MatchRef, MatchSide, MatchStatRow, SportsCompetition, SportsConfig, SportsGame, SportsMatch, SportsProvider, SportsTeam } from "../sports/types"

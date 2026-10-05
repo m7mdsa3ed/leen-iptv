@@ -1,7 +1,8 @@
 // Pure Jellyfin helpers (no '@/' imports, no DOM) so `node scripts/jellyfin.check.ts` can run them.
-import type { Episode, Item } from "./types"
+import type { Episode, Item, Watch } from "./types"
 import { isLanHost } from "./plex-pure.ts"
-import { jfStream } from "./meta/facts-pure.ts"
+import { hasStreamFacts, jfStream } from "./meta/facts-pure.ts"
+import { day } from "./browse-pure.ts"
 
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 /** (item id, image type, max width, tag) -> image URL. */
@@ -50,6 +51,8 @@ export function mapItem(m: J, o: { sourceId: string; group: string; img: Img }):
     plot: m.Overview || undefined,
     rating: m.CommunityRating ? Number(m.CommunityRating).toFixed(1) : undefined,
     year: m.ProductionYear ? String(m.ProductionYear) : undefined,
+    released: day(m.PremiereDate),
+    added: Math.floor(Date.parse(m.DateCreated) / 1000) || undefined,
     genres: Array.isArray(m.Genres) ? m.Genres.map(String) : [],
     resume: fromTicks(m.UserData?.PlaybackPositionTicks),
     dur: fromTicks(m.RunTimeTicks),
@@ -79,8 +82,18 @@ export function mapEpisode(e: J, series: Item, sourceId: string, img: Img): Epis
       plot: e.Overview || undefined,
       resume: fromTicks(e.UserData?.PlaybackPositionTicks),
       dur: sec,
+      ...(hasStreamFacts(jfStream(e)) ? { stream: jfStream(e) } : {}),
     },
   }
+}
+
+/** Jellyfin Movie/Episode with UserData -> Watch; undefined when never played. A resume position wins over Played (a rewatch in progress). */
+export function jfWatch(m: J, sourceId: string): Watch | undefined {
+  const u = m.UserData ?? {}, dur = fromTicks(m.RunTimeTicks) ?? 0
+  const pos = fromTicks(u.PlaybackPositionTicks) ?? (u.Played ? dur : 0)
+  if (!dur || !pos || (m.Type !== "Movie" && m.Type !== "Episode")) return undefined
+  const ep = m.Type === "Episode"
+  return { id: `${sourceId}|${ep ? "ep" : "movie"}|${m.Id}`, pos, dur, t: Date.parse(u.LastPlayedDate ?? "") || 0, ...(ep && m.SeriesId ? { series: `${sourceId}|series|${m.SeriesId}` } : {}) }
 }
 
 /** One /LiveTv/Channels entry -> live Item. */
@@ -135,7 +148,7 @@ export const shiftVtt = (txt: string, sec: number) => {
 }
 
 /** Audio / subtitle streams (MediaStreams of the item); ids are the stream Index the server expects back. */
-export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean }
+export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean; detail?: string; flags?: string[] }
 /** Skippable stretch of an episode, in seconds. */
 export type Seg = { kind: "intro" | "recap" | "credits"; start: number; end: number }
 const SEG_KIND: Record<string, Seg["kind"]> = { Intro: "intro", Recap: "recap", Outro: "credits" }
@@ -147,7 +160,13 @@ export const mapIntroSkipper = (j: J): Seg[] => (j?.Valid && j.IntroEnd > j.Intr
 
 export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
   const st: J[] = m?.MediaSources?.[0]?.MediaStreams ?? m?.MediaStreams ?? []
-  const pick = (type: string) => st.filter((s) => s.Type === type).map((s) => ({ id: Number(s.Index), label: String(s.DisplayTitle || s.Language || s.Codec || s.Index), def: !!s.IsDefault, lang: s.Language || undefined, text: type === "Subtitle" ? !!s.IsTextSubtitleStream : undefined }))
+  const pick = (type: string) => st.filter((s) => s.Type === type).map((s) => {
+    const label = String(s.DisplayTitle || s.Language || s.Codec || s.Index)
+    const extra = [s.Language, s.Codec ? String(s.Codec).toUpperCase() : "", type === "Audio" && Number(s.Channels) > 0 ? `${s.Channels}ch` : ""]
+      .filter((v): v is string => !!v && !label.toLowerCase().includes(v.toLowerCase()))
+    const flags = [s.IsForced ? "forced" : "", s.IsHearingImpaired ? "sdh" : ""].filter(Boolean)
+    return { id: Number(s.Index), label, def: !!s.IsDefault, lang: s.Language || undefined, ...(extra.length ? { detail: extra.join(" · ") } : {}), ...(flags.length ? { flags } : {}), text: type === "Subtitle" ? !!s.IsTextSubtitleStream : undefined }
+  })
   return { audio: pick("Audio"), subs: pick("Subtitle") }
 }
 

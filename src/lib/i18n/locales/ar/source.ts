@@ -2,6 +2,8 @@ import type { Dict } from "../../pure.ts"
 
 const d: Dict = {
   "source.availableOn": "متاح على",
+  "source.versions": { zero: "مفيش نسخ", one: "نسخة واحدة", two: "نسختين", few: "{n} نسخ", many: "{n} نسخة", other: "{n} نسخة" },
+  "source.chooseVariant": "اختار النسخة للتشغيل",
   "source.label": "المصدر",
   "source.all": "الكل",
   "source.conn.localJf": "العنوان المحلي (http://host:8096)",

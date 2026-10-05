@@ -18,10 +18,10 @@ assert.deepEqual(order, ["https://lan.plex.direct", "http://lan:1", "https://rem
 
 const img = (p: string, w: number, h: number) => `IMG${w}x${h}${p}`
 const movie = mapMeta(
-  { ratingKey: "42", type: "movie", title: "Heat", year: 1995, summary: "s", rating: 8.25, thumb: "/t", art: "/a", viewOffset: 61000, duration: 7200000, Genre: [{ tag: "Crime" }], Media: [{ Part: [{ container: "mkv" }] }] },
+  { ratingKey: "42", type: "movie", title: "Heat", year: 1995, originallyAvailableAt: "1995-12-15", addedAt: 1700000000, summary: "s", rating: 8.25, thumb: "/t", art: "/a", viewOffset: 61000, duration: 7200000, Genre: [{ tag: "Crime" }], Media: [{ Part: [{ container: "mkv" }] }] },
   { sourceId: "s1", group: "Movies", img },
 )
-assert.deepEqual(movie, { id: "s1|movie|42", kind: "movie", sid: "42", name: "Heat", group: "Movies", logo: "IMG300x450/t", backdrop: "IMG1280x720/a", plot: "s", rating: "8.3", year: "1995", genres: ["Crime"], resume: 61, dur: 7200, ext: "mkv" })
+assert.deepEqual(movie, { id: "s1|movie|42", kind: "movie", sid: "42", name: "Heat", group: "Movies", logo: "IMG300x450/t", backdrop: "IMG1280x720/a", plot: "s", rating: "8.3", year: "1995", released: "1995-12-15", added: 1700000000, genres: ["Crime"], resume: 61, dur: 7200, ext: "mkv", part: undefined, codecs: undefined })
 assert.equal(mapMeta({ ratingKey: "7", type: "show", title: "X" }, { sourceId: "s1", group: "TV", img }).kind, "series")
 
 const d = mapDetail({ summary: "p", year: 1995, duration: 7200000, Genre: [{ tag: "Crime" }], Director: [{ tag: "M" }], Role: [{ tag: "Al", role: "Hanna", thumb: "/p" }], Rating: [{ image: "imdb://image.rating", value: 8.3 }, { image: "rottentomatoes://image.rating.ripe", value: 8 }, { image: "other://", value: 1 }] }, img)
@@ -78,3 +78,23 @@ assert.equal((await firstReachable(["a"], async () => { throw new Error("x") }))
 console.log("plex remote ok")
 assert.deepEqual(mapSegments({ Marker: [{ type: "intro", startTimeOffset: 1000, endTimeOffset: 31000 }, { type: "commercial", startTimeOffset: 0, endTimeOffset: 5 }, { type: "credits", startTimeOffset: 90000, endTimeOffset: 80000 }] }), [{ kind: "intro", start: 1, end: 31 }]); assert.deepEqual(mapSegments({}), [])
 console.log("plex segments ok")
+
+// direct play: file fields + canPlayType strings
+import { fileOf, directType } from "../src/lib/plex-pure.ts"
+const f = fileOf({ Media: [{ videoCodec: "hevc", audioCodec: "eac3", container: "mkv", Part: [{ key: "/library/parts/9/1/file.mkv", container: "mkv" }] }] })
+assert.deepEqual(f, { ext: "mkv", part: "/library/parts/9/1/file.mkv", codecs: "hevc,eac3" })
+assert.equal(directType(f.ext, f.codecs), 'video/mp4; codecs="hvc1.2.4.L153.B0, ec-3"')
+assert.equal(directType("mp4", "h264,aac"), 'video/mp4; codecs="avc1.640033, mp4a.40.2"')
+assert.equal(directType("mkv", "hevc,dts"), undefined) // dts/truehd -> transcoder
+assert.equal(directType("avi", "h264,aac"), undefined)
+assert.equal(directType(undefined, undefined), undefined)
+console.log("plex direct play ok")
+
+// watch history -> Watch entries
+import { plexWatch } from "../src/lib/plex-pure.ts"
+assert.deepEqual(plexWatch({ type: "movie", ratingKey: 7, duration: 6000000, viewCount: 1, lastViewedAt: 1700000000 }, "s1"), { id: "s1|movie|7", pos: 6000, dur: 6000, t: 1700000000000 })
+assert.deepEqual(plexWatch({ type: "episode", ratingKey: 9, grandparentRatingKey: 3, duration: 2400000, viewCount: 2, viewOffset: 600000, lastViewedAt: 1 }, "s1"),
+  { id: "s1|ep|9", pos: 600, dur: 2400, t: 1000, series: "s1|series|3" }) // rewatch in progress: the offset wins
+assert.equal(plexWatch({ type: "movie", ratingKey: 7, duration: 6000000 }, "s1"), undefined) // never played
+assert.equal(plexWatch({ type: "clip", ratingKey: 7, duration: 6000000, viewCount: 1 }, "s1"), undefined)
+console.log("plex watch ok")

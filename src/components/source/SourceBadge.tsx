@@ -7,7 +7,7 @@ import type { Item } from "@/lib/types"
 /**
  * Colored source chip. Props: item (its source comes from item.id), dot (small colored dot for tight tiles, no text),
  * className (position it yourself, e.g. "absolute start-2 bottom-2"). Shows "+N" when item.alts has entries.
- * Renders nothing when only one source is enabled or Settings > Sources "badges" is off.
+ * Renders nothing when fewer than two sources are connected (a failed or hidden one does not count) or Settings > Sources "badges" is off.
  */
 export function SourceBadge({ item, dot, className }: { item: Item; dot?: boolean; className?: string }) {
   const src = useSourceOf(item)

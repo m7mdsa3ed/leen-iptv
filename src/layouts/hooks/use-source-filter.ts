@@ -7,14 +7,16 @@ import type { Item, Kind } from "@/lib/types"
 
 /**
  * Source filter state for the pill bar. Returns {
- *  sources: { id, name, title (name, plus the type label when two sources share a name), label, color, count }[] (enabled sources, priority order; count = titles/channels loaded),
- *  filter: string | null (null = All), setFilter(id | null), multi (more than one enabled source: show badges/filter)
+ *  sources: { id, name, title (name, plus the type label when two sources share a name), label, color, count }[] (enabled sources, priority order, minus a Plex / Jellyfin that cannot be reached; count = titles/channels loaded),
+ *  filter: string[] (picked source ids; [] = All), toggle(id), clear(), multi (more than one of those sources: show the filter)
  * }
  */
 export function useSourceFilter() {
-  const list = useSources()
+  const all = useSources()
   const stats = useCatalog((s) => s.sources)
-  const filter = useApp((s) => s.sourceFilter)
+  // catalog.ts drops an unreachable Plex / Jellyfin (no tiles), so it gets no chip either
+  const list = useMemo(() => all.filter((s) => !((s.type === "plex" || s.type === "jellyfin") && stats[s.id]?.status === "error")), [all, stats])
+  const picked = useApp((s) => s.sourceFilter)
   const setFilter = useApp((s) => s.setSourceFilter)
   const sources = useMemo(() => {
     // two sources with the same name (ignoring case) would be indistinguishable: append their type label ("Mohamed - Plex")
@@ -22,18 +24,21 @@ export function useSourceFilter() {
     for (const s of list) dup.set(s.name.trim().toLowerCase(), (dup.get(s.name.trim().toLowerCase()) ?? 0) + 1)
     return list.map((s) => ({ id: s.id, name: s.name, title: (dup.get(s.name.trim().toLowerCase()) ?? 0) > 1 ? `${s.name} · ${s.label}` : s.name, label: s.label, type: s.type, color: s.color, count: stats[s.id]?.count ?? 0 }))
   }, [list, stats])
-  return { sources, filter: filter && list.some((s) => s.id === filter) ? filter : null, setFilter, multi: list.length > 1 }
+  // ids of sources that no longer exist (or are disabled) drop out, so a stale pick can never hide everything
+  const filter = useMemo(() => picked.filter((id) => list.some((s) => s.id === id)), [picked, list])
+  const toggle = (id: string) => setFilter(filter.includes(id) ? filter.filter((x) => x !== id) : [...filter, id])
+  return { sources, filter, toggle, clear: () => setFilter([]), multi: list.length > 1 }
 }
 
-/** Active filter id (null = All; a disabled/removed source counts as All). */
-export function useActiveFilter(): string | null {
-  const f = useApp((s) => s.sourceFilter)
-  const ok = useApp((s) => !!f && s.sources.some((x) => x.id === f && x.enabled !== false))
-  return ok ? f : null
+/** Active filter ids ([] = All; a disabled/removed source drops out). Stable while nothing changes, so it is safe as a memo dep. */
+export function useActiveFilter(): string[] {
+  const picked = useApp((s) => s.sourceFilter)
+  const sources = useApp((s) => s.sources)
+  return useMemo(() => picked.filter((id) => sources.some((x) => x.id === id && x.enabled !== false)), [picked, sources])
 }
 
 /** Is this item (by its own source) visible under the filter? Used for favorites/history lists. */
-export const inSource = (i: { id: string }, filter: string | null) => !filter || srcOfId(i.id) === filter
+export const inSource = (i: { id: string }, filter: string[]) => !filter.length || filter.includes(srcOfId(i.id))
 
 /**
  * Catalog with the source filter applied: { items, byKind, groups } (same shapes as the catalog store).
@@ -45,7 +50,7 @@ export function useCatalogView() {
   const groups = useCatalog((s) => s.groups)
   const filter = useActiveFilter()
   return useMemo(() => {
-    if (!filter) return { items, byKind, groups }
+    if (!filter.length) return { items, byKind, groups }
     const k = { live: onlySource(byKind.live, filter), movie: onlySource(byKind.movie, filter), series: onlySource(byKind.series, filter) }
     const g = (kind: Kind) => { const s = new Set(k[kind].map((i: Item) => i.group)); return groups[kind].filter((x) => s.has(x)) }
     return { items: [...k.live, ...k.movie, ...k.series], byKind: k, groups: { live: g("live"), movie: g("movie"), series: g("series") } }

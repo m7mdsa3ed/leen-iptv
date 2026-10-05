@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
-import { useVirtualizer } from "@tanstack/react-virtual"
+import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual"
 import { create } from "zustand"
 import { List, ListPlus, Lock, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -34,9 +34,10 @@ export function PinModal() {
     if (n === ask.pin) done(true)
     else (setV(""), setBad(true))
   }
+  // every prompt starts clean (Back resolves the store without going through done()) with focus on the pad; only a NEW prompt moves focus, not each digit
+  useEffect(() => { setV(""); setBad(false); if (ask) requestAnimationFrame(focusFirst) }, [ask])
   useEffect(() => {
     if (!ask) return
-    requestAnimationFrame(focusFirst)
     const k = (e: KeyboardEvent) => /^[0-9]$/.test(e.key) && press(e.key)
     window.addEventListener("keydown", k)
     return () => window.removeEventListener("keydown", k)
@@ -69,24 +70,32 @@ export function TvButton({ className, ...p }: React.ComponentProps<typeof Button
 /** Display name of a group chip: the FAV / ALL pseudo groups are localised, real categories are shown as-is. (FAV/ALL live in groups.tsx; literals here avoid an import cycle.) */
 export const groupLabel = (g: string, t: TFn) => (g === "Favorites" ? t("common.favorites") : g === "All" ? t("common.all") : g === "Other" ? t("common.other") : g)
 
-/** Category lists can be shown as a start-side sidebar (Settings > Display > Categories): marks the page content so CSS reserves room for it. */
+/** Category lists can be shown as a start-side sidebar (Settings > Display > Categories): marks the page content so CSS reserves room for it, and hands it the sidebar's width (`--cat-w`, it follows the longest category name). */
 export function useCatSide() {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const m = ref.current?.closest<HTMLElement>("[data-page-content]")
-    m?.setAttribute("data-cats", "")
-    return () => m?.removeAttribute("data-cats")
+    const el = ref.current, m = el?.closest<HTMLElement>("[data-page-content]")
+    if (!el || !m) return
+    m.setAttribute("data-cats", "")
+    const ro = new ResizeObserver(() => m.style.setProperty("--cat-w", `${el.offsetWidth}px`))
+    ro.observe(el)
+    return () => { ro.disconnect(); m.removeAttribute("data-cats"); m.style.removeProperty("--cat-w") }
   }, [])
   return ref
 }
 
-export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLists }: { cat?: boolean; items: string[]; active: string; onPick: (g: string) => void; locked?: (g: string) => boolean; onKey?: (e: React.KeyboardEvent, g: string) => void; onCtx?: (e: React.MouseEvent, g: string) => void; liveLists?: boolean }) {
+/** Title count at the end of a category pill; CSS shows it only in the sidebar (.cat-count). */
+export const CatCount = ({ n }: { n?: number }) => (n == null ? null : <span className="cat-count ms-auto shrink-0 ps-2 text-sm tabular-nums text-muted-foreground">{fmt.number(n)}</span>)
+
+export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLists, count }: { count?: (g: string) => number | undefined; cat?: boolean; items: string[]; active: string; onPick: (g: string) => void; locked?: (g: string) => boolean; onKey?: (e: React.KeyboardEvent, g: string) => void; onCtx?: (e: React.MouseEvent, g: string) => void; liveLists?: boolean }) {
   const t = useT()
   const lists = useLists()
   const isList = (g: string) => lists.some((l) => l.name === g)
   const ref = useCatSide()
+  const mode = useMode()
+  const side = useApp((s) => s.settings.catNav === "sidebar") && mode !== "mobile" // the category list as a fixed sidebar (Settings > Display): beside the page, not a row in it
   const row = (
-    <div data-nav-group className="rail !mb-0 !gap-3 !pb-2">
+    <div data-nav-group="memory" className="rail !mb-0 !gap-3 !pb-2">
       {items.map((g) => (
         <button
           key={g}
@@ -102,6 +111,7 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLi
           {isList(g) && <List className="size-4" />}
           {locked?.(g) && <Lock className="size-4" />}
           <bdi>{groupLabel(g, t)}</bdi>
+          {count && <CatCount n={count(g)} />}
         </button>
       ))}
       {liveLists && (
@@ -111,7 +121,7 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLi
       )}
     </div>
   )
-  return cat ? <div ref={ref} className="cat-side">{row}</div> : row
+  return cat ? <div ref={ref} data-nav-aside={side ? "" : undefined} className="cat-side">{row}</div> : row
 }
 
 /** Channel logo / poster: `logo`, then `logoAlt` when that link is dead, then a name tile. */
@@ -177,11 +187,14 @@ export function useOpen() {
 }
 
 /* ---------- virtualised layouts ---------- */
+/** A stacked page is display:none and reports a 0x0 scroller. Keep the last real size instead, so its rows (and the card Back returns focus to) stay mounted. */
+const keepSize: typeof observeElementRect = (inst, cb) => observeElementRect(inst, (r) => { if (r.height > 0 && r.width > 0) cb(r) })
+
 /** TV text scale (Settings > Display). Pixel-sized layouts authored for the 20px base multiply by this. */
 export const useK = () => useApp((s) => (isTv ? s.settings.tvScale : 1))
 
 /** `head` scrolls with the grid (above the first row); `className` extends the scroller (e.g. under the mobile top bar). */
-export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, head, className }: { items: T[]; cols?: number; minW?: number; ratio?: number; label?: number; render: (t: T) => ReactNode; head?: ReactNode; className?: string }) {
+export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, head, className, scrollRef }: { items: T[]; cols?: number; minW?: number; ratio?: number; label?: number; render: (t: T) => ReactNode; head?: ReactNode; className?: string; scrollRef?: { current: ((index: number) => void) | null } }) {
   const mode = useMode()
   minW ??= mode === "tv" ? 190 : mode === "mobile" ? 110 : 170
   const ref = useRef<HTMLDivElement>(null)
@@ -189,6 +202,7 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
   useLayoutEffect(() => {
     const el = ref.current!
     const f = () => {
+      if (!el.clientWidth) return // hidden (stacked page): keep the columns it had
       const cs = getComputedStyle(el)
       setW(el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) || 1500) // inner width, minus the --gx padding
     }
@@ -214,10 +228,16 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
     ro.observe(el)
     return () => ro.disconnect()
   }, [!!head]) // eslint-disable-line react-hooks/exhaustive-deps
-  const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3, scrollMargin: hh })
+  const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3, scrollMargin: hh, observeElementRect: keepSize })
   useEffect(() => v.measure(), [rowH, v])
+  // scrollRef: jump to the row holding item `index` (item -> row needs the column count, so it lives here). Used by the AlphaRail index.
+  useEffect(() => {
+    if (!scrollRef) return
+    scrollRef.current = (index: number) => v.scrollToIndex(Math.max(0, Math.floor(index / c)), { align: "start" })
+    return () => { scrollRef.current = null }
+  }, [scrollRef, c, v])
   return (
-    <div ref={ref} data-vscroll data-under className={cn("-mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4", className)}>
+    <div ref={ref} data-vscroll className={cn("under-bottom -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4", className)}>
       {head && <div ref={headRef}>{head}</div>}
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((r) => (
@@ -227,6 +247,19 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
         ))}
       </div>
     </div>
+  )
+}
+
+/** Side A-Z index for a long alphabetical grid: a slim capsule with the whole alphabet, each letter jumps the grid to its first title (letters with no titles are dimmed and jump to the next one). */
+export function AlphaRail({ letters, onPick, className }: { letters: { ch: string; index: number; has?: boolean }[]; onPick: (index: number) => void; className?: string }) {
+  const t = useT()
+  if (letters.length < 2) return null
+  return (
+    <nav aria-label={t("common.alpha")} data-nav-aside className={cn("no-scrollbar fixed end-2 top-1/2 z-20 flex max-h-[calc(100%_-_var(--content-t)_-_var(--content-b)_-_2rem)] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-border bg-surface-2/85 p-[3px] shadow-lg", className)}>
+      {letters.map(({ ch, index, has }) => (
+        <button key={ch} data-nav data-pill onClick={() => onPick(index)} className={cn("grid size-4 shrink-0 place-items-center rounded-full text-[0.5625rem] leading-none font-semibold text-muted-foreground transition-colors hover:bg-accent-blue-container hover:text-foreground", has === false && "opacity-35")}>{ch}</button>
+      ))}
+    </nav>
   )
 }
 
@@ -244,10 +277,10 @@ export function VList<T>({ items, rowH: baseH, render, head, className }: { item
     ro.observe(el)
     return () => ro.disconnect()
   }, [!!head]) // eslint-disable-line react-hooks/exhaustive-deps
-  const v = useVirtualizer({ count: items.length, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 8, scrollMargin: hh })
+  const v = useVirtualizer({ count: items.length, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 8, scrollMargin: hh, observeElementRect: keepSize })
   useEffect(() => v.measure(), [rowH, v])
   return (
-    <div ref={ref} data-vscroll data-under className={cn("h-full overflow-y-auto [--s:1.025]", className)}>
+    <div ref={ref} data-vscroll className={cn("under-bottom h-full overflow-y-auto [--s:1.025]", className)}>
       {head && <div ref={headRef}>{head}</div>}
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((r) => (

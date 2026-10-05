@@ -13,6 +13,7 @@ import { Toasts } from "@/components/tv/toast"
 import { startReminders } from "@/lib/sports/reminders"
 import { CardMenu, closeCardMenu, useCardMenu } from "@/components/tv/card-menu"
 import { ListModal } from "@/components/tv/list-modal"
+import { FilterPanel, closeFilterPanel, useFilterPanel } from "@/components/tv/filter-panel"
 import EpisodePage from "@/pages/episode"
 import { MatchModal } from "@/components/tv/match-modal"
 import { useBackfillMatches } from "@/lib/meta"
@@ -20,7 +21,7 @@ import { closeLogoMatch, closeMatch, useLogoMatch, useMatch } from "@/components
 import { LogoModal } from "@/components/tv/logo-modal"
 import { closeListModal, useListModal } from "@/components/tv/lists"
 import { ExitConfirm, askExit, closeExit, useExitAsk } from "@/components/tv/exit-confirm"
-import { installNav, useRoute } from "@/lib/nav"
+import { backStep, installNav, useRoute } from "@/lib/nav"
 import { CARD_K } from "@/lib/cards"
 import { SearchPalette, closePalette, installPaletteKeys, usePalette } from "@/components/tv/search-palette"
 import { OnScreenKeyboard, closeKeyboard, installKeyboard, useKbd } from "@/components/tv/keyboard"
@@ -37,7 +38,8 @@ import Library from "@/pages/library"
 import Live from "@/pages/live"
 import PersonPage from "@/pages/person"
 import TeamPage from "@/pages/team"
-import Player from "@/pages/player"
+import MatchPage from "@/pages/match"
+import { PlayerHost, PlayerRoute } from "@/player/host"
 import Profiles from "@/pages/profiles"
 import LinkPage from "@/pages/link"
 import Welcome from "@/pages/welcome"
@@ -54,7 +56,7 @@ function RestorePlayer({ id }: { id: string }) {
   if (status === "ready" && !item) return <Empty>{t("common.notFound")} <button data-nav className="ms-3 underline" onClick={back}>{t("common.back")}</button></Empty>
   if (!item) return <Empty>{t("common.loading")}</Empty>
   const queue = item.kind === "live" ? byKind.live.filter((i) => i.group === item.group) : [item]
-  return <Player queue={queue} index={queue.indexOf(item)} />
+  return <PlayerRoute queue={queue} index={queue.indexOf(item)} />
 }
 
 // pages rendered inside a layout Shell: their top bar stays put and only [data-page-content] (the Shell's <main>) animates
@@ -62,7 +64,7 @@ const SHELL_PAGES = new Set(["home", "live", "sports", "movies", "series", "sear
 
 /** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
 const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, detail: Detail, episode: EpisodePage, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage,
+  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, detail: Detail, episode: EpisodePage, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage,
 }
 
 function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
@@ -71,7 +73,7 @@ function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
   switch (r.name) {
     case "sources": return <Sources />
     case "home": return <Home />
-    case "player": return p.queue ? <Player queue={p.queue as never} index={p.index as number} /> : <RestorePlayer id={p.id as string} />
+    case "player": return p.queue ? <PlayerRoute queue={p.queue as never} index={p.index as number} start={!!p.start} /> : <RestorePlayer id={p.id as string} />
   }
   const C = over?.[r.name as keyof typeof over] ?? DEFAULT_PAGES[r.name]
   if (!C) return null
@@ -102,10 +104,12 @@ export default function App() {
       if (ask) return ask.resolve(false), usePinAsk.setState({ ask: null })
       if (useCardMenu.getState().cur) return closeCardMenu()
       if (useListModal.getState().cur) return closeListModal()
+      if (useFilterPanel.getState().kind) return closeFilterPanel()
       if (useMatch.getState().item) return closeMatch()
       if (useLogoMatch.getState().item) return closeLogoMatch()
       if (useTrailer.getState().cur) return closeTrailer()
       if (useExitAsk.getState().open) return closeExit()
+      if (backStep()) return
       if (!useRoute.getState().back() && isTv) askExit()
     }), [])
 
@@ -130,7 +134,7 @@ export default function App() {
 
   // remember focus per stacked page so Back returns to the same tile
   useEffect(() => {
-    const f = (e: FocusEvent) => { if (e.target instanceof HTMLElement && e.target.hasAttribute("data-nav")) last.current.set(useRoute.getState().stack.length - 1, e.target) }
+    const f = (e: FocusEvent) => { if (e.target instanceof HTMLElement && e.target.hasAttribute("data-nav") && !e.target.closest("[data-modal]")) last.current.set(useRoute.getState().stack.length - 1, e.target) } // not a dialog's buttons: they are gone when Back returns here
     window.addEventListener("focusin", f)
     return () => window.removeEventListener("focusin", f)
   }, [])
@@ -156,16 +160,18 @@ export default function App() {
           <Boundary><Page r={r} /></Boundary>
         </div>
       ))}
+      <PlayerHost />
       <PinModal />
       <CardMenu />
       <ListModal />
+      <FilterPanel />
       <MatchModal />
       <LogoModal />
-      <SearchPalette />
-      <OnScreenKeyboard />
       <ExitConfirm />
       <RecoveryGate />
       <TrailerModal />
+      <SearchPalette />
+      <OnScreenKeyboard />
       <Toasts />
     </>
   )

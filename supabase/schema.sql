@@ -18,6 +18,34 @@ create policy "user_data_insert_own" on public.user_data for insert to authentic
 create policy "user_data_update_own" on public.user_data for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "user_data_delete_own" on public.user_data for delete to authenticated using (auth.uid() = user_id);
 
+-- Short-lived, per-device playback presence. This stays separate from encrypted account sync data.
+create table if not exists public.playback_presence (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  device_id text not null check (length(device_id) between 1 and 100),
+  device_name text not null check (length(device_name) <= 40),
+  profile_name text not null check (length(profile_name) <= 100),
+  item_id text not null check (length(item_id) <= 500),
+  item_name text not null check (length(item_name) <= 500),
+  item_kind text not null check (item_kind in ('live', 'movie', 'episode')),
+  status text not null check (status in ('playing', 'paused')),
+  position double precision not null default 0 check (position >= 0),
+  duration double precision not null default 0 check (duration >= 0),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, device_id)
+);
+alter table public.playback_presence add column if not exists device_name text not null default 'Device';
+
+alter table public.playback_presence enable row level security;
+drop policy if exists "playback_presence_select_own" on public.playback_presence;
+drop policy if exists "playback_presence_insert_own" on public.playback_presence;
+drop policy if exists "playback_presence_update_own" on public.playback_presence;
+drop policy if exists "playback_presence_delete_own" on public.playback_presence;
+create policy "playback_presence_select_own" on public.playback_presence for select to authenticated using (auth.uid() = user_id);
+create policy "playback_presence_insert_own" on public.playback_presence for insert to authenticated with check (auth.uid() = user_id);
+create policy "playback_presence_update_own" on public.playback_presence for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "playback_presence_delete_own" on public.playback_presence for delete to authenticated using (auth.uid() = user_id);
+
+
 -- Auth > Providers > Email: keep "Enable Email provider" on. For the 6-digit code flow, edit
 -- Auth > Email Templates > Magic Link and put {{ .Token }} in the body (otherwise only a link is sent).
 

@@ -8,6 +8,7 @@ import type { Item } from "@/lib/types"
 import type { MoreActions } from "./actions"
 import { useGuard, useTick } from "./hooks"
 import { Section } from "./parts"
+import { ProgrammeInfo } from "./programme"
 
 const NONE: string[] = []
 const MAX_CH = 80 // channels rendered around the current one (a category can hold hundreds)
@@ -32,6 +33,7 @@ export function LiveMore({ item, act }: { item: Item; act: MoreActions }) {
   return (
     <>
       <Section title={item.name}>
+        <ProgrammeInfo item={item} compact />
         <Pill data-autofocus="" className="pl-btn pl-act" onClick={() => toggleFav(item.id)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />{t(isFav ? "player.more.removeFav" : "player.more.addFav")}</Pill>
       </Section>
 

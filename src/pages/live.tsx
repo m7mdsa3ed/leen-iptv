@@ -49,7 +49,7 @@ export default function Live() {
               }} />
           )
           // mobile: filters + now panel scroll with the grid, which starts under the top bar and runs under the bottom bar
-          if (items.length) return grid(<div className="flex flex-col gap-3 pb-1">{head}</div>, "-mt-[var(--hdr)] pt-[var(--hdr)] [--up:var(--hdr)]")
+          if (items.length) return grid(<div className="flex flex-col gap-3 pb-1">{head}</div>, "under-top")
           return (
             <div className="flex h-full flex-col gap-3">
               {head}

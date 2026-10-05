@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Pill, Row, SectionCard, Field } from "../controls"
+import { ConfirmButton, Pill, Row, SectionCard, Field } from "../controls"
 import { askPin } from "@/components/tv/ui"
 import { useRoute } from "@/lib/nav"
 import { useT } from "@/lib/i18n"
@@ -19,7 +19,7 @@ export default function ProfilesSection() {
         <Row label={t("settings.profiles.switch")}><Pill onClick={() => reset("profiles")}>{t("settings.profiles.switch")}</Pill></Row>
         {profiles.length > 1 && (
           <Row label={t("settings.profiles.delete")} description={t("settings.profiles.delete.desc")}>
-            <Pill onClick={async () => { if (p.pin && !(await askPin(p.pin))) return; removeProfile(p.id); reset("profiles") }}>{t("settings.profiles.delete")}</Pill>
+            <ConfirmButton onConfirm={async () => { if (p.pin && !(await askPin(p.pin))) return; removeProfile(p.id); reset("profiles") }}>{t("settings.profiles.delete")}</ConfirmButton>
           </Row>
         )}
       </SectionCard>

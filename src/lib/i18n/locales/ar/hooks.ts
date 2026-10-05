@@ -6,6 +6,8 @@ const d: Dict = {
   "hooks.sort.default": "الافتراضي",
   "hooks.sort.az": "أ-ي",
   "hooks.sort.rating": "الأعلى تقييم",
+  "hooks.sort.added": "المضاف حديثاً",
+  "hooks.sort.year": "الأحدث",
   "hooks.detail.resume": "كمّل",
   "hooks.detail.play": "شغّل",
   "hooks.detail.watched": "اتشاف",

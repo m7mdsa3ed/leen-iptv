@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Check } from "lucide-react"
 import { LeenMark, Pill } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
-import { useRoute } from "@/lib/nav"
+import { useBackStep, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
 import { useSync } from "@/lib/sync"
 import { SignIn } from "@/settings/AccountSync"
@@ -17,6 +17,7 @@ export default function Welcome() {
   const setSettings = useApp((s) => s.setSettings)
   const sync = useSync()
   const [signIn, setSignIn] = useState(false)
+  useBackStep(signIn, () => setSignIn(false)) // Back from the sign-in panel returns to the two choices, not the exit prompt
 
   const choose = (accountChoice: "guest" | "account") => { setSettings({ accountChoice }); reset("profiles") }
   useEffect(() => { if (sync.session) choose("account") }, [sync.session]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -28,7 +29,7 @@ export default function Welcome() {
   )
 
   return (
-    <div className="flex h-full flex-col items-center gap-8 overflow-y-auto bg-background p-4 py-[max(1.5rem,env(safe-area-inset-top))] md:gap-10 md:[&>:first-child]:mt-auto md:[&>:last-child]:mb-auto">
+    <div className="flex h-full flex-col items-center gap-8 overflow-y-auto bg-background p-4 pt-[max(1.5rem,var(--safe-t))] pb-[max(1.5rem,var(--safe-b))] md:gap-10 md:[&>:first-child]:mt-auto md:[&>:last-child]:mb-auto">
       <div className="flex flex-col items-center gap-3 text-center">
         <LeenMark className="size-16 md:size-20" />
         <h1 className="text-3xl font-medium tracking-tight md:text-5xl">{t("welcome.title")}</h1>

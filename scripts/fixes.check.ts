@@ -1,6 +1,6 @@
 // node scripts/fixes.check.ts - Settings > Fix matches: what needs fixing, export / import of manual fixes
 import assert from "node:assert/strict"
-import { autoPick, exportFixes, failedKey, logoFixes, mergeFixes, metaFixes, parseFixes } from "../src/lib/fixes-pure.ts"
+import { autoPick, exportFixes, failedKey, logoFixes, mergeFixes, metaFixes, newestMetaFixes, parseFixes } from "../src/lib/fixes-pure.ts"
 import { buildLogoIndex, type LogoRow } from "../src/lib/logos-pure.ts"
 import { matchKeyOf } from "../src/lib/meta/title.ts"
 import type { Item } from "../src/lib/types.ts"
@@ -17,6 +17,7 @@ assert.equal(failedKey("season:tmdb:1:2:"), undefined)
 const failed = new Set([failedKey("meta5:movie:the weight:2023:::x")!])
 const M = metaFixes([vod("AR - The Weight (2023) [4K]", "p.jpg"), vod("The Weight (2023)"), vod("No Art"), vod("Fine", "p.jpg"), vod("Fixed")], failed, { [matchKeyOf("movie", "Fixed")]: "5" })
 assert.deepEqual(M.map((x) => [x.item.name, x.reason]), [["AR - The Weight (2023) [4K]", "failed"], ["No Art", "noPoster"]]) // same title once; matched ones are done
+assert.deepEqual(newestMetaFixes([{ item: vod("Undated") }, { item: { ...vod("Old"), year: "1998" } }, { item: { ...vod("New"), year: "2023" } }, { item: vod("Newer (2024)") }]).map((x) => x.item.name), ["Newer (2024)", "New", "Old", "Undated"])
 
 const U = metaFixes([vod("Seen", "p.jpg"), vod("Never", "p.jpg"), vod("No Art 2"), vod("Fixed 2", "p.jpg")], new Set(), { [matchKeyOf("movie", "Fixed 2")]: "5" }, new Set([matchKeyOf("movie", "Seen")]))
 assert.deepEqual(U.map((x) => [x.item.name, x.reason]), [["Never", "unchecked"], ["No Art 2", "noPoster"]]) // looked-up, matched: fine; without `looked` nothing is unchecked

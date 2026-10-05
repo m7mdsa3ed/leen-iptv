@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Clock, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from "lucide-react"
+import { Captions, Clock, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from "lucide-react"
 
-export type FlashKind = "play" | "pause" | "back" | "fwd" | "vol" | "mute" | "clock"
+export type FlashKind = "play" | "pause" | "back" | "fwd" | "vol" | "mute" | "clock" | "sub"
 type FlashState = { k: number; kind: FlashKind; text?: string } | null
 
 /** Transient centre indicator (seek, volume, mute, play/pause). The element is removed by a timer, so it also disappears when animations are off. */
@@ -18,7 +18,7 @@ export function useFlash() {
   return [f, fire] as const
 }
 
-const ICON = { play: Play, pause: Pause, back: RotateCcw, fwd: RotateCw, mute: VolumeX, vol: Volume2, clock: Clock } as const
+const ICON = { play: Play, pause: Pause, back: RotateCcw, fwd: RotateCw, mute: VolumeX, vol: Volume2, clock: Clock, sub: Captions } as const
 
 export function Flash({ f }: { f: FlashState }) {
   if (!f) return null
@@ -47,5 +47,5 @@ export function Spinner({ title, started, label }: { title: string; started: boo
 
 /** Channel number being typed with the remote / keyboard. */
 export const NumberEntry = ({ n }: { n: string }) => (
-  <div dir="ltr" data-ltr className="absolute end-[var(--gx)] top-[max(1rem,env(safe-area-inset-top))] z-[6] rounded-[var(--pl-r)] bg-black/60 px-6 py-3 text-3xl sm:text-5xl">{n}</div>
+  <div dir="ltr" data-ltr className="absolute end-[var(--gx)] top-[max(1rem,var(--safe-t))] z-[6] rounded-[var(--pl-r)] bg-black/60 px-6 py-3 text-3xl sm:text-5xl">{n}</div>
 )

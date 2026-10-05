@@ -9,6 +9,7 @@ import { fmt, t, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { useSources } from "@/lib/sources"
+import { usePlaybackPresence, useSync } from "@/lib/sync"
 
 const mb = (n: number) => t("settings.about.mb", { n: fmt.number(Math.round(n / 104857.6) / 10) })
 const ua = () => {
@@ -22,6 +23,8 @@ export default function AboutSection() {
   const layout = useApp((s) => s.settings.layout)
   const sources = useSources()
   const stat = useCatalog((s) => s.sources)
+  const sync = useSync()
+  const presence = usePlaybackPresence()
   const go = useRoute((s) => s.go)
   const [store, setStore] = useState("")
   useEffect(() => {
@@ -38,6 +41,11 @@ export default function AboutSection() {
         <Row label={t("settings.about.browser")} description={<span dir="ltr" className="inline-block">{ua()}</span>} />
         {store && <Row label={t("settings.about.storage")}>{store}</Row>}
       </SectionCard>
+      {sync.session && <SectionCard title={t("settings.about.activeDevices")} description={presence.error ?? t("settings.about.activeDevices.desc")}>
+        {presence.devices.length ? presence.devices.map((device) => (
+          <Row key={`${device.device_id}:${device.item_id}`} label={`${device.device_name} - ${device.item_name}`} description={`${device.profile_name} - ${t(`sync.presence.${device.status}`)}${device.duration > 0 ? ` · ${fmt.duration(device.position)} / ${fmt.duration(device.duration)}` : ""}`} />
+        )) : <p className="text-sm text-muted-foreground">{t("settings.about.activeDevices.none")}</p>}
+      </SectionCard>}
       <SectionCard title={t("settings.about.health")} description={t("settings.about.health.desc")}>
         {sources.map((s) => {
           const st = stat[s.id]

@@ -27,7 +27,8 @@ export function SectionCard({ title, description, children, className }: { title
 /** Label/description left, control(s) right (wraps under on narrow screens). `stack` puts the control below. */
 export function Row({ label, description, children, stack, className }: { label: ReactNode; description?: ReactNode; children?: ReactNode; stack?: boolean; className?: string }) {
   return (
-    <div className={cn("flex gap-x-6 gap-y-3", stack ? "flex-col" : "flex-wrap items-center justify-between", className)}>
+    // a group: Up/Down treat a row's control as lying under the whole row, so a switch / button at its far end is never skipped by a later row's left-aligned control
+    <div data-nav-group className={cn("flex gap-x-6 gap-y-3", stack ? "flex-col" : "flex-wrap items-center justify-between", className)}>
       <div className={cn("min-w-0", !stack && "flex-1 basis-56")}>
         <div className="text-base font-medium">{label}</div>
         {description && <div className="text-sm text-muted-foreground">{description}</div>}
@@ -37,13 +38,9 @@ export function Row({ label, description, children, stack, className }: { label:
   )
 }
 
-/** Row with a switch on the right. */
+/** A whole-row switch: label and description left, the track right, ONE full-width control (a lone 70px switch at the far end is skipped by Up/Down and is a small target). */
 export function ToggleRow({ label, description, checked, onChange, disabled }: { label: string; description?: ReactNode; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <Row label={label} description={description}>
-      <Toggle label={label} checked={checked} onChange={onChange} disabled={disabled} className="w-auto bg-transparent p-0 [&>span:first-child]:sr-only" />
-    </Row>
-  )
+  return <Toggle label={label} description={description} checked={checked} onChange={onChange} disabled={disabled} className="rounded-2xl py-3" />
 }
 
 /** Labelled text input with an inline validation message (shown when `error` is set). */

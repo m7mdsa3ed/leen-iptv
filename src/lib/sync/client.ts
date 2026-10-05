@@ -101,9 +101,10 @@ export const api = {
   rpc: (c: Config, name: string, body: unknown, token?: string) => req(c, `/rest/v1/rpc/${name}`, { body, token }),
   logout: (c: Config, s: Session) => req(c, "/auth/v1/logout", { method: "POST", body: {}, token: s.access }),
 
-  async pull(c: Config, s: Session): Promise<{ data: string; updated_at: string } | null> {
-    const r = (await req(c, `/rest/v1/user_data?select=data,updated_at&user_id=eq.${s.id}`, { token: s.access })) as { data: string; updated_at: string }[]
-    return r[0] ?? null
+  async pull(c: Config, s: Session): Promise<{ row: { data: string; updated_at: string } | null; serverTime?: number }> {
+    let serverTime: number | undefined
+    const r = (await req(c, `/rest/v1/user_data?select=data,updated_at&user_id=eq.${s.id}`, { token: s.access, onResponse: (x) => { serverTime = Date.parse(x.headers.get("date") ?? "") || undefined } })) as { data: string; updated_at: string }[]
+    return { row: r[0] ?? null, serverTime }
   },
   /** true = written; false = someone else wrote first (re-pull and retry) */
   async push(c: Config, s: Session, data: string, base: string | null, at: string): Promise<boolean> {
@@ -133,5 +134,11 @@ export const api = {
   },
   /** writes only through meta_put(): the server validates, stamps the time and never replaces a row younger than 7 days */
   metaPut: (c: Config, s: Session, key: string, data: unknown) => req(c, "/rest/v1/rpc/meta_put", { token: s.access, body: { p_key: key, p_data: data } }),
+  presencePut: (c: Config, s: Session, presence: import("@/lib/api/ports").PlaybackPresence) => req(c, "/rest/v1/playback_presence?on_conflict=user_id,device_id", { method: "POST", token: s.access, headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: { user_id: s.id, ...presence } }),
+  async presenceGet(c: Config, s: Session) {
+    return (await req(c, `/rest/v1/playback_presence?select=device_id,device_name,profile_name,item_id,item_name,item_kind,status,position,duration,updated_at&user_id=eq.${s.id}&status=neq.stopped&order=updated_at.desc`, { token: s.access })) as import("@/lib/api/ports").PlaybackPresence[]
+  },
+  presenceRemove: (c: Config, s: Session, deviceId: string, itemId: string) => req(c, `/rest/v1/playback_presence?user_id=eq.${s.id}&device_id=eq.${encodeURIComponent(deviceId)}&item_id=eq.${encodeURIComponent(itemId)}`, { method: "DELETE", token: s.access }),
+  presencePrune: (c: Config, s: Session, before: string) => req(c, `/rest/v1/playback_presence?user_id=eq.${s.id}&updated_at=lt.${encodeURIComponent(before)}`, { method: "DELETE", token: s.access }),
   del: (c: Config, s: Session) => req(c, `/rest/v1/user_data?user_id=eq.${s.id}`, { method: "DELETE", token: s.access }),
 }

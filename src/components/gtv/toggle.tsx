@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 /** The app's switch. With a label it is a whole clickable row (label left, track right); without, just the track. */
@@ -5,7 +6,7 @@ export function Toggle({ checked, onChange, label, description, disabled, classN
   checked: boolean
   onChange: (v: boolean) => void
   label?: string
-  description?: string
+  description?: ReactNode
   disabled?: boolean
   className?: string
 }) {

@@ -9,13 +9,13 @@ import { t as tn } from "@/lib/i18n"
 import type { Item, Source } from "@/lib/types"
 import { audioLabel, type Stats } from "./stats"
 
-export type Track = { id: number; label: string }
+export type Track = { id: number; label: string; detail?: string; flags?: string[] }
 
 /** hls.js / mpegts.js / native <video> for one item, plus the connection-quality sampler and the video event handlers that feed it.
     Teardown is strict: the old stream must be fully closed (requests aborted, decoder released) before the next one opens, because many
     providers allow only 1-2 connections and a leftover one makes the new channel fail. */
-export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: Item; live: boolean; raw: string; url: string; direct: boolean; setProxied: (u: string) => void; src?: Source | null }) {
-  const { vref, item, live, raw, url, direct, setProxied, src } = o
+export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: Item; live: boolean; raw: string; url: string; direct: boolean; setProxied: (u: string) => void; src?: Source | null; fallback?: () => void }) {
+  const { vref, item, live, raw, url, direct, setProxied, src, fallback } = o
   const proxy = useApp((s) => s.settings.proxy)
   const hls = useRef<Hls | null>(null)
   const mp = useRef<mpegts.Player | null>(null)
@@ -68,8 +68,8 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
         h.on(Hls.Events.BUFFER_CODECS, (_e, d) => { const a = d.audio ?? d.audiovideo; if (a?.codec) aud.current = { codec: a.codec, ch: a.metadata?.channelCount } })
         h.on(Hls.Events.FRAG_BUFFERED, () => { net = 0 }) // retries are per outage, not per session
         h.on(Hls.Events.MANIFEST_PARSED, () => void v.play().catch(() => {}))
-        h.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => setAudio(h.audioTracks.map((x, i) => ({ id: i, label: x.name || x.lang || tn("player.audioTrack", { n: i + 1 }) }))))
-        h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => setSubs(h.subtitleTracks.map((x, i) => ({ id: i, label: x.name || x.lang || tn("player.subtitleTrack", { n: i + 1 }) }))))
+        h.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => setAudio(h.audioTracks.map((x, i) => ({ id: i, label: x.name || x.lang || tn("player.audioTrack", { n: i + 1 }), detail: [x.lang, x.audioCodec, x.channels].filter(Boolean).join(" · ") || undefined, flags: x.default ? [tn("player.track.default")] : [] }))))
+        h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => setSubs(h.subtitleTracks.map((x, i) => ({ id: i, label: x.name || x.lang || tn("player.subtitleTrack", { n: i + 1 }), detail: x.lang || undefined, flags: [x.default ? "default" : "", /forced/i.test(x.characteristics || "") ? "forced" : "", /hearing.?impaired|\bsd[hx]\b/i.test(x.characteristics || "") ? "sdh" : ""].filter(Boolean) }))))
         h.on(Hls.Events.ERROR, (_e, d) => {
           if (!d.fatal) return
           const code = d.response?.code
@@ -154,7 +154,7 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
     onWaiting: () => { setBuf(true); if (played.current) { stalls.current.push(Date.now()); meas.current.stallTotal++ } },
     onPlaying: () => { auto.current = 0; setBuf(false); setStarted(true); setPaused(false); played.current = true; meas.current.startupMs ??= Date.now() - meas.current.attachAt },
     onPause: () => setPaused(true),
-    onError: () => (!live && !hls.current && viaHls !== url && Hls.isSupported() ? setViaHls(url) : fail(vref.current?.error?.code === 4 ? tn("errors.video.format") : vref.current?.error?.code === 3 ? tn("errors.video.corrupt") : tn("errors.video.cannotPlay"))),
+    onError: () => fallback ? fallback() : (!live && !hls.current && viaHls !== url && Hls.isSupported() ? setViaHls(url) : fail(vref.current?.error?.code === 4 ? tn("errors.video.format") : vref.current?.error?.code === 3 ? tn("errors.video.corrupt") : tn("errors.video.cannotPlay"))),
   }
 
   return { hls, mp, err, buf, started, paused, audio, subs, setSubs, stats, statsRef, meas, handlers, retry: () => { auto.current = 0; setRetry((r) => r + 1) } }

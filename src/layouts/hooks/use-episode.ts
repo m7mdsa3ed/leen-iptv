@@ -9,8 +9,8 @@ import { useDetail } from "./use-detail"
  * Episode page: one episode of a series, with TMDB details where known. Route id = `<seriesId>~<episodeItemId>`.
  * Returns {
  *  D (the series' useDetail: title, logo, backdrops, back, ...), episode (undefined while loading / gone), missing (episodes loaded but this one is not among them),
- *  title, still, plot, code ("S1 · E3"), chips (air date, runtime), rating (TMDB, "7.9"|undefined), guests, directors, writers,
- *  pct, resuming, watched, play(), toggleWatched(), prev / next (Episode|undefined), openEp(e) (another episode, in place)
+ *  title, still, plot, code ("S1 · E3"), chips (air date, runtime), air / runtime (the same two, "" when unknown), rating (TMDB, "7.9"|undefined), guests, directors, writers,
+ *  pct, resuming, resumeAt (seconds, 0 = none), watched, play(fromStart?), toggleWatched(), prev / next (Episode|undefined), openEp(e) (another episode, in place)
  * }
  */
 export function useEpisode(routeId: string) {
@@ -43,13 +43,15 @@ export function useEpisode(routeId: string) {
     still: episode?.item.logo,
     plot: episode?.item.plot || m?.plot,
     code: episode ? t("pages.episode.code", { s: episode.season, e: episode.num }) : "",
+    air: m?.air ? fmt.date(new Date(`${m.air}T12:00:00`), { year: "numeric", month: "long", day: "numeric" }) : "", runtime: D.epDur(episode?.dur) || "",
     chips: [m?.air && fmt.date(new Date(`${m.air}T12:00:00`), { year: "numeric", month: "long", day: "numeric" }), D.epDur(episode?.dur)].filter(Boolean) as string[],
     rating: m?.rating,
     guests: m?.guests ?? [], directors: m?.directors ?? [], writers: m?.writers ?? [],
     pct: episode ? D.pct(episode.item) : 0,
     resuming: !!p && p.pos > 30 && !watched,
     watched,
-    play: () => { if (episode) D.play(D.episodes, index) },
+    resumeAt: D.resumeOf(episode?.item), // > 0: the page offers Resume from / Play from beginning
+    play: (fromStart?: boolean) => { if (episode) D.play(D.episodes, index, fromStart) },
     toggleWatched: () => { if (episode) D.markItems([episode.item], !watched) },
     prev: index > 0 ? D.episodes[index - 1] : undefined,
     next: index >= 0 ? D.episodes[index + 1] : undefined,

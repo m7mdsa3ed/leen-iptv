@@ -26,7 +26,7 @@ export function TrailerModal() {
   }, [cur])
   if (!cur) return null
   return (
-    <div data-modal role="dialog" aria-modal="true" aria-label={t("trailer.title", { name: cur.name })} className="dark fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div data-modal role="dialog" aria-modal="true" aria-label={t("trailer.title", { name: cur.name })} className="dark fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/90 p-4 pb-[max(1rem,var(--safe-b))]">
       <div className="relative aspect-video w-full max-w-[min(100%,calc((100vh-9rem)*16/9))] overflow-hidden rounded-2xl bg-black" dir="ltr">
         {state !== "error" && (
           <iframe

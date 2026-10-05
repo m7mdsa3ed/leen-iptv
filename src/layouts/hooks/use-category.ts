@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useState } from "react"
 import { askPin, useOpen } from "@/components/tv/ui"
 import { findLock } from "@/lib/merge-pure"
-import { LOCALE, fold, useLang, useT } from "@/lib/i18n"
+import { LOCALE, fold, useLang, useT, type Lang } from "@/lib/i18n"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
 import { usePData, useProfile } from "@/lib/store"
 import type { Item } from "@/lib/types"
+import { byAdded, byRelease, yearNum } from "@/lib/browse-pure"
 import { useCatalogView } from "./use-source-filter"
 
-export type Sort = "default" | "az" | "rating"
-const SORTS: Sort[] = ["default", "az", "rating"]
+export type Sort = "default" | "az" | "rating" | "year" | "added"
+export const SORTS: Sort[] = ["default", "added", "year", "rating", "az"]
+/** Sorts this list can offer: Top rated / Newest / Recently added only when some title has a rating / a year / an added date. */
+export const sortsFor = (l: Item[], t: (k: string) => string) => {
+  const has = { rating: l.some((i) => parseFloat(i.rating ?? "") > 0), year: l.some((i) => yearNum(i) > 0), added: l.some((i) => !!i.added) }
+  return SORTS.filter((s) => (s !== "rating" && s !== "year" && s !== "added") || has[s]).map((s): [Sort, string] => [s, t(`hooks.sort.${s}`)])
+}
+/** A-Z title compare for the app language. One Collator per sort: localeCompare with options builds a new one per call (~40x slower on big catalogs). */
+export const byName = (lang: Lang) => { const c = new Intl.Collator(LOCALE[lang], { numeric: true, sensitivity: "base" }).compare; return (a: Item, b: Item) => c(a.name, b.name) }
 
 /**
  * One category page (route id `${kind}|${category}`), incl. the PIN gate (Back if refused).
@@ -37,16 +45,18 @@ export function useCategory(id: string) {
     void askPin(p.pin).then((good) => (good ? setOk(true) : back()))
   }, [ok, p?.pin, back])
   const all = useMemo(() => byKind[kind].filter((i) => i.group === group), [byKind, kind, group])
-  const hasRating = useMemo(() => all.some((i) => parseFloat(i.rating ?? "") > 0), [all])
+  const sorts = useMemo(() => sortsFor(all, t), [all, t])
   const items = useMemo(() => {
     const f = fold(q.trim())
     const l = f ? all.filter((i) => fold(i.name).includes(f)) : all
-    if (sort === "az") return [...l].sort((a, b) => a.name.localeCompare(b.name, LOCALE[lang], { numeric: true, sensitivity: "base" }))
+    if (sort === "az") return [...l].sort(byName(lang))
     if (sort === "rating") return [...l].sort((a, b) => (parseFloat(b.rating ?? "") || 0) - (parseFloat(a.rating ?? "") || 0))
+    if (sort === "year") return [...l].sort(byRelease)
+    if (sort === "added") return [...l].sort(byAdded)
     return l
   }, [all, q, sort, lang])
   return {
-    kind, group, status, ok, all, items, sort, setSort, sorts: SORTS.filter((s) => s !== "rating" || hasRating).map((s): [Sort, string] => [s, t(`hooks.sort.${s}`)]), q, setQ, back,
+    kind, group, status, ok, all, items, sort, setSort, sorts, q, setQ, back,
     pct: (i: Item) => d.progress[i.id] && (d.progress[i.id].pos / d.progress[i.id].dur) * 100,
     open: (i: Item) => open(i),
   }

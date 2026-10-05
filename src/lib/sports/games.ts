@@ -1,4 +1,5 @@
 import { SPORTS_PROVIDERS, type Follow, type SportsGame, type SportsProvider } from "@/lib/api"
+import { teamKey } from "./pure"
 
 /** Games of one follow (a team or a competition) in [from, to]. The provider caches the month scoreboard (see espn.ts). */
 export function scheduleFor(follow: Follow, proxy: string, from: number, to: number): Promise<SportsGame[]> {
@@ -37,11 +38,20 @@ export async function liveScores(follows: Follow[], proxy: string): Promise<Spor
 
 /** The followed team playing in this game (for bolding), or undefined for a competition game. */
 export const teamInGame = (follows: Follow[], g: SportsGame): string | undefined =>
-  follows.find((f) => f.kind !== "league" && (f.teamId === g.home.id || f.teamId === g.away.id))?.teamId
+  follows.find((f) => f.kind !== "league" && (teamKey(f.teamId) === teamKey(g.home.id) || teamKey(f.teamId) === teamKey(g.away.id)))?.teamId
+
+/** Route params to open a game's match page (needs provider + sport/league/event). */
+export function matchRoute(follows: Follow[], g: SportsGame): { id: string } | undefined {
+  const follow = follows.find((f) => f.kind !== "league" && (teamKey(f.teamId) === teamKey(g.home.id) || teamKey(f.teamId) === teamKey(g.away.id)))
+    ?? follows.find((f) => f.kind === "league" && (g.home.id.startsWith(f.teamId + "/") || g.away.id.startsWith(f.teamId + "/")))
+  const [sport, league] = g.home.id.split("/")
+  if (!follow || !sport || !league || !g.id) return undefined
+  return { id: `${follow.provider}~${sport}/${league}/${g.id}` }
+}
 
 /** Route params to open from a game: the followed team's page, else the home team's page for a followed competition. */
 export function gameRoute(follows: Follow[], g: SportsGame): { id: string; name: string; badge?: string; league?: string } | undefined {
-  const team = follows.find((f) => f.kind !== "league" && (f.teamId === g.home.id || f.teamId === g.away.id))
+  const team = follows.find((f) => f.kind !== "league" && (teamKey(f.teamId) === teamKey(g.home.id) || teamKey(f.teamId) === teamKey(g.away.id)))
   if (team) return { id: `${team.provider}~${team.teamId}`, name: team.name, badge: team.badge, league: team.league }
   const lg = follows.find((f) => f.kind === "league" && (g.home.id.startsWith(f.teamId + "/") || g.away.id.startsWith(f.teamId + "/")))
   if (lg) return { id: `${lg.provider}~${g.home.id}`, name: g.home.name }

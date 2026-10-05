@@ -25,7 +25,19 @@ export function Plot({ text, loading }: { text?: string; loading: boolean }) {
 }
 
 export function Ratings({ ratings, name }: { ratings: DetailRating[]; name: (s: string) => string }) {
-  return <>{ratings.map((r) => <Chip key={r.source}>{name(r.source)} <bdi>{r.value}</bdi></Chip>)}</>
+  return <>{ratings.map((r) => <Chip key={r.source}>{name(r.source)} <bdi>{r.value}{r.votes ? ` · ${r.votes}` : ""}</bdi></Chip>)}</>
+}
+
+export function StreamFacts({ facts }: { facts: import("@/lib/meta/facts-pure").StreamFacts }) {
+  const t = useT()
+  const rows: [string, string][] = [
+    [t("player.more.resolution"), facts.res ?? ""], [t("player.more.video"), facts.video ?? ""],
+    [t("player.more.audio"), [facts.audio, facts.ch].filter(Boolean).join(" · ")], [t("player.more.container"), facts.box ?? ""],
+    [t("player.more.size"), facts.size ? `${fmt.number(Math.round(facts.size / 1_000_000))} MB` : ""],
+    [t("player.more.added"), facts.added ? fmt.date(new Date(facts.added * 1000), { year: "numeric", month: "short", day: "numeric" }) : ""],
+  ]
+  const values = rows.filter(([, value]) => value)
+  return values.length || facts.langs?.length ? <Section title={t("player.more.sourceInfo")}><div className="flex flex-wrap items-center gap-2">{values.map(([label, value]) => <Chip key={label}>{label}: <bdi dir="ltr">{value}</bdi></Chip>)}{facts.langs?.map((lang) => <Chip key={lang}>{t("player.more.audioLanguage")}: <bdi>{lang}</bdi></Chip>)}</div></Section> : null
 }
 
 const grid = "grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(var(--min),1fr))]"

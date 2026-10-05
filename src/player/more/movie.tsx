@@ -1,12 +1,12 @@
 import { Clapperboard, Info, Star } from "lucide-react"
 import { Pill } from "@/components/gtv"
 import { useDetail } from "@/layouts/hooks/use-detail"
-import { useT } from "@/lib/i18n"
+import { fmt, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
 import type { Item } from "@/lib/types"
 import type { MoreActions } from "./actions"
 import { useGuard } from "./hooks"
-import { CastRail, Chip, Plot, Ratings, Section, SimilarRail } from "./parts"
+import { CastRail, Chip, Plot, Ratings, Section, SimilarRail, StreamFacts } from "./parts"
 
 /** Movie: overview, actions (favorite, trailer, full details), cast, more like this. Works without a metadata provider (Xtream / Plex / Jellyfin data only). */
 export function MovieMore({ item, act }: { item: Item; act: MoreActions }) {
@@ -24,6 +24,7 @@ export function MovieMore({ item, act }: { item: Item; act: MoreActions }) {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {chips.map((c) => <Chip key={c}><bdi>{c}</bdi></Chip>)}
           <Ratings ratings={D.ratings} name={D.ratingName} />
+          {D.releaseDate && /^\d{4}-\d{2}-\d{2}/.test(D.releaseDate) && <Chip>{t("player.more.releaseDate")}: <bdi>{fmt.date(new Date(`${D.releaseDate.slice(0, 10)}T12:00:00`), { year: "numeric", month: "short", day: "numeric" })}</bdi></Chip>}
           {D.genres.map((g) => <Chip key={g}>{g}</Chip>)}
         </div>
         <Plot text={plot} loading={D.loading} />
@@ -35,6 +36,7 @@ export function MovieMore({ item, act }: { item: Item; act: MoreActions }) {
           <Pill className="pl-btn pl-act" onClick={() => act.details(item.id)}><Info />{t("player.more.details")}</Pill>
         </div>
       </Section>
+      <StreamFacts facts={D.stream} />
       <CastRail cast={D.cast} loading={D.loading} onOpen={act.person} />
       <SimilarRail items={D.similar} loading={D.loading} onOpen={(i) => guard(i, () => act.play(i, [i]))} />
     </>

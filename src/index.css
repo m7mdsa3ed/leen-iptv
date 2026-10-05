@@ -159,16 +159,32 @@ html { font-size: 16px; }
 html[data-mode=mobile] { font-size: 15px; }
 html[data-mode=tv] { font-size: calc(20px * var(--tv-scale, 1)); }
 html, body, #root { height: 100%; background: var(--background, #0e0f11); overscroll-behavior: contain; }
-html { --gx: 2.5rem; --hdr: 4.25rem; } /* --hdr = height of the overlay header (Shell) */
-html[data-mode=tv] { --hdr: 5.25rem; }
-/* THE bar gradient (top bar, bottom bar, player bars): solid behind the bar content, eased through the 70% stop to transparent. Only edit it here. (.dark too: custom properties resolve where declared, so the always-dark player needs its own copy.) */
-:root, .dark { --bar-top: linear-gradient(to bottom, var(--background) 0, var(--background) 28%, var(--fade-mid) 62%, var(--fade-to)); --bar-bottom: linear-gradient(to top, var(--background) 0, var(--background) 28%, var(--fade-mid) 62%, var(--fade-to)); }
-html[data-mode=mobile] { --hdr: calc(3.5rem + env(safe-area-inset-top)); }
-/* header overlay: solid at the top, fading to transparent over the content scrolling under it */
-.hdr-fade { background-image: var(--bar-top); }
-html[data-mode=tv] { --gx: 3.5rem; }
-html[data-mode=mobile] { --gx: 1rem; }
-@media (orientation: landscape) { html[data-mode=mobile] { --gx: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right)); } }
+/* ===== Bars and safe areas: every bar size, device inset and bar background lives in this block (nowhere else) =====
+   --safe-t/r/b/l  device insets (status bar, notch, gesture bar); 0 on TV and in desktop browsers. Use these, never env() directly.
+   --gx            page gutter, always clear of a side inset (landscape notch)
+   --bar-h         the top bar's own row; --hdr = --safe-t + --bar-h = where page content starts (the Shell header is exactly this tall)
+   --nav-h         the mobile bottom bar incl. --safe-b (0px when there is none) = where page content ends
+   --fade          how far each bar's gradient runs past the bar, over the content
+   --content-t/b   where page content starts / ends at rest: past the bar AND its fade, so the gradient never lies on content until it scrolls (b = 0 without a bottom bar)
+   Bars: .topbar / .float-nav paint --bar-top / --bar-bottom behind themselves: one gradient from solid (under the safe area) to transparent at the end of --fade.
+   Scrollers that run under the bars: classes under-top / under-bottom / under-bleed, the ONE shared way for any scroller (page grids, Home, Settings panes); see .under-top below. */
+:root { --safe-t: env(safe-area-inset-top, 0px); --safe-r: env(safe-area-inset-right, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); --fade: 1rem; }
+html { --gx: max(2.5rem, var(--safe-l), var(--safe-r)); --bar-h: 4.25rem; --nav-h: 0px; }
+html[data-mode=tv] { --gx: 3.5rem; --bar-h: 5.25rem; }
+html[data-mode=mobile] { --gx: max(1rem, var(--safe-l), var(--safe-r)); --bar-h: 3.5rem; --nav-h: calc(4rem + var(--safe-b)); }
+@media (max-height: 500px) { html[data-mode=mobile] { --nav-h: calc(2.75rem + var(--safe-b)); } } /* landscape phone: one-line tabs */
+html { --hdr: calc(var(--safe-t) + var(--bar-h)); --content-t: calc(var(--hdr) + var(--fade)); --content-b: 0px; }
+html[data-mode=mobile] { --content-b: calc(var(--nav-h) + var(--fade)); }
+/* bar backgrounds: a gradient over the whole bar, stops in lengths so they follow the bar at any size: solid only under the status / gesture bar, then one even fade to fully transparent at the end of --fade (the 70% tone, --fade-mid, sits halfway to ease it). Player bars sit over video with no fixed height: they use the --scrim-* (solid edge, eased through 70% to transparent).
+   (.dark too: custom properties resolve where declared, so the always-dark player needs its own copy.) */
+:root, .dark {
+  --bar-top: linear-gradient(to bottom, var(--background) var(--safe-t), var(--fade-mid) calc((var(--safe-t) + var(--hdr) + var(--fade)) / 2), var(--fade-to) calc(var(--hdr) + var(--fade)));
+  --bar-bottom: linear-gradient(to top, var(--background) var(--safe-b), var(--fade-mid) calc((var(--safe-b) + var(--nav-h) + var(--fade)) / 2), var(--fade-to) calc(var(--nav-h) + var(--fade)));
+  --scrim-top: linear-gradient(to bottom, var(--background) 0, var(--background) 28%, var(--fade-mid) 62%, var(--fade-to));
+  --scrim-bottom: linear-gradient(to top, var(--background) 0, var(--background) 28%, var(--fade-mid) 62%, var(--fade-to));
+}
+.topbar { position: absolute; z-index: 30; top: 0; inset-inline: 0; height: var(--hdr); display: flex; align-items: center; gap: .5rem; padding: var(--safe-t) var(--gx) 0; isolation: isolate; }
+.topbar::before { content: ""; position: absolute; inset: 0 0 auto; height: calc(100% + var(--fade)); z-index: -1; pointer-events: none; background: var(--bar-top); }
 body { -webkit-tap-highlight-color: transparent; }
 html[data-mode=tv], html[data-mode=tv] body, html[data-mode=tv] #root { overflow: hidden; user-select: none; }
 html:not([data-mode=tv]) button, html:not([data-mode=tv]) [role=button] { touch-action: manipulation; }
@@ -228,12 +244,6 @@ html[data-mode=mobile] ::-webkit-scrollbar { display: none; }
 .rail::-webkit-scrollbar { display: none; }
 html[data-mode=tv] .rail { gap: 1.25rem; }
 
-/* safe-area helpers (need viewport-fit=cover) */
-@utility pt-safe { padding-top: env(safe-area-inset-top); }
-@utility pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-@utility pl-safe { padding-left: env(safe-area-inset-left); }
-@utility pr-safe { padding-right: env(safe-area-inset-right); }
-@utility px-safe { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 
 /* ================= MOTION (settings.motion -> html[data-motion=full|reduced|off], set by useMotion in lib/motion.ts) =================
    webOS rules: animate only transform + opacity; no box-shadow/filter/size animation; no infinite animation except .skel shimmer. */
@@ -305,33 +315,32 @@ html[dir=rtl] .rtl-flip { transform: scaleX(-1); } /* directional icons (chevron
 [data-ltr] { direction: ltr; unicode-bidi: isolate; } /* media transport, seek bars, timelines stay left-to-right (also use dir="ltr") */
 
 /* Mobile bottom navigation (all layouts that use .float-nav / .float-tab): a docked bar on a bottom-up gradient scrim (like the top bar), no blur (cheap on phones),
-   icon sits in a pill that fills with the accent container when its tab is current. Shells pad <main> by --float-nav-h. */
-:root { --float-nav-h: calc(5.5rem + env(safe-area-inset-bottom)); }
-html:not([data-mode=mobile]) { --float-nav-h: 0px; } /* no bottom bar outside mobile: [data-under] scrollers only add their end padding */
-.float-nav { position: absolute; z-index: 30; inset-inline: 0; bottom: 0; display: flex; gap: .25rem; padding: 1.6rem max(.5rem, env(safe-area-inset-left)) calc(.4rem + env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-right)); background: var(--bar-bottom); } /* gradient scrim: content fades out under the bar */
-.float-tab { display: flex; flex: 1 1 0; min-width: 0; flex-direction: column; align-items: center; justify-content: flex-start; gap: .2rem; padding: .1rem 0; border-radius: 1rem; font-size: 12px; line-height: 1.1; color: var(--muted-foreground); }
+   icon sits in a pill that fills with the accent container when its tab is current. Height and background come from the bars block (--nav-h, --bar-bottom); Shells pad <main> by --nav-h. */
+.float-nav { position: absolute; z-index: 30; inset-inline: 0; bottom: 0; height: var(--nav-h); display: flex; align-items: center; gap: .25rem; padding: 0 max(.5rem, var(--safe-r)) var(--safe-b) max(.5rem, var(--safe-l)); isolation: isolate; }
+.float-nav::before { content: ""; position: absolute; inset: auto 0 0; height: calc(100% + var(--fade)); z-index: -1; pointer-events: none; background: var(--bar-bottom); }
+.float-tab { display: flex; flex: 1 1 0; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; padding: .1rem 0; border-radius: 1rem; font-size: 12px; line-height: 1.1; color: var(--muted-foreground); }
 .float-tab svg { box-sizing: content-box; width: 1.5rem; height: 1.5rem; padding: .3rem 1.2rem; border-radius: 9999px; transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .float-tab:active svg { background: var(--fg-10); }
 .float-tab[aria-current=page] { color: var(--foreground); font-weight: 600; }
 .float-tab[aria-current=page] svg { background: var(--accent-blue-container); color: var(--foreground); }
-@media (max-height: 500px) { .float-nav { padding-block: .9rem .2rem; } .float-tab { flex-direction: row; justify-content: center; gap: .4rem; } .float-tab svg { padding: .2rem .7rem; } :root { --float-nav-h: calc(3.5rem + env(safe-area-inset-bottom)); } }
+@media (max-height: 500px) { .float-tab { flex-direction: row; justify-content: center; gap: .4rem; } .float-tab svg { padding: .2rem .7rem; } }
 
 /* "Leen" wordmark: Kaushan Script handwriting (always Latin, so no Arabic fallback needed); one weight only, so no synthetic bold */
 .wordmark { font-family: "Kaushan Script", "Segoe Script", cursive; font-weight: 400; font-synthesis: none; letter-spacing: 0; }
 
-/* Categories as a start-side sidebar (Settings > Display > Categories). Not on mobile or in layouts that already have a side menu. */
-html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side { position: fixed; inset-inline-start: calc(var(--gx) / 2); top: calc(var(--hdr) + .5rem); bottom: .75rem; width: 14rem; z-index: 5; overflow-x: hidden; overflow-y: auto; }
+/* Categories as a start-side sidebar (Settings > Display > Categories). Not on mobile or in layouts that already have a side menu.
+   Lined up with the top bar: the pills start on the --gx gutter (the logo's edge) and at the content top (--hdr); the offsets cancel the rail's .5rem/.25rem padding. */
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side { position: fixed; inset-inline-start: calc(var(--gx) - .5rem); top: calc(var(--content-t) - .25rem); bottom: max(.75rem, var(--safe-b)); width: max-content; min-width: 10rem; max-width: 20rem; z-index: 5; overflow-x: hidden; overflow-y: auto; }
 html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side > .rail { flex-direction: column; overflow: visible; gap: .35rem !important; margin: 0 !important; padding: .25rem .5rem !important; }
 html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button { width: 100%; justify-content: flex-start; border-radius: 1rem; text-align: start; }
-html[data-catnav=sidebar]:not([data-mode=mobile]) [data-page-content][data-cats] { padding-inline-start: calc(14rem + var(--gx)) !important; }
+.cat-count { display: none; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side .cat-count { display: inline; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button bdi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* names past the 20rem cap end in ... */
+html[data-catnav=sidebar]:not([data-mode=mobile]) [data-page-content][data-cats] { padding-inline-start: calc(var(--cat-w, 14rem) + var(--gx) + 1rem) !important; } /* --cat-w = measured sidebar width (useCatSide); 2rem gap after the pills */
 
 /* Poster size + card details (Settings > Display). Rails zoom their tiles; grids change column width instead (VGrid). */
 .rail > [data-poster] { zoom: var(--card-k, 1); }
 html[data-cardinfo=hide] [data-card]:not([data-live]) .card-info { display: none; }
-
-/* Top bars (all modes) (Google TV, Live TV, Apple TV, Prime, Poster wall): a top-down gradient scrim behind the bar so content fades out under it instead of a hard edge. */
-header[data-topbar] { isolation: isolate; }
-header[data-topbar]::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: calc(100% + 1.5rem); z-index: -1; pointer-events: none; background: linear-gradient(to bottom, var(--background), var(--fade-mid) 55%, var(--fade-to)); }
 
 /* ===== COLOUR THEMES (generated from src/lib/themes.ts: see themeCss in src/lib/themes.ts). Beat layout palettes by specificity; default theme = no rules. ===== */
 html[data-theme=midnight][data-layout][data-lang] { --background: #eef2fb; --surface: #ffffff; --surface-2: #e1e8f7; --surface-3: #d2dbf0; --accent-blue: #2f55d4; --accent-blue-container: #d6e0fb; --primary: #2f55d4; --primary-foreground: #ffffff; --ring: #2f55d4; --focus-bg: #1f1f1f; --focus-fg: #ffffff; --fade-mid: #eef2fbb3; --fade-to: #eef2fb00; --card: #ffffff; --popover: #e1e8f7; --secondary: #e1e8f7; --muted: #e1e8f7; --accent: #d2dbf0; --float-bg: #ffffffb8; --foreground: #1f1f1f; --card-foreground: #1f1f1f; --popover-foreground: #1f1f1f; --secondary-foreground: #1f1f1f; --accent-foreground: #1f1f1f; --muted-foreground: rgba(0, 0, 0, 0.6); --border: rgba(0, 0, 0, 0.12); --input: rgba(0, 0, 0, 0.18); --fg-10: rgba(0, 0, 0, 0.1); --fg-30: rgba(0, 0, 0, 0.3); --fg-40: rgba(0, 0, 0, 0.4); --fg-70: rgba(0, 0, 0, 0.7); --fg-80: rgba(0, 0, 0, 0.8); }
@@ -349,10 +358,17 @@ html[data-theme=mocha][data-layout][data-lang] { --background: #f6f0ea; --surfac
 html[data-theme=mocha][data-layout][data-lang].dark, html[data-theme=mocha][data-layout][data-lang] .dark { --background: #14100d; --surface: #1e1814; --surface-2: #2a221c; --surface-3: #382e26; --accent-blue: #d9a877; --accent-blue-container: #5a3f22; --primary: #d9a877; --primary-foreground: #2e1a05; --ring: #d9a877; --focus-bg: #ffffff; --focus-fg: #1f1f1f; --fade-mid: #14100db3; --fade-to: #14100d00; --card: #1e1814; --popover: #2a221c; --secondary: #2a221c; --muted: #2a221c; --accent: #382e26; --float-bg: #2a221ca3; --foreground: rgba(255, 255, 255, 0.87); --card-foreground: rgba(255, 255, 255, 0.87); --popover-foreground: rgba(255, 255, 255, 0.87); --secondary-foreground: rgba(255, 255, 255, 0.87); --accent-foreground: rgba(255, 255, 255, 0.87); --muted-foreground: rgba(255, 255, 255, 0.6); --border: rgba(255, 255, 255, 0.12); --input: rgba(255, 255, 255, 0.18); --fg-10: rgba(255, 255, 255, 0.1); --fg-30: rgba(255, 255, 255, 0.3); --fg-40: rgba(255, 255, 255, 0.4); --fg-70: rgba(255, 255, 255, 0.7); --fg-80: rgba(255, 255, 255, 0.8); }
 /* ===== END COLOUR THEMES ===== */
 
-/* Bars are gradients, never solid bands (parents used to add solid fills): hide the "solid after scroll" overlays and replace solid header fills. */
-.gtv-hdr-solid { display: none; }
-/* virtualised lists/grids (and scrollers marked data-under) run under the bottom bar: grow by the bar height (+ --up when they also start under the top bar), pad the end so the last row stays reachable */
-[data-under] { height: calc(100% + var(--up, 0px) + var(--float-nav-h)); margin-bottom: calc(var(--float-nav-h) * -1); padding-bottom: calc(var(--float-nav-h) + 1rem); }
+/* THE way a scroller runs under the bars (content scrolls beneath them and fades out in their gradients, yet rests below the top bar and above the bottom one).
+   Put the classes on the scrolling element itself; it may be a block or a flex item (Settings' two panes), as long as it would otherwise fill its parent's height:
+   .under-top     pulled up under the top bar by --content-t and padded back down (only for a scroller that starts at the top of the page content)
+   .under-bottom  runs under the bottom bar: grows by --content-b and pads its end so the last row stays reachable (VGrid / VList always have it)
+   .under-bleed   with .under-top: no top padding, the content (Home's hero) draws from the very top and pads itself
+   They keep D-pad / scrollIntoView focus clear of the bars with scroll-padding. Unlayered on purpose: they beat Tailwind pt-/pb-/h- utilities on the same
+   element, so set other paddings with padding-inline / Tailwind, never a padding shorthand in a more specific rule. */
+.under-top { margin-top: calc(var(--content-t) * -1); padding-top: var(--content-t); height: calc(100% + var(--content-t)); scroll-padding-top: var(--content-t); }
+.under-top.under-bleed { padding-top: 0; }
+.under-bottom { height: calc(100% + var(--content-b)); margin-bottom: calc(var(--content-b) * -1); padding-bottom: calc(var(--content-b) + 1rem); scroll-padding-bottom: var(--content-b); }
+.under-top.under-bottom { height: calc(100% + var(--content-t) + var(--content-b)); }
 
 /* Old TVs: no blur compositing and no big soft shadows (the GPU-heavy parts); focus rings/fills carry the focus instead */
 html[data-mode=tv] *, html[data-mode=tv] *::before, html[data-mode=tv] *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }

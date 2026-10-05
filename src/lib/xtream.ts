@@ -1,6 +1,8 @@
 import type { Episode, Item, Source } from "./types"
 import { fetchT, px } from "./net"
 import { t } from "./i18n"
+import { hasStreamFacts, streamInfo } from "./meta/facts-pure"
+import { day } from "./browse-pure"
 
 const base = (s: Source) => s.server!.replace(/\/+$/, "")
 const api = (s: Source, action = "", extra = "") =>
@@ -41,6 +43,9 @@ export async function loadXtream(s: Source, proxy: string, step: (m: string) => 
         ext: x.container_extension ? String(x.container_extension) : undefined,
         num: x.num ? Number(x.num) : undefined,
         rating: x.rating ? String(x.rating) : undefined,
+        year: String(x.year ?? x.releaseDate ?? x.release_date ?? "").match(/^(?:19|20)\d{2}/)?.[0], // "2023" or "2023-05-01"
+        released: day(x.releaseDate ?? x.release_date),
+        added: Number(kind === "series" ? x.last_modified : x.added) || undefined, // series: last update = newest episode
         plot: x.plot ? String(x.plot) : undefined,
       })
     }
@@ -60,6 +65,12 @@ export async function connInfo(s: Source, proxy: string): Promise<{ act: number;
 export async function vodInfo(s: Source, proxy: string, sid: string) {
   const r = await call<{ info?: R; movie_data?: R }>(s, proxy, "get_vod_info", `&vod_id=${sid}`)
   return { ...r.info, added: r.movie_data?.added, container: r.movie_data?.container_extension } // streamInfo() reads these
+}
+
+/** Current and upcoming programme data, when the Xtream panel exposes its short EPG. */
+export async function xtreamShortEpg(s: Source, proxy: string, sid: string): Promise<R[]> {
+  const r = await call<{ epg_listings?: R[] }>(s, proxy, "get_short_epg", `&stream_id=${encodeURIComponent(sid)}&limit=6`)
+  return arr<R>(r.epg_listings)
 }
 
 export async function seriesInfo(s: Source, proxy: string, series: Item) {
@@ -86,6 +97,7 @@ export async function seriesInfo(s: Source, proxy: string, series: Item) {
           logo: String(info.movie_image ?? "") || series.logo,
           url: xtreamUrl(s, "series", String(e.id), ext),
           plot: info.plot ? String(info.plot) : undefined,
+          ...(hasStreamFacts(streamInfo(info)) ? { stream: streamInfo(info) } : {}),
         },
       })
     }

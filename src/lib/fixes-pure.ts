@@ -1,6 +1,6 @@
 import type { Item, MetaMatch } from "./types"
 import { logoFor, logoKey, type LogoIndex } from "./logos-pure.ts"
-import { cleanTitle, matchKeyOf, norm } from "./meta/title.ts"
+import { cleanTitle, matchKeyOf, norm, yearOf } from "./meta/title.ts"
 
 /** Settings > Fix matches. Pure: lists of what needs a manual fix, and export / import of the manual fixes (which sync as g/ and m/ entities). */
 
@@ -20,6 +20,13 @@ export function logoFixes(live: Item[], ix: LogoIndex | null, matches: Record<st
 }
 
 export type MetaFix = { item: Item; key: string; reason: "failed" | "noPoster" | "unchecked" }
+/** Order metadata fixes by newest release year, leaving undated titles in their existing order. */
+export function newestMetaFixes<T extends { item: Item }>(fixes: T[]): T[] {
+  return fixes.map((fix, index) => ({ fix, index, year: Number(fix.item.year?.match(/(?:19|20)\d{2}/)?.[0] ?? yearOf(fix.item.srcName ?? fix.item.name)) || 0 }))
+    .sort((a, b) => b.year - a.year || a.index - b.index)
+    .map(({ fix }) => fix)
+}
+
 /** Movies/series without a manual match whose lookup found nothing (`failed` = the cache's `kind:title:year` keys), or that have no poster at all. With `looked` (every cached lookup's match key), a title that has a poster but was never looked up is `unchecked`. */
 export function metaFixes(vod: Item[], failed: Set<string>, matches: Record<string, MetaMatch> | undefined, looked?: Set<string>): MetaFix[] {
   const out: MetaFix[] = []

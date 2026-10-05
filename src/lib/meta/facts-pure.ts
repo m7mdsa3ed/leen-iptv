@@ -33,6 +33,7 @@ export function tmdbExtras(d: J, tv: boolean, img: string): Partial<Meta> {
 
 /** Technical facts of one copy (source) of a title. size = bytes, added = epoch seconds. */
 export type StreamFacts = { res?: string; video?: string; audio?: string; ch?: string; box?: string; size?: number; added?: number; langs?: string[] }
+export const hasStreamFacts = (facts: StreamFacts) => Object.values(facts).some((v) => v !== undefined && (!Array.isArray(v) || v.length > 0))
 
 const res = (w: number, h: number) => (w >= 3200 || h >= 2000 ? "4K" : w >= 1800 || h >= 1000 ? "1080p" : w >= 1200 || h >= 700 ? "720p" : h ? `${h}p` : undefined)
 const CODEC: Record<string, string> = { h264: "H.264", avc: "H.264", hevc: "HEVC", h265: "HEVC", av1: "AV1", vp9: "VP9", mpeg4: "MPEG-4", aac: "AAC", ac3: "AC3", eac3: "E-AC3", dts: "DTS", truehd: "TrueHD", mp3: "MP3", opus: "Opus", flac: "FLAC" }
@@ -58,8 +59,10 @@ export function plexStream(m: J): StreamFacts {
 export function jfStream(m: J): StreamFacts {
   const src = (m.MediaSources ?? [])[0] ?? {}, st = (src.MediaStreams ?? m.MediaStreams ?? []) as J[]
   const v = st.find((x) => x.Type === "Video") ?? {}, a = st.find((x) => x.Type === "Audio") ?? {}
-  return {
+  const out: StreamFacts = {
     res: res(Number(v.Width) || 0, Number(v.Height) || 0), video: codec(v.Codec), audio: codec(a.Codec), ch: chan(Number(a.Channels)), box: s(src.Container)?.toUpperCase(),
     size: num(src.Size), added: m.DateCreated ? Math.round(Date.parse(m.DateCreated) / 1000) || undefined : undefined, langs: uniq(st.filter((x) => x.Type === "Audio").map((x) => x.Language)),
   }
+  if (!Object.values(out).some((x) => x !== undefined && (!Array.isArray(x) || x.length))) return {}
+  return out
 }

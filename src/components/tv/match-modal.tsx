@@ -10,6 +10,7 @@ import { tmdbSearch, type Candidate } from "@/lib/meta/providers"
 import { cleanTitle, matchId } from "@/lib/meta/title"
 import { cn } from "@/lib/utils"
 import { closeMatch, useMatch } from "./match"
+import { isSubmit } from "./keyboard"
 
 /** "Match metadata" on Detail: search TMDB and pin the right movie/show for this title (Settings `metaMatch`), or go back to automatic. */
 export function MatchModal() {
@@ -59,7 +60,7 @@ export function MatchModal() {
         <div className="text-center text-2xl font-semibold">{t("nav.match.title")}</div>
         <div dir="auto" className="truncate text-center text-base text-muted-foreground">{item.srcName ?? item.name}</div>
         <div className="flex items-center gap-2">
-          <input data-nav value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.keyCode === 13) void run(q) }} type="search" enterKeyHint="search" autoComplete="off"
+          <input data-nav value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (isSubmit(e)) void run(q) }} type="search" enterKeyHint="search" autoComplete="off"
             placeholder={t("common.search")} aria-label={t("common.search")} dir="auto" className="min-h-11 min-w-0 flex-1 rounded-full bg-surface-2 px-4 text-base outline-none" />
           <Pill data-nav variant="primary" onClick={() => void run(q)}><Search className="size-4" />{t("common.search")}</Pill>
         </div>

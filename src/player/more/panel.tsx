@@ -54,7 +54,7 @@ export const MorePanel = memo(function MorePanel({ item, closing, act }: { item:
       >
         <div ref={sc} data-more-scroll className="absolute inset-0 overflow-x-hidden overflow-y-auto overscroll-contain" onScroll={() => (lastScroll.current = Date.now())}>
           <div aria-hidden className="h-[24%] min-h-24" onClick={act.close} />
-          <div className="pl-more-body min-h-[76%] px-[var(--gx)] pb-[max(2rem,env(safe-area-inset-bottom))] pt-10">
+          <div className="pl-more-body min-h-[76%] px-[var(--gx)] pb-[max(2rem,var(--safe-b))] pt-10">
             <header className="mb-2 flex items-center gap-3">
               <div className="min-w-0 flex-1">
                 <div dir="auto" className="pl-title truncate">{title}</div>

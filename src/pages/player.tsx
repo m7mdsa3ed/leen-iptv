@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { isTv, useTouch } from "@/lib/device"
 import { navState, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
+import { srcOfId } from "@/lib/merge-pure"
 import type { Item } from "@/lib/types"
 import { STREAM_QS, type StreamQ } from "@/lib/quality"
 import { plexStopTranscode } from "@/lib/plex"
 import { jellyfinStopTranscode } from "@/lib/jellyfin"
-import { fmt, useT } from "@/lib/i18n"
+import { fmt, useLang, useT } from "@/lib/i18n"
 import { openTrailer } from "@/components/TrailerModal"
 import { Controls } from "@/player/controls"
 import { ErrorScreen } from "@/player/error-screen"
@@ -28,7 +29,14 @@ import { useNextUp } from "@/player/use-next-up"
 import { useSidecar } from "@/player/use-sidecar"
 import { useStream, type Picked } from "@/player/use-stream"
 import { useTracking } from "@/player/use-tracking"
+import { Subtitles } from "@/player/subtitles"
+import { langName } from "@/player/menus"
+import { useCatalog } from "@/lib/catalog"
+import { downloadSub, searchSubs, subQuery } from "@/lib/subs"
+import { DEFAULT_SUB_LANGS, sameLang } from "@/lib/subs-pure"
 import { BANNER_MS, fsEl, HIDE_MS, isEpisode } from "@/player/util"
+import { closePlayer, usePlayerHost } from "@/player/host"
+import { Pause as PauseIcon, PictureInPicture2, Play as PlayIcon, X } from "lucide-react"
 import "./player.css"
 
 const NONE: string[] = []
@@ -38,7 +46,9 @@ type Overlay = "none" | "strip" // live only: bottom channel strip
 // ponytail: module-level so the picked quality carries to the next episode; resets to Original on reload
 let lastQ: StreamQ = STREAM_QS[0]
 
-export default function Player({ queue: q0, index }: { queue: Item[]; index: number }) {
+/** `mini` = shrunk to the corner while another page is on top (see player/host.tsx): video only, no keys, tap to expand.
+ *  `start` = play the first title from the beginning (ignores its resume point). */
+export default function Player({ queue: q0, index, start, mini = false }: { queue: Item[]; index: number; start?: boolean; mini?: boolean }) {
   const t = useT()
   const touch = useTouch()
   const back = useRoute((s) => s.back)
@@ -52,6 +62,10 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const qref = useRef(queue)
   qref.current = queue
   const item = queue[idx]
+  // live with Group channel variants on: the channel's primary carries the other variants in `alts`
+  const vp = useCatalog((s) => (item.kind === "live" ? s.primaryOf.get(item.id) ?? s.byId.get(item.id) : undefined))
+  const sources = useApp((s) => s.sources)
+  const variants = vp?.alts?.length ? [vp, ...vp.alts].map((v) => ({ item: v, src: sources.length > 1 ? sources.find((x) => x.id === srcOfId(v.id))?.name : undefined })) : []
   const [show, setShow] = useState(true)
   const [banner, setBanner] = useState(true)
   const [menu, setMenu] = useState<MenuKind | null>(null)
@@ -70,6 +84,8 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const [subSel, setSubSel] = useState(-1)
   const [picked, setPicked] = useState<Picked & { id: string }>({ id: "" }) // media-server track picks, tagged with their item
   const tr: Picked = picked.id === item.id ? picked : {}
+  const [ext, setExt] = useState<{ id: string; label: string; vtt: string } | null>(null) // subtitle fetched online (any source), per title
+  const extNow = ext?.id === item.id ? ext : null
   const [subSize, setSubSize] = useState(() => prefs().subSize)
   const [off, setOff] = useState({ id: "", sec: 0 }) // subtitle delay is per title, so it resets on the next one
   const subOffset = off.id === item.id ? off.sec : 0
@@ -91,12 +107,14 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const swipe = useRef<{ x: number; y: number } | null>(null)
   const opener = useRef<HTMLElement | null>(null) // control that opened a menu: focus returns to it
   const returnMore = useRef(false) // focus returns to the More button after the panel closes
+  const seekFirst = useRef(false) // the controls came up from a seek key: focus the seek bar instead of Play
 
   const S = useStream(item, sq, tr)
   const { live } = S
-  useSidecar(vref, S.sidecar, subOffset)
-  const E = useEngine({ vref, item, live, raw: S.raw, url: S.url, direct: S.direct, setProxied: S.setProxied, src: S.src })
-  useTracking({ vref, item, live, src: S.src, plex: S.plex, jf: S.jf, resume, meas: E.meas, statsRef: E.statsRef })
+  useSidecar(vref, extNow?.vtt ?? S.sidecar, subOffset)
+  const E = useEngine({ vref, item, live, raw: S.raw, url: S.url, direct: S.direct, setProxied: S.setProxied, src: S.src, fallback: S.fallback && (() => { const v = vref.current; if (v && v.currentTime > 0) resume.current = v.currentTime; S.fallback!() }) })
+  const startId = useRef(start ? item.id : "")
+  useTracking({ vref, item, live, src: S.src, plex: S.plex, jf: S.jf, resume, meas: E.meas, statsRef: E.statsRef, startId })
   const hasNext = !live && isEpisode(item.id) && idx < queue.length - 1
   const showNext = useApp((s) => s.settings.nextBanner ?? true), autoAll = useApp((s) => s.settings.autoNext ?? true)
   const noAuto = useApp((s) => s.settings.noAutoShows) ?? [], showKey = item.series ?? item.group
@@ -104,23 +122,39 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const toggleShowAuto = () => useApp.getState().setSettings({ noAutoShows: noAuto.includes(showKey) ? noAuto.filter((k) => k !== showKey) : [...noAuto, showKey] })
 
   /* ---------- controls visibility ---------- */
+  // the countdown never hides while paused, while a menu / help sheet is open, or under a mouse resting on the controls; it restarts when that ends
+  const hold = useRef(false), hover = useRef(false)
+  hold.current = E.paused || !!menu || help
+  const idle = useCallback(() => {
+    if (hold.current || hover.current || moreRef.current === "open" || ovRef.current !== "none") return
+    setShow(false)
+    const a = document.activeElement as HTMLElement | null
+    if (!a?.closest("[data-next],[data-modal]")) a?.blur() // not the Next card, nor a menu / the error screen (their buttons keep the D-pad)
+  }, [])
   const poke = useCallback(() => {
     if (moreRef.current === "open" || ovRef.current !== "none") return // the panel / overlays hold the UI: no auto-hide, no controls behind them
     setShow(true)
     clearTimeout(hideT.current)
-    hideT.current = window.setTimeout(() => {
-      if (moreRef.current === "open" || ovRef.current !== "none") return
-      setShow(false); setMenu(null)
-      const a = document.activeElement as HTMLElement | null
-      if (!a?.closest("[data-next]")) a?.blur()
-    }, HIDE_MS)
-  }, [])
+    hideT.current = window.setTimeout(idle, HIDE_MS)
+  }, [idle])
+  useEffect(() => { if (show && !hold.current) poke() }, [E.paused, menu, help]) // eslint-disable-line react-hooks/exhaustive-deps -- also runs on mount, so the controls up at start hide on TV too
   const hide = () => { setShow(false); (document.activeElement as HTMLElement)?.blur() }
   const showBanner = useCallback(() => { setBanner(true); clearTimeout(bannerT.current); bannerT.current = window.setTimeout(() => setBanner(false), BANNER_MS) }, [])
   useEffect(() => { showBanner() }, [item.id, showBanner])
 
   /* ---------- transport ---------- */
-  const zap = useCallback((d: number) => { setIdx((i) => (i + d + queue.length) % queue.length); showBanner() }, [queue.length, showBanner])
+  // zapping into another category honours its PIN lock like the strip and the More panel do (inside one category the lock was already passed)
+  const idxRef = useRef(idx), guardRef = useRef(guard)
+  idxRef.current = idx
+  guardRef.current = guard
+  const zapTo = useCallback((j: number) => {
+    const q = qref.current, to = q[j]
+    if (!to) return
+    const go = () => { setIdx(j); showBanner() }
+    if (to.group !== q[idxRef.current]?.group) guardRef.current(to, go)
+    else go()
+  }, [showBanner])
+  const zap = useCallback((d: number) => { const n = qref.current.length; zapTo((idxRef.current + d + n) % n) }, [zapTo])
   const advance = () => { setIdx((i) => Math.min(i + 1, qref.current.length - 1)); showBanner() }
   const nu = useNextUp({ vref, enabled: hasNext && showNext, itemId: item.id, onNext: advance, auto: autoNext })
   const nextOn = hasNext && nu.show
@@ -130,6 +164,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   const next_ = () => (live ? zap(1) : idx < queue.length - 1 && setIdx(idx + 1))
   const prev_ = () => (live ? zap(-1) : idx > 0 && setIdx(idx - 1))
   const seek = (d: number) => {
+    if (!show) seekFirst.current = true // Left/Right with the controls hidden: they come up with the seek bar focused, so a held key keeps scrubbing
     const v = vref.current!
     v.currentTime = Math.min(Math.max(0, v.currentTime + d), v.duration || 1e9)
     fire(d < 0 ? "back" : "fwd", `${d < 0 ? "-" : "+"}${fmt.digits(Math.abs(d))}`)
@@ -149,10 +184,21 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
     if (v.muted || v.volume === 0) { v.muted = false; if (v.volume === 0) v.volume = 0.5 } else v.muted = true
     fire(v.muted ? "mute" : "vol", v.muted ? "" : `${fmt.digits(Math.round(v.volume * 100))}%`)
   }
+  // the request is a promise that rejects silently: try the player, then the whole page, then the <video>'s own fullscreen, and say why it failed
   const toggleFs = () => {
-    const el = root.current as unknown as Record<string, (() => void) | undefined>, d = document as unknown as Record<string, (() => void) | undefined>
-    if (fsEl()) (d.exitFullscreen || d.webkitExitFullscreen)?.call(document)
-    else (el.requestFullscreen || el.webkitRequestFullscreen)?.call(root.current)
+    type Fs = { requestFullscreen?: () => Promise<void> | void; webkitRequestFullscreen?: () => void; webkitEnterFullscreen?: () => void }
+    const d = document as unknown as Record<string, (() => Promise<void> | void) | undefined>
+    if (fsEl()) return void Promise.resolve((d.exitFullscreen || d.webkitExitFullscreen)?.call(document)).catch(() => {})
+    const req = (el: Element | null) => {
+      const e = el as unknown as Fs | null
+      const f = e?.requestFullscreen || e?.webkitRequestFullscreen
+      return f ? Promise.resolve(f.call(e)) : Promise.reject(new Error("unsupported"))
+    }
+    req(root.current).catch(() => req(document.documentElement)).catch((err) => {
+      const v = vref.current as unknown as Fs | null
+      if (v?.webkitEnterFullscreen) v.webkitEnterFullscreen()
+      else console.warn("[player] fullscreen refused:", err)
+    })
   }
   const digit = (d: number) => {
     numRef.current = (numRef.current + d).slice(-4)
@@ -163,14 +209,18 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
       numRef.current = ""; setNum("")
       const k = q.findIndex((x) => x.num === +n)
       const j = k >= 0 ? k : +n - 1
-      if (j >= 0 && j < q.length) { setIdx(j); showBanner() }
+      if (j >= 0 && j < q.length) zapTo(j)
     }, 1500)
   }
 
   /* ---------- menus ---------- */
   const srvAudio = S.mediaServer && S.tracks.audio.length > 0
   const srvSubs = S.mediaServer && S.tracks.subs.length > 0
-  const openMenu = (m: MenuKind) => {
+  // which sheet each sheet was opened from (Settings > Speed): Back on the remote and the sheet's back arrow return there; a sheet opened from a control just closes
+  const menuFrom = useRef<Partial<Record<MenuKind, MenuKind>>>({})
+  const menuBack = () => { const up = menu ? menuFrom.current[menu] : undefined; return up ? () => openMenu(up, true) : undefined }
+  const openMenu = (m: MenuKind, up?: boolean) => {
+    if (!up) { if (menu) menuFrom.current[m] = menu; else delete menuFrom.current[m] }
     const v = vref.current!, h = E.hls.current
     const a = document.activeElement as HTMLElement | null
     if (a?.closest("[data-controls]")) opener.current = a // a sheet opened from another sheet (Settings > Speed) keeps the original control
@@ -208,7 +258,40 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
     if (s) next.sub = s.id
     if (next.audio !== undefined || next.sub !== undefined) apply(next)
   }, [S.tracks, item.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Settings > Subtitles > "Load my language automatically": once per title, after the remembered-language pick above had its turn.
+  // The title's own track in the first language, else the best online match (non-HI first). Refs: the async part must see the latest state.
+  const subsCfg = useApp((s) => s.settings.subs)
+  const autoSub = useRef("")
+  const { lang: uiLang } = useLang()
+  const latest = useRef<{ id: string; tr: Picked; ext: typeof extNow; apply: typeof apply; pickExt: (vtt: string, label: string) => void }>({ id: item.id, tr, ext: extNow, apply, pickExt: () => {} })
+  useEffect(() => {
+    const want = subsCfg?.auto && !live ? (subsCfg.langs?.length ? subsCfg.langs : DEFAULT_SUB_LANGS)[0] : undefined
+    if (!want || autoSub.current === item.id || prefs().subLang === "off") return
+    if (S.mediaServer ? !S.tracksReady : !E.started) return
+    autoSub.current = item.id
+    const id = item.id, L = latest
+    const on = () => L.current.id === id && !L.current.ext && !(L.current.tr.sub !== undefined && L.current.tr.sub >= 0)
+    const t0 = window.setTimeout(() => {
+      const v = vref.current, h = E.hls.current
+      if (!on() || !v || (!S.mediaServer && Array.from(v.textTracks).some((x) => x.mode !== "disabled"))) return // something is already on
+      const own = S.mediaServer ? S.tracks.subs.find((x) => sameLang(want, x.lang)) : undefined
+      if (own) { L.current.apply({ sub: own.id }); setSubSel(own.id); return }
+      const hi = h ? h.subtitleTracks.findIndex((x) => sameLang(want, x.lang)) : Array.from(v.textTracks).findIndex((x) => sameLang(want, x.language))
+      if (hi >= 0) { if (h) { h.subtitleTrack = hi; h.subtitleDisplay = true } else v.textTracks[hi].mode = "showing"; return }
+      void (async () => {
+        const q = await subQuery(item, useCatalog.getState().byId)
+        const { hits } = await searchSubs(q, want)
+        const rank = (x: (typeof hits)[number]) => (x.provider === "subdl" ? 0 : 2) + (x.hi ? 1 : 0) // SubDL first: OpenSubtitles allows ~5 downloads a day
+        const best = hits.slice().sort((a, b) => rank(a) - rank(b))[0]
+        if (!best || !on()) return
+        const vtt = await downloadSub(best, q)
+        if (on()) { L.current.pickExt(vtt, `${langName(best.lang || want, uiLang)} · ${best.name}`); fire("sub", langName(best.lang || want, uiLang)) }
+      })().catch(() => {}) // quiet: the user can still search by hand
+    }, 100) // after the remembered-language pick has landed
+    return () => clearTimeout(t0)
+  }, [item.id, S.tracksReady, E.started, subsCfg?.auto]) // eslint-disable-line react-hooks/exhaustive-deps
   const pickSub = (i: number) => {
+    setExt(null)
     if (srvSubs) {
       if (i !== subSel) { apply({ sub: i }); setPrefs({ subLang: i < 0 ? "off" : S.tracks.subs.find((x) => x.id === i)?.lang ?? "" }) }
       setSubSel(i); setMenu(null); return
@@ -218,6 +301,14 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
     else Array.from(vref.current!.textTracks).forEach((x, j) => (x.mode = j === i ? "showing" : "disabled"))
     setSubSel(i); setMenu(null)
   }
+  // a subtitle fetched online replaces whatever subtitle was on (a burned-in pick restarts the stream without it)
+  const pickExt = (vtt: string, label: string) => {
+    if (srvSubs) { if (tr.sub !== undefined && tr.sub >= 0) apply({ sub: -1 }) }
+    else if (E.hls.current) { E.hls.current.subtitleTrack = -1; E.hls.current.subtitleDisplay = false }
+    else Array.from(vref.current!.textTracks).forEach((x) => (x.mode = "disabled"))
+    setSubSel(-1); setExt({ id: item.id, label, vtt }); setMenu(null)
+  }
+  latest.current = { id: item.id, tr, ext: extNow, apply, pickExt: (vtt, label) => { const m = menu; pickExt(vtt, label); setMenu(m) } } // auto pick keeps an open sheet open
   const pickAudio = (i: number) => {
     if (srvAudio) {
       if (i !== audioSel) { apply({ audio: i }); setPrefs({ audioLang: S.tracks.audio.find((x) => x.id === i)?.lang ?? "" }) }
@@ -258,10 +349,10 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
     const id = window.setTimeout(() => {
       vref.current?.pause()
       setSleepMin(0); setSleepAt(null)
-      back()
+      stopRef.current() // the latest stop(): the player may be the mini one by now, and a stale one would pop an unrelated page
     }, Math.max(0, sleepAt - Date.now()))
     return () => clearTimeout(id)
-  }, [sleepAt, back])
+  }, [sleepAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- More panel ---------- */
   const openMore = () => {
@@ -289,7 +380,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
     showBanner()
     if (!keepOpen) closeMore()
   }
-  // the player must not keep playing under the next page: replace the route (unmounts the player = strict teardown)
+  // replace the route: the next page takes over and the player keeps running in the mini player (player/host.tsx)
   const details = (id: string) => useRoute.getState().replace("detail", { id })
   const person = (c: { id?: string; name: string }) => useRoute.getState().replace("person", { id: c.id, name: c.name })
   const trailer = (x: { key: string; name: string }) => { vref.current?.pause(); openTrailer(x) }
@@ -328,27 +419,27 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   useEffect(() => { if (E.err) closeImpl.current() }, [E.err])
 
   /* ---------- nav lock + focus ---------- */
-  navState.lock = !show && !menu && !E.err && more === "closed" && !nextOn && ov === "none"
+  navState.lock = !mini && !show && !menu && !E.err && more === "closed" && !nextOn && ov === "none"
   useEffect(() => () => { navState.lock = false }, [])
   // focus enters the menu / error buttons (both are [data-modal], so the D-pad stays inside them); the last modal in the DOM is the top one
   useEffect(() => {
-    if (!menu && !E.err) return
+    if (mini || (!menu && !E.err)) return
     requestAnimationFrame(() => {
       const all = root.current?.querySelectorAll<HTMLElement>("[data-modal]")
       const m = all?.[all.length - 1]
       ;(m?.querySelector<HTMLElement>("[data-autofocus]") ?? m?.querySelector<HTMLElement>("[data-nav]"))?.focus()
     })
-  }, [menu, E.err])
+  }, [menu, E.err, mini])
   // controls up: focus goes back to what opened the menu / the More button, else Play
   useEffect(() => {
-    if (!show || menu || E.err || more !== "closed" || ov !== "none") return
+    if (mini || !show || menu || E.err || more !== "closed" || ov !== "none" || nextOn) return // the Next card keeps the focus it took
     requestAnimationFrame(() => {
       const q = (s: string) => root.current?.querySelector<HTMLElement>(s)
-      const el = returnMore.current ? q("[data-more]") : opener.current?.isConnected ? opener.current : q("[data-play]")
-      returnMore.current = false; opener.current = null
+      const el = returnMore.current ? q("[data-more]") : opener.current?.isConnected ? opener.current : (seekFirst.current && q("[data-seek]")) || q("[data-play]")
+      returnMore.current = false; opener.current = null; seekFirst.current = false
       el?.focus()
     })
-  }, [show, menu, E.err, more, ov])
+  }, [show, menu, E.err, more, ov, mini, nextOn])
 
   /* ---------- desktop/mobile extras: fullscreen state, idle hide, wake lock ---------- */
   useEffect(() => {
@@ -360,6 +451,7 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
       clearTimeout(tap.current.w); clearTimeout(hideT.current); clearTimeout(bannerT.current); clearTimeout(numT.current)
     }
   }, [poke])
+  useEffect(() => () => { if (fsEl() === document.documentElement) void document.exitFullscreen?.().catch(() => {}) }, []) // page-level fallback: leave it with the player
   useEffect(() => {
     if (isTv || E.paused || E.err) return
     let l: WakeLockSentinel | null = null
@@ -393,9 +485,31 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   /* remembered volume / mute (per device) applied once */
   useEffect(() => { const v = vref.current!, p = prefs(); v.volume = p.vol; v.muted = p.muted }, [])
 
+  /* ---------- mini player (host) ---------- */
+  const stop = () => { if (!mini) back(); closePlayer() } // for good: no mini player
+  const stopRef = useRef(stop)
+  stopRef.current = stop
+  useEffect(() => { usePlayerHost.setState({ cur: { queue, index: idx } }) }, [queue, idx])
+  useEffect(() => { usePlayerHost.setState({ canMini: E.started && !E.err }) }, [E.started, E.err])
+  useEffect(() => { usePlayerHost.setState({ pip }) }, [pip]) // native PiP window open: the mini box hides
+  useEffect(() => { if (mini && E.err) closePlayer() }, [mini, E.err]) // a dead stream does not linger in the corner
+  const wasMini = useRef(mini)
+  useEffect(() => {
+    if (wasMini.current === mini) return
+    wasMini.current = mini
+    if (mini) {
+      setMenu(null); setHelp(false); setShow(false); clearTimeout(hideT.current)
+      if (moreRef.current !== "closed") setMore("closed")
+      if (ovRef.current !== "none") setOv("none")
+      if (fsEl()) void Promise.resolve((document.exitFullscreen || (document as unknown as { webkitExitFullscreen?: () => void }).webkitExitFullscreen)?.call(document)).catch(() => {})
+    } else poke()
+  }, [mini]) // eslint-disable-line react-hooks/exhaustive-deps
+  const expand = () => useRoute.getState().go("player", { queue, index: idx })
+
   useKeys({
+    off: mini, stop,
     live, show, menu, err: E.err, help, more, nextShow: nextOn, canPip, overlay: ov,
-    back, hide, closeMenu: () => setMenu(null), closeHelp: () => setHelp(false), toggleHelp: () => setHelp((h) => !h),
+    back, hide, closeMenu: () => { const up = menuBack(); if (up) up(); else setMenu(null) }, closeHelp: () => setHelp(false), toggleHelp: () => setHelp((h) => !h),
     closeMore, openMore, cancelNext: nu.cancel, skipSeg: skipOn ? sg.skip : undefined, closeOverlay, openStrip: () => openOverlay("strip"),
     play, pause, toggle, seek, zap, toggleFav: () => toggleFav(item.id), openMenu, cycleFit, poke,
     toggleFs, togglePip, toggleMute, setVolume: bumpVolume, digit,
@@ -417,16 +531,16 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
   return (
     <div
       ref={root}
-      style={{ "--sub-size": subSize } as React.CSSProperties}
-      className={`dark pl-root fixed inset-0 bg-black text-white${!show && more === "closed" && !isTv ? " cursor-none" : ""}`}
-      onMouseMove={poke}
+      className={`dark pl-root ${mini ? "absolute" : "fixed"} inset-0 bg-black text-white${!mini && !show && more === "closed" && !isTv ? " cursor-none" : ""}`}
+      onMouseMove={(e) => { if (mini) return; hover.current = !!(e.target as HTMLElement).closest(".pl-layer"); poke() }}
+      onMouseLeave={() => { hover.current = false; if (ptr.current === "mouse") { clearTimeout(hideT.current); idle() } }} // mouse left the window: hide now
       // desktop: wheel down pulls the More panel up; touch: swipe up (not from the seek bar or inside the panel)
-      onWheel={(e) => { if (moreRef.current === "closed" && ovRef.current === "none" && !menu && !help && !E.err && e.deltaY > 30) openMore() }}
+      onWheel={(e) => { if (!mini && moreRef.current === "closed" && ovRef.current === "none" && !menu && !help && !E.err && e.deltaY > 30) openMore() }}
       onTouchStart={(e) => { swipe.current = (e.target as HTMLElement).closest("[data-seek],[data-more-panel]") ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
       onTouchEnd={(e) => {
         const s = swipe.current
         swipe.current = null
-        if (!s || moreRef.current !== "closed" || ovRef.current !== "none" || menu || E.err) return
+        if (!s || mini || moreRef.current !== "closed" || ovRef.current !== "none" || menu || E.err) return
         const dy = e.changedTouches[0].clientY - s.y, dx = e.changedTouches[0].clientX - s.x
         if (dy < -70 && Math.abs(dx) < Math.abs(dy) * 0.6) openMore()
       }}
@@ -447,10 +561,24 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
         onVolumeChange={(e) => { const v = e.currentTarget; setVol(v.volume); setMuted(v.muted); setPrefs({ vol: v.volume, muted: v.muted }) }}
         onEnded={() => {
           if (idx < queue.length - 1) { if (!hasNext || (autoNext && !nu.blocked.current)) advance(); else poke() } // Cancel on the next-episode card also stops the auto-advance
-          else back()
+          else stop()
         }}
         {...E.handlers}
       />
+      {mini ? (
+        // mini player: the whole video expands it; play/pause + close in the corner
+        <div className="absolute inset-0">
+          <button data-nav aria-label={t("player.mini.expand")} onClick={expand} className="absolute inset-0 size-full rounded-[inherit]" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-6 text-sm" dir="auto">{item.name}</div>
+          <div className="absolute inset-x-0 top-2 mx-auto flex w-fit gap-1.5">
+            <button data-nav aria-label={E.paused ? t("player.play") : t("player.pause")} onClick={toggle} className="grid size-9 place-items-center rounded-full bg-black/60">{E.paused ? <PlayIcon className="size-4 fill-current" /> : <PauseIcon className="size-4 fill-current" />}</button>
+            {canPip && <button data-nav aria-label={t("player.pip")} onClick={togglePip} className="grid size-9 place-items-center rounded-full bg-black/60"><PictureInPicture2 className="size-4" /></button>}
+            <button data-nav aria-label={t("player.mini.close")} onClick={closePlayer} className="grid size-9 place-items-center rounded-full bg-black/60"><X className="size-5" /></button>
+          </div>
+          {E.buf && <div aria-hidden className="pointer-events-none absolute inset-0 m-auto size-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+        </div>
+      ) : <>
+      <Subtitles vref={vref} lift={show} />
       {E.buf && !E.err && <Spinner title={item.name} started={E.started} label={t("player.loading")} />}
       <Flash f={flash} />
       {num && <NumberEntry n={num} />}
@@ -460,10 +588,10 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
         <Controls
           on={show && more === "closed" && ov === "none"} live={live} tv={isTv} touch={touch && !isTv} vref={vref}
           paused={E.paused} queueLen={queue.length}
-          sleepAt={sleepAt} canPip={canPip} pip={pip} fs={fs} isFav={isFav} stats={E.stats} vol={vol} muted={muted}
+          sleepAt={sleepAt} fs={fs} vol={vol} muted={muted}
           onPrev={prev_} onNext={next_} onToggle={toggle} onSeek={(d) => { seek(d); poke() }} onSeekFrac={seekFrac}
-          onMute={toggleMute} onVolume={(x) => setVolume(x, false)} onFav={() => toggleFav(item.id)} onMenu={openMenu}
-          onPip={togglePip} onFs={toggleFs} onMore={openMore} onChannels={() => openOverlay("strip")}
+          onMute={toggleMute} onVolume={(x) => setVolume(x, false)} onMenu={openMenu}
+          onFs={toggleFs} onMore={openMore} onChannels={() => openOverlay("strip")}
         />
       </div>
 
@@ -475,12 +603,14 @@ export default function Player({ queue: q0, index }: { queue: Item[]; index: num
       {menu && (
         <PlayerMenu
           menu={menu} audio={srvAudio ? S.tracks.audio : E.audio} audioSel={audioSel} onAudio={pickAudio} subs={srvSubs ? S.tracks.subs : E.subs} subSel={subSel} onSub={pickSub}
-          subSize={subSize} onSubSize={stepSubSize} subOffset={S.sidecar !== null ? subOffset : null} onSubOffset={stepSubOffset}
-          sq={sq} onQuality={pickQ} speed={speed} onSpeed={pickSpeed} fit={fit} onFit={pickFit} sleepMin={sleepMin} onSleep={setSleep}
-          live={live} mediaServer={S.mediaServer} onMenu={openMenu} onClose={() => setMenu(null)}
+          subSize={subSize} onSubSize={stepSubSize} subOffset={extNow || S.sidecar !== null ? subOffset : null} onSubOffset={stepSubOffset}
+          item={item} ext={extNow?.label ?? null} onExt={pickExt}
+          sq={sq} onQuality={pickQ} stats={E.stats} speed={speed} onSpeed={pickSpeed} fit={fit} onFit={pickFit} sleepMin={sleepMin} onSleep={setSleep}
+          live={live} mediaServer={S.mediaServer} isFav={isFav} onFav={() => toggleFav(item.id)} variants={variants} onVariant={(v) => { setMenu(null); tune(v, queue.map((x, i) => (i === idx ? v : x))) }} canPip={canPip} pip={pip} onPip={togglePip} onMenu={openMenu} onBack={menuBack()} onClose={() => setMenu(null)}
         />
       )}
       {E.err && <ErrorScreen name={item.name} msg={E.err} canNext={queue.length > 1} onRetry={E.retry} onNext={() => zap(1)} onBack={back} />}
+      </>}
     </div>
   )
 }

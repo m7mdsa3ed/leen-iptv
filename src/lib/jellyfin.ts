@@ -1,13 +1,13 @@
 // Jellyfin server as a source: username/password or Quick Connect sign-in, catalog (per library), live TV + guide when the
 // server has it, detail, HLS URL, progress reporting. The token rides as api_key in the query so GETs stay CORS-simple.
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
-import type { Episode, Item, Source } from "./types"
+import type { Episode, Item, Source, Watch } from "./types"
 import { HttpError, fetchT, mixed, plexFetch, px, scanLan } from "./net"
 import { t } from "./i18n"
 import { useApp } from "./store"
 import { clientId } from "./plex"
 import { firstReachable } from "./plex-pure"
-import { authHeader, imageUrl, jfCands, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapIntroSkipper, mapSegments, mapStreams, normServer, toTicks, type Img } from "./jellyfin-pure"
+import { authHeader, imageUrl, jfActiveKind, jfCands, jfUrl, jfWatch, mapChannel, mapDetail, mapEpisode, mapItem, mapIntroSkipper, mapSegments, mapStreams, normServer, toTicks, type Img } from "./jellyfin-pure"
 
 export { normServer }
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -65,6 +65,9 @@ export async function ensureJellyfinConnection(s: Source, force = false): Promis
   if (!cand) throw errs.find((e) => (e as { auth?: boolean })?.auth) ?? new Error(t("source.conn.noRoute", { name: s.name }))
   return save(cand.uri)
 }
+
+/** Does the saved address answer right now (same server, token still accepted)? Throws when it does not; `ensureJellyfinConnection` skips this for a single address. */
+export const pingJellyfin = (s: Source) => jfProbe(s, { uri: base(s), kind: jfActiveKind(s) })
 
 const auth = (j: J): JfAuth => ({ token: String(j.AccessToken), userId: String(j.User?.Id) })
 
@@ -136,13 +139,31 @@ export async function loadJellyfin(s: Source, px_: string, step: (m: string) => 
   return out
 }
 
+/** Watch history: the newest 500 played + 500 in-progress movies/episodes of the signed-in user. */
+export async function jellyfinHistory(s: Source, px_: string): Promise<Watch[]> {
+  const q = (Filters: string) => get<{ Items?: J[] }>(s, px_, `/Users/${s.userId}/Items`, {
+    Recursive: "true", IncludeItemTypes: "Movie,Episode", Filters, SortBy: "DatePlayed", SortOrder: "Descending", Limit: 500, EnableUserData: "true", EnableImages: "false",
+  })
+  const lists = await Promise.all([q("IsPlayed"), q("IsResumable")])
+  return lists.flatMap((l) => (l.Items ?? []).map((m) => jfWatch(m, s.id)).filter((w): w is Watch => !!w))
+}
+
+export async function jellyfinPrograms(s: Source, px_: string, channelId: string): Promise<J[]> {
+  const now = Date.now()
+  const r = await get<{ Items?: J[]; Programs?: J[] }>(s, px_, "/LiveTv/Programs", {
+    userId: s.userId, channelIds: channelId,
+    MinStartDate: new Date(now - 3 * 3600_000).toISOString(), MaxStartDate: new Date(now + 6 * 3600_000).toISOString(),
+  })
+  return r.Items ?? r.Programs ?? []
+}
+
 export async function jellyfinDetail(s: Source, px_: string, item: Item): Promise<{ info: Record<string, unknown>; meta: Partial<import("./meta/types").Meta>; episodes: Episode[] }> {
   const img = jellyfinImg(s)
   const [d, sim, eps] = await Promise.all([
     get<J>(s, px_, `/Users/${s.userId}/Items/${item.sid}`),
     get<{ Items?: J[] }>(s, px_, `/Items/${item.sid}/Similar`, { userId: s.userId, limit: 20 }).catch(() => ({}) as { Items?: J[] }), // optional
     item.kind === "series"
-      ? get<{ Items?: J[] }>(s, px_, `/Shows/${item.sid}/Episodes`, { userId: s.userId, Fields: "Overview", EnableUserData: "true" })
+      ? get<{ Items?: J[] }>(s, px_, `/Shows/${item.sid}/Episodes`, { userId: s.userId, Fields: "Overview,MediaSources", EnableUserData: "true" })
       : Promise.resolve({} as { Items?: J[] }),
   ])
   const r = mapDetail(d, img)

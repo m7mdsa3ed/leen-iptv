@@ -1,8 +1,9 @@
+import { useEffect, useRef } from "react"
 import { create } from "zustand"
 import { isTv } from "@/lib/device"
 import { useApp } from "@/lib/store"
 import { envConfigured } from "@/lib/api"
-import { lineStart, pickIndex, popLen, scoreMove, type Box, type Dir } from "@/lib/nav-pure"
+import { firstRowIndex, lineStart, pickIndex, popLen, scoreMove, type Box, type Dir, type Hints } from "@/lib/nav-pure"
 
 export { scoreMove }
 
@@ -18,9 +19,9 @@ interface R {
 /* URL <-> stack. Each history entry carries a hash (#/live, #/detail/<id>, #/player/<id>) so a refresh lands on the same page.
    Hash routing works from file:// (webOS) and any static host. Entry d=0 is a guard (Back never leaves the app),
    entry d=n shows stack[n-1]. */
-const PAGES = ["profiles", "sources", "home", "live", "movies", "series", "library", "settings", "detail", "player", "person", "team", "sports", "category", "genre", "history", "stats", "diagnostics", "welcome", "link", "episode"]
+const PAGES = ["profiles", "sources", "home", "live", "movies", "series", "library", "settings", "detail", "player", "person", "team", "match", "sports", "category", "genre", "history", "stats", "diagnostics", "welcome", "link", "episode"]
 const hashOf = (r: Route) => {
-  const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "team" ? r.p?.id : r.name === "detail" || r.name === "episode" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
+  const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "team" || r.name === "match" ? r.p?.id : r.name === "detail" || r.name === "episode" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
   return `#/${r.name}${id ? "/" + encodeURIComponent(String(id)) : ""}`
 }
 const baseFor = (id: string): Route["name"] => (id.includes("|live|") ? "live" : id.includes("|movie|") ? "movies" : id.includes("|series|") ? "series" : "home")
@@ -43,11 +44,16 @@ function initialStack(): Route[] {
   if ((name === "category" || name === "genre") && id) return [{ name: id.startsWith("series|") ? "series" : "movies" }, { name, p: { id } }]
   if (name === "person" && id) return [{ name: "home" }, { name, p: { id } }]
   if (name === "team" && id) return [{ name: "home" }, { name, p: { id } }]
+  if (name === "match" && id) return [{ name: "home" }, { name, p: { id } }]
   if (name === "episode" && id.includes("~")) { const sid = id.slice(0, id.indexOf("~")); return [{ name: baseFor(sid) }, { name: "detail", p: { id: sid } }, { name, p: { id } }] } // <seriesId>~<episodeItemId>
   return [{ name }]
 }
 
-let skip = 0 // popstates caused by back()/reset(): the stack is already trimmed
+let skip = 0, skipAt = 0 // popstates caused by back()/reset(): the stack is already trimmed. Two quick back() calls can share ONE traversal, so a stale count expires instead of swallowing a later real Back
+const markSkip = () => (skip++, (skipAt = performance.now()))
+/** Back on a top-level page (a tab, Settings, ...) other than Home goes Home; setup screens (no profile/source yet) keep their own flow. */
+const NOT_HOME = ["home", "welcome", "profiles", "sources", "link"]
+const backToHome = (st: Route[]) => st.length === 1 && !NOT_HOME.includes(st[0].name)
 const url = () => hashOf(useRoute.getState().stack.slice(-1)[0])
 export const useRoute = create<R>((set, get) => ({
   stack: initialStack(),
@@ -61,17 +67,22 @@ export const useRoute = create<R>((set, get) => ({
   },
   back: () => {
     const st = get().stack
+    if (backToHome(st)) {
+      set({ stack: [{ name: "home" }] })
+      history.replaceState(history.state, "", url())
+      return true
+    }
     if (st.length <= 1) return false
     // our stack decides (exactly one page), the browser follows: it may skip entries pushed without a user gesture
     set({ stack: st.slice(0, -1) })
-    skip++
+    markSkip()
     history.back()
     return true
   },
   reset: (name) => {
     const n = get().stack.length
     set({ stack: [{ name }] })
-    if (n > 1) (skip++, history.go(1 - n))
+    if (n > 1) (markSkip(), history.go(1 - n))
     else history.replaceState(history.state, "", url())
   },
 }))
@@ -81,18 +92,42 @@ export const useRoute = create<R>((set, get) => ({
   st.forEach((r, i) => history.pushState({ d: i + 1 }, "", hashOf(r)))
 }
 window.addEventListener("popstate", (e) => {
-  const ours = skip > 0
-  if (ours) skip--
+  const ours = skip > 0 && performance.now() - skipAt < 2000
+  skip = ours ? skip - 1 : 0
   const d = (e.state?.d as number | undefined) ?? 0
   const st = useRoute.getState().stack
   if (!ours && d > st.length) return void history.go(st.length - d) // forward button: not supported
   const n = popLen(d, st.length, ours)
   if (n < st.length) useRoute.setState({ stack: st.slice(0, n) })
   // re-stamp the entry we landed on to match the stack; landing on the guard (d=0) pushes a page entry back so Back never leaves the app
-  if (d < 1) history.pushState({ d: n }, "", url())
+  if (d < 1) {
+    if (backToHome(useRoute.getState().stack)) useRoute.setState({ stack: [{ name: "home" }] }) // browser Back on a top-level page: Home, like the remote
+    history.pushState({ d: useRoute.getState().stack.length }, "", url())
+  }
   else history.replaceState({ d: n }, "", url())
 })
 export const useCur = () => useRoute((s) => s.stack[s.stack.length - 1])
+
+/* A page with an inner step (the add-profile form, a sign-in panel) registers it while it is open: Back closes that step instead of leaving the page.
+   A step belongs to the page that registered it (its stack depth): stacked pages stay mounted, and a hidden page's step must not swallow Back on the page above it.
+   `global` = not a page's (the password-recovery dialog, shown over whatever page is up). */
+const steps: { f: () => void; depth: number }[] = []
+export function useBackStep(open: boolean, close: () => void, global = false) {
+  const fn = useRef(close)
+  fn.current = close
+  useEffect(() => {
+    if (!open) return
+    const step = { f: () => fn.current(), depth: global ? 0 : useRoute.getState().stack.length }
+    steps.push(step)
+    return () => void steps.splice(steps.indexOf(step), 1)
+  }, [open, global])
+}
+/** App's Back chain: closes the innermost open step of the page on top (or a global one); false when there is none. */
+export const backStep = () => {
+  const depth = useRoute.getState().stack.length
+  for (let i = steps.length - 1; i >= 0; i--) if (steps[i].depth === 0 || steps[i].depth === depth) return steps[i].f(), true
+  return false
+}
 
 // webOS remote key codes (LG magic remote / standard remote)
 export const KEY = {
@@ -118,6 +153,16 @@ function topModal() {
   return null
 }
 
+/** An open [data-modal] that is not inside `scope` (a CSS selector): the player yields its keys to those (PIN, card menu, trailer, keyboard...). */
+export function dialogOutside(scope: string) {
+  const all = document.querySelectorAll<HTMLElement>("[data-modal]")
+  for (let i = 0; i < all.length; i++) if (!all[i].closest(scope) && all[i].getBoundingClientRect().width > 0) return true
+  return false
+}
+
+/** The player's raw-key lock (navState.lock) only holds while no dialog is open: a PIN prompt, card menu or keyboard over a locked player still needs the D-pad. */
+const locked = () => navState.lock && !topModal()
+
 export function focusables(root: ParentNode = document) {
   // an open [data-modal] scopes navigation to itself
   const scope = topModal() ?? root
@@ -131,12 +176,35 @@ function focusEl(el: HTMLElement) {
 }
 
 let anchorX: number | null = null // x centre kept across consecutive Up/Down moves
+/** What the boxes alone cannot say (see nearestRow): the row / grid / list each candidate belongs to, and whether it sits beside the page ([data-nav-aside]). */
+function hintsOf(els: HTMLElement[]): Hints {
+  const seen = new Map<Element, Box>()
+  return {
+    ext: els.map((el) => {
+      let g = el.closest("[data-nav-group],[data-vscroll]")
+      for (let up = g?.parentElement?.closest("[data-nav-group],[data-vscroll]"); up; up = up.parentElement?.closest("[data-nav-group],[data-vscroll]")) g = up // the outermost: a settings Row that holds a Segmented
+      if (!g) return null
+      let b = seen.get(g)
+      if (!b) { const r = g.getBoundingClientRect(); seen.set(g, (b = { left: r.left, right: r.right, top: r.top, bottom: r.bottom })) }
+      return b
+    }),
+    aside: els.map((el) => !!el.closest("[data-nav-aside]")),
+  }
+}
 function pick(from: HTMLElement, dir: Dir) {
   const a = from.getBoundingClientRect()
   const vert = dir === "up" || dir === "down"
   if (vert && anchorX == null) anchorX = (a.left + a.right) / 2
   const els = focusables().filter((el) => el !== from)
-  const i = pickIndex(a, els.map((el) => el.getBoundingClientRect()), dir, vert ? anchorX : null)
+  const i = pickIndex(a, els.map((el) => el.getBoundingClientRect()), dir, vert ? anchorX : null, hintsOf(els))
+  return i >= 0 ? els[i] : null
+}
+
+/** Down from the top bar goes to the first row on screen (the hero's Watch button, the category chips...), not to whatever lies under the tab. */
+function firstRow(bar: HTMLElement) {
+  const edge = (bar.closest("header.topbar") ?? bar).getBoundingClientRect().bottom
+  const els = focusables().filter((e) => e.closest("[data-page-content]") && !e.closest("[data-nav-aside]"))
+  const i = firstRowIndex(els.map((e) => e.getBoundingClientRect()), edge, window.innerHeight, document.documentElement.dir === "rtl")
   return i >= 0 ? els[i] : null
 }
 
@@ -168,7 +236,8 @@ function viaMemory(cur: HTMLElement, next: HTMLElement, dir: Dir) {
 
 function wrap(cur: HTMLElement, next: HTMLElement | null, dir: Dir) {
   const w = cur.closest("[data-nav-wrap]")
-  if (!w || (dir !== "left" && dir !== "right") || (next && w.contains(next))) return next
+  // only at a dead end: a neighbour outside the row (the top bar's Search and profile buttons beside the tabs) is still reachable
+  if (!w || (dir !== "left" && dir !== "right") || next) return next
   // by position (not DOM order) so RTL and reordered rows wrap to the visually opposite end
   const items = Array.from(w.querySelectorAll<HTMLElement>("[data-nav]")).filter(visible).map((el) => ({ el, x: el.getBoundingClientRect().left }))
   items.sort((p, q) => p.x - q.x)
@@ -177,6 +246,8 @@ function wrap(cur: HTMLElement, next: HTMLElement | null, dir: Dir) {
 
 const textField = (e: Element) => e instanceof HTMLTextAreaElement || (e instanceof HTMLInputElement && TEXT.test(e.type))
 const TEXT = /^(text|search|email|password|url|tel|number)$/
+const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/
+const STRONG = /[A-Za-z\u00C0-\u024F\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/ // a letter with a direction (digits and punctuation have none)
 let autoWait = 0
 export function focusFirst() {
   clearInterval(autoWait)
@@ -206,10 +277,7 @@ function scroller(el: HTMLElement) {
   }
   return null
 }
-/** focus without the browser's jump, then keep it comfortably visible (rails: centre when clipped) */
-function focusTo(el: HTMLElement, fast: boolean) {
-  lastKeyTarget = el
-  focusEl(el)
+function scrollFocused(el: HTMLElement, fast: boolean) {
   const m = document.documentElement.dataset.motion
   const behavior: ScrollBehavior = fast || m === "off" || m === "reduced" ? "auto" : "smooth"
   const sc = scroller(el)
@@ -218,7 +286,19 @@ function focusTo(el: HTMLElement, fast: boolean) {
     const r = el.getBoundingClientRect(), pr = sc.getBoundingClientRect()
     clipped = r.left < pr.left || r.right > pr.right
   }
-  el.scrollIntoView({ block: "nearest", inline: clipped ? "center" : "nearest", behavior })
+  el.scrollIntoView({ block: el.closest("nav") ? "center" : "nearest", inline: clipped ? "center" : "nearest", behavior })
+  if (el === lastEl) { // where it is NOW, not where it was before the scroll: that is where recover() looks if the control disappears
+    const r = el.getBoundingClientRect()
+    lastBox = { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+    if (el === lastPage) lastPageBox = lastBox
+  }
+}
+/** focus without the browser's jump, then keep it comfortably visible (navigation controls stay centred).
+ *  `keep` = a D-pad move: the x anchor of consecutive Up/Down moves survives it. Any other focus (page open, recovery, Back to the tab bar) starts a new column. */
+function focusTo(el: HTMLElement, fast: boolean, keep = false) {
+  lastKeyTarget = keep ? el : null
+  focusEl(el)
+  scrollFocused(el, fast)
 }
 
 /* Virtualized lists ([data-vscroll] = VList / VGrid): only the rows near the viewport are mounted, so at the edge of the mounted
@@ -238,8 +318,8 @@ function virtualStep(vs: HTMLElement, cur: HTMLElement, dir: Dir, fast: boolean)
   const attempt = () => {
     const o = { left: from.left, right: from.right, top: from.top - moved, bottom: from.bottom - moved }
     const els = focusables().filter((el) => vs.contains(el))
-    const i = pickIndex(o, els.map((el) => el.getBoundingClientRect()), dir, anchorX)
-    if (i >= 0) { vsBusy = false; return focusTo(els[i], fast) }
+    const i = pickIndex(o, els.map((el) => el.getBoundingClientRect()), dir, anchorX, hintsOf(els))
+    if (i >= 0) { vsBusy = false; return focusTo(els[i], fast, true) }
     if (++tries < 5) return void requestAnimationFrame(attempt)
     vsBusy = false
   }
@@ -251,6 +331,27 @@ let lastMove = 0
 let lastEl: HTMLElement | null = null
 let lastBox: Box | null = null
 let lastRoute: unknown = null
+let lastPage: HTMLElement | null = null // last focused control outside every [data-modal]: where focus goes back to when a dialog closes
+let lastPageBox: Box | null = null // ...and where it was, for when that control is gone (its dialog's action removed it)
+const modalLast = new WeakMap<Element, HTMLElement>() // last focused control per dialog: a dialog closing over another one hands focus back to it
+
+let keyAt = 0 // time of the last key: a blur right after one is React re-ordering / disabling the control, not the user clicking away
+
+/** Focus is nowhere (the focused control was removed, moved by React or disabled itself): the same control if it is still usable, else the one nearest to where it was; a new page starts at its first control. */
+function recover(box: Box | null = lastBox) {
+  const stack = useRoute.getState().stack
+  if (!box || lastRoute !== stack[stack.length - 1]) return focusFirst()
+  const els = focusables()
+  if (lastEl && els.includes(lastEl)) return focusTo(lastEl, true)
+  const cx = (box.left + box.right) / 2, cy = (box.top + box.bottom) / 2
+  let best: HTMLElement | null = null, bd = Infinity
+  for (const el of els) {
+    const r = el.getBoundingClientRect()
+    const d = Math.hypot((r.left + r.right) / 2 - cx, (r.top + r.bottom) / 2 - cy)
+    if (d < bd) (best = el), (bd = d)
+  }
+  return best ? focusTo(best, true) : focusFirst()
+}
 
 function pageMove(cur: HTMLElement, sign: 1 | -1) {
   const dir: Dir = sign > 0 ? "down" : "up"
@@ -272,7 +373,8 @@ const NATIVE_CLICK = /^(BUTTON|A|INPUT|SELECT|TEXTAREA|SUMMARY)$/
 const hold = { t: 0, el: null as HTMLElement | null }
 export function installNav(onBack: () => void) {
   const onKey = (e: KeyboardEvent) => {
-    if (navState.lock) return
+    if (locked()) return
+    keyAt = performance.now()
     const dir = DIRS[e.keyCode]
     const t = e.target as HTMLElement
     // typing = text entry only: checkboxes, radios, ranges, buttons... are plain controls (Enter activates, arrows navigate)
@@ -289,17 +391,19 @@ export function installNav(onBack: () => void) {
       } else if (typing && (dir === "left" || dir === "right")) {
         // caret moves inside the text; at the edge of the text the key leaves the field
         const i = t as HTMLInputElement
-        const s0 = i.selectionStart, s1 = i.selectionEnd
-        if (i.value && !(s0 === s1 && s0 != null && (dir === "left" ? s0 === 0 : s0 === i.value.length))) return
+        const s0 = i.selectionStart, s1 = i.selectionEnd // null on type=email / number: no caret to move, the key leaves
+        const rtl = i.dir === "auto" ? RTL_CHAR.test((i.value ?? "").match(STRONG)?.[0] ?? "") : getComputedStyle(i).direction === "rtl" // dir=auto: the first strong letter decides; Left walks toward the END of right-to-left text
+        if (i.value && s0 != null && !(s0 === s1 && ((dir === "left") !== rtl ? s0 === 0 : s0 === i.value.length))) return
       } else if (t instanceof HTMLInputElement && t.type === "range" && (dir === "left" || dir === "right") && t.hasAttribute("data-seek")) return // seek bar: native step
       e.preventDefault()
-      if (!cur || cur === document.body || cur === document.documentElement) return focusFirst()
+      if (!cur || cur === document.body || cur === document.documentElement) return recover() // focus is nowhere: the key brings it back (to the last control), it does not also move
       // key repeat: throttle so virtualized lists can mount rows between moves
       const now = performance.now()
       if (e.repeat && now - lastMove < 90) return
       lastMove = now
       if (dir === "left" || dir === "right") anchorX = null
       let next = dir ? pick(cur, dir) : pageMove(cur, page as 1 | -1)
+      if (dir === "down" && cur.closest("header.topbar")) next = firstRow(cur) ?? next
       if (dir) {
         if (next) next = viaMemory(cur, next, dir)
         next = wrap(cur, next, dir)
@@ -308,7 +412,7 @@ export function installNav(onBack: () => void) {
         const vs = cur.closest<HTMLElement>("[data-vscroll]")
         if (vs && (!next || !vs.contains(next)) && canScrollV(vs, dir)) return virtualStep(vs, cur, dir, e.repeat)
       }
-      if (next) focusTo(next, e.repeat)
+      if (next) focusTo(next, e.repeat, true)
       else if (!cur.hasAttribute("data-nav") || !visible(cur)) focusFirst() // stray/disabled focus with nowhere to go
     } else if ((e.keyCode === KEY.enter || e.keyCode === 32) && !typing && !(t instanceof HTMLSelectElement) && t.hasAttribute?.("data-nav") && ((e.keyCode === KEY.enter && isTv) || !NATIVE_CLICK.test(t.tagName))) {
       // TV: Enter clicks any [data-nav]; div/section/[role] with data-nav (any mode): Enter and Space click like a button
@@ -321,9 +425,10 @@ export function installNav(onBack: () => void) {
       e.preventDefault()
       // Back from page content first returns to the layout's active nav item ([data-nav-home])
       const home = Array.from(document.querySelectorAll<HTMLElement>("[data-nav-home]")).find(visible)
-      const box = home?.parentElement
+      const box = home?.closest("nav") ?? home?.parentElement // the whole tab bar / settings list: Back from another item of it leaves too
       const cur = document.activeElement as HTMLElement
-      if (home && box && !topModal() && cur?.hasAttribute?.("data-nav") && !box.contains(cur)) return focusTo(home, false)
+      // ...but only on a top-level page: a sub-page (category, genre, history) Back pops at once
+      if (home && box && !topModal() && cur?.hasAttribute?.("data-nav") && !box.contains(cur) && useRoute.getState().stack.length === 1) return focusTo(home, false)
       onBack()
     }
   }
@@ -340,6 +445,9 @@ export function installNav(onBack: () => void) {
     lastEl = el
     const r = el.getBoundingClientRect()
     lastBox = { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+    const dlg = el.closest("[data-modal]")
+    if (dlg) modalLast.set(dlg, el)
+    else (lastPage = el), (lastPageBox = lastBox)
     lastRoute = useRoute.getState().stack[useRoute.getState().stack.length - 1]
     for (let g = groupOf(el); g; g = groupOf(g.parentElement)) memory.set(g, el)
   }
@@ -357,6 +465,7 @@ export function installNav(onBack: () => void) {
     if (modal && !modal.contains(el)) return
     lastKeyTarget = null
     focusEl(el)
+    scrollFocused(el, false)
   }
   // never lose focus: if the focused element unmounts/hides/disables (virtualized list, reload, page change) or nothing was ever
   // focused, refocus the nearest remaining item (same page) or the page's first/autofocus item. A deliberate pointer blur
@@ -368,24 +477,28 @@ export function installNav(onBack: () => void) {
   }
   let timer = 0
   const mo = new MutationObserver(() => {
-    if (timer || navState.lock || !stray()) return
+    if (timer || locked() || !stray()) return
     timer = window.setTimeout(() => {
       timer = 0
-      if (navState.lock || !stray()) return
+      if (locked() || !stray()) return
       const m = topModal()
       const stack = useRoute.getState().stack
       const lost = !lastEl || !lastEl.isConnected || !visible(lastEl) || (m != null && !m.contains(lastEl))
       const moved = lastRoute !== stack[stack.length - 1]
-      if (!lost && !moved && !m) return
-      if (m || !lost || moved || !lastBox) return focusFirst()
-      const cx = (lastBox.left + lastBox.right) / 2, cy = (lastBox.top + lastBox.bottom) / 2
-      let best: HTMLElement | null = null, bd = Infinity
-      for (const el of focusables()) {
-        const r = el.getBoundingClientRect()
-        const d = Math.hypot((r.left + r.right) / 2 - cx, (r.top + r.bottom) / 2 - cy)
-        if (d < bd) (best = el), (bd = d)
+      if (m) { // a dialog is up: back to where focus was inside it (another dialog just closed over it), else its first control
+        const r = modalLast.get(m)
+        return r && r.isConnected && visible(r) ? focusTo(r, true) : focusFirst()
       }
-      if (best) focusTo(best, true)
+      if (moved) return focusFirst()
+      if (!lost) { // the control is still there: blurred right after a key = React moved / re-keyed it ("move down" buttons), so take it back; a click on empty space is left alone
+        if (lastEl && performance.now() - keyAt < 1000) focusTo(lastEl, true)
+        return
+      }
+      // a dialog closed on the same page: back to the control that opened it, or to whatever now sits where that one was (an action can remove it: "remove from continue watching"),
+      // not to whatever is nearest to where the dialog's own button was
+      const fromDialog = !!lastEl?.closest("[data-modal]")
+      if (fromDialog && lastPage?.isConnected && visible(lastPage)) return focusTo(lastPage, true)
+      recover((fromDialog && lastPageBox) || lastBox)
     }, 120)
   })
   window.addEventListener("keydown", onKey)

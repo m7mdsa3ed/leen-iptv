@@ -1,5 +1,5 @@
 // IPTV names are messy: "AR - The Weight (2023) [4K]". Providers need the bare title (+ year when it is bracketed).
-const NOISE = /\b(4k|uhd|fhd|hd|sd|hdr10?\+?|hevc|x26[45]|h\.?26[45]|web-?dl|web-?rip|blu-?ray|brrip|dvdrip|hdtv|2160p|1080p|720p|480p|dubbed|subbed|multi)\b/gi
+const NOISE = /\b(4k|uhd|fhd|hd|sd|hdr10?\+?|hdr|dolby[ .-]?vision|hevc|x26[45]|h\.?26[45]|av1|vp9|10[ .-]?bit|8[ .-]?bit|hdcam(?:rip)?|hdts|cam(?:rip)?|telesync|telecine|workprint|screener|bluray|blu[ .-]?ray|brrip|bdrip|bdr|dvdrip|dvd|hdtv|pdtv|dsr|web[ .-]?dl|web[ .-]?rip|webrip|webdl|proper|repack|rerip|limited|extended|unrated|remastered|internal|readnfo|aac\d?(?:\.\d)?|e-?ac-?3|ac-?3|ddp?\+?\d?(?:\.\d)?|truehd|dts(?:-hd)?(?:[ .-]?ma)?|atmos|mp3|flac|2160p|1080p|720p|576p|540p|480p|360p|dubbed|subbed|multi)\b/gi
 const YEAR = /[([]\s*((?:19|20)\d{2})\s*[)\]]/
 
 /** The bracketed year of a name, as cleanTitle() reads it (cheap: one regex). */

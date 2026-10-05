@@ -8,6 +8,20 @@ export type Snapshot = { v: 1; e: Record<string, Ent>; progress: Record<string, 
 /** local stamp bookkeeping: h = hash of the value when it was last stamped */
 export type Stamp = { t: number; del?: 1; h: string }
 
+/** Minutes this device's clock is off the server's, or 0 when within `max` ms. Stamps are last-writer-wins, so a skewed clock would win or lose edits it shouldn't. */
+export const clockSkewMin = (server: number, now: number, max = 120000) => (Math.abs(server - now) > max ? Math.round(Math.abs(server - now) / 60000) : 0)
+
+/** What a merge changed on this device: entities that differ from local (added, edited or removed), by kind. Progress and watch days are left out (they change on every play elsewhere). */
+export function mergeSummary(local: Snapshot, merged: Snapshot) {
+  const n = { sources: 0, profiles: 0, other: 0 }
+  for (const k in merged.e) {
+    const a = local.e[k], b = merged.e[k]
+    if (a && a.t === b.t && !!a.del === !!b.del) continue
+    n[k[0] === "s" ? "sources" : k[0] === "p" ? "profiles" : "other"]++
+  }
+  return n
+}
+
 export const emptySnap = (): Snapshot => ({ v: 1, e: {}, progress: {}, days: {} })
 
 export function stable(x: unknown): string {
@@ -46,16 +60,23 @@ export type AppSlice = {
   settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown; metaMatch?: Record<string, string | { id: string }>; logoMatch?: Record<string, string> } & Partial<Record<DisplayKey, unknown>>
 }
 /** Display preferences that follow the account. Only written once set (an untouched device never overwrites a customised one); "reset" stores an empty value, not undefined. */
-export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext", "noAutoShows", "colorTheme"] as const
+export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext", "noAutoShows", "colorTheme", "subs"] as const
 type DisplayKey = (typeof DISPLAY_KEYS)[number]
 export const RECENTS_MAX = 40
+
+type Src = P & { type?: string; server?: string; url?: string; user?: string; userId?: string; serverId?: string; conns?: unknown[]; localServer?: string; remoteServer?: string }
+/** Plex/Jellyfin sources with several addresses re-pick `server` per device (home Wi-Fi vs away), so it is not part of the change hash and a merge never overwrites this device's pick. */
+const autoServer = (x: Src) => !!(x.conns?.length || x.localServer || x.remoteServer)
+const srcKey = (x: Src) => [x.type, x.serverId || (x.server || x.url || "").toLowerCase().replace(/\/+$/, ""), x.userId || x.user || ""].join("|")
+/** How many sources are copies of another (same account on the same server), e.g. the same provider added by hand on two devices. */
+export const dupSources = (list: P[]) => list.length - new Set((list as Src[]).map(srcKey)).size
 
 /** Current synced values keyed like Snapshot.e, with a hash for change detection. */
 export function flatten(s: AppSlice): Record<string, { h: string; v?: unknown }> {
   const o: Record<string, { h: string; v?: unknown }> = {}
   const put = (k: string, v: unknown) => { o[k] = { h: hash(stable(v)), v } }
   s.profiles.forEach((p) => put(`p/${p.id}`, p))
-  s.sources.forEach((x) => put(`s/${x.id}`, x))
+  s.sources.forEach((x) => { o[`s/${x.id}`] = { h: hash(stable(autoServer(x as Src) ? { ...x, server: undefined } : x)), v: x } })
   for (const pid in s.data) {
     if (!s.profiles.some((p) => p.id === pid)) continue
     const d = s.data[pid]
@@ -112,7 +133,10 @@ export function applySnapshot(cur: AppSlice, m: Snapshot): { slice: AppSlice; da
   }
   const profiles = ordered(cur.profiles, "p/")
   const orderEnt = alive("c/sourceOrder")
-  const sources = ordered(cur.sources, "s/", Array.isArray(orderEnt?.v) ? (orderEnt!.v as string[]) : undefined)
+  const sources = ordered(cur.sources, "s/", Array.isArray(orderEnt?.v) ? (orderEnt!.v as string[]) : undefined).map((x) => {
+    const l = (cur.sources as Src[]).find((y) => y.id === x.id)
+    return l?.server && autoServer(x as Src) ? { ...x, server: l.server } : x // keep this device's active address
+  })
   const pset = new Set(profiles.map((p) => p.id))
   const data: AppSlice["data"] = {}
   for (const p of profiles) data[p.id] = { favs: [], recents: [], progress: {}, lists: [], follows: [] }

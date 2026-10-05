@@ -47,7 +47,7 @@ export function LogoModal() {
       <div className="flex max-h-full w-full max-w-[40rem] flex-col gap-4 rounded-[28px] bg-surface p-6 shadow-2xl">
         <div className="text-center text-2xl font-semibold">{t("nav.logo.title")}</div>
         <div dir="auto" className="truncate text-center text-base text-muted-foreground">{item.name}</div>
-        <input data-nav value={q} onChange={(e) => setQ(e.target.value)} type="search" enterKeyHint="search" autoComplete="off"
+        <input data-nav data-autofocus="" value={q} onChange={(e) => setQ(e.target.value)} type="search" enterKeyHint="search" autoComplete="off"
           placeholder={t("common.search")} aria-label={t("common.search")} dir="auto" className="min-h-11 rounded-full bg-surface-2 px-4 text-base outline-none" />
         <div className="text-sm text-muted-foreground">{t("nav.logo.hint")}</div>
         <div className="-mx-2 grid min-h-0 grid-cols-3 gap-2 overflow-y-auto px-2 sm:grid-cols-4" data-nav-group>

@@ -28,12 +28,12 @@ html[data-layout=googletv] .pl-root { --pl-btn: rgba(255, 255, 255, .12); }
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur);
 }
 .pl-layer[data-on] { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
-.pl-top { transform: translate3d(0, -10px, 0); background: var(--bar-top); }
-.pl-bottom { transform: translate3d(0, 10px, 0); background: var(--bar-bottom); }
+.pl-top { transform: translate3d(0, -10px, 0); background: var(--scrim-top); }
+.pl-bottom { transform: translate3d(0, 10px, 0); background: var(--scrim-bottom); }
 
 /* ---- shared pieces: top bar, channel strip, next card ---- */
-.pl-pad-top { padding-top: max(1rem, env(safe-area-inset-top)); }
-@media (min-width: 640px) { .pl-pad-top { padding-top: max(1.75rem, env(safe-area-inset-top)); } }
+.pl-pad-top { padding-top: max(1rem, var(--safe-t)); }
+@media (min-width: 640px) { .pl-pad-top { padding-top: max(1.75rem, var(--safe-t)); } }
 .pl-title { font-size: var(--pl-title); font-weight: 500; }
 .pl-sub { font-size: var(--pl-sub); color: rgba(255, 255, 255, .7); }
 .pl-chip { display: inline-flex; align-items: center; gap: .5rem; height: calc(var(--pl-h) * .75); padding-inline: 1rem; border-radius: 999px; background: var(--pl-btn); box-shadow: inset 0 0 0 1px var(--pl-btn-edge); color: #fff; font-size: 1rem; }
@@ -120,5 +120,3 @@ html[data-mode=tv] .pl-tile.pl-cur:focus { box-shadow: none; }
 .pl-more-body::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: rgba(14, 15, 17, .9); -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, .08) 3rem, rgba(0, 0, 0, .3) 7rem, rgba(0, 0, 0, .65) 11rem, #000 16rem); mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, .08) 3rem, rgba(0, 0, 0, .3) 7rem, rgba(0, 0, 0, .65) 11rem, #000 16rem); }
 html:not([data-mode=tv]) .pl-more-body::before { background: rgba(14, 15, 17, .72); -webkit-backdrop-filter: blur(28px) saturate(1.4); backdrop-filter: blur(28px) saturate(1.4); }
 
-/* subtitle size (Player sets --sub-size, percent); 5vh is the browser's default cue size */
-.pl-root video::cue { font-size: calc(var(--sub-size, 100) * 0.05vh); }
