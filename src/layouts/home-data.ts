@@ -1,10 +1,13 @@
-import { useMemo } from "react"
-import { t, useLang } from "@/lib/i18n"
+import { catsOf } from "@/lib/merge-pure"
+import { useEffect, useMemo } from "react"
+import { fmt, t, useLang } from "@/lib/i18n"
+import { useNotify } from "@/lib/notify"
+import { accountInfo } from "@/lib/xtream"
 import { useCatalog } from "@/lib/catalog"
 import { useApp, usePData } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { useOpen } from "@/components/tv/ui"
-import type { Item, Kind } from "@/lib/types"
+import type { Item, Kind, Source } from "@/lib/types"
 import { useSources } from "@/lib/sources"
 import { inSource, useActiveFilter, useCatalogView } from "./hooks/use-source-filter"
 
@@ -30,6 +33,26 @@ export type HomeRail = {
   seeAll?: () => void
 }
 
+const DAY = 86400000
+const checked = new Set<string>() // ponytail: once per app session per source; a daily stamp in localStorage if that nags too much
+
+/** Toast on Home when an Xtream subscription has ended or ends within 7 days. */
+function useExpiryWarning(sources: Source[], proxy: string) {
+  useEffect(() => {
+    const todo = sources.filter((s) => s.type === "xtream" && !checked.has(s.id))
+    if (!todo.length) return
+    todo.forEach((s) => checked.add(s.id))
+    void Promise.all(todo.map((s) => accountInfo(s, proxy).then((a) => ({ s, exp: a?.exp ?? 0 })))).then((r) => {
+      const now = Date.now()
+      const lines = r.filter((x) => x.exp && x.exp - now < 7 * DAY).map(({ s, exp }) => {
+        const date = fmt.date(exp, { dateStyle: "medium" })
+        return exp < now ? t("hooks.expiry.ended", { name: s.name, date }) : t("hooks.expiry.soon", { name: s.name, date, n: Math.ceil((exp - now) / DAY) })
+      })
+      if (lines.length) useNotify.getState().push({ title: t("hooks.expiry.title"), body: lines.join(" · ") })
+    })
+  }, [sources, proxy])
+}
+
 /** Everything a layout's Home needs; layouts only decide how to render it. */
 export function useHomeData() {
   const status = useCatalog((s) => s.status) // idle | loading | ready | error
@@ -43,6 +66,7 @@ export function useHomeData() {
   const openItem = useOpen()
   const toggleFav = useApp((s) => s.toggleFav)
   const proxy = useApp((s) => s.settings.proxy)
+  useExpiryWarning(enabled, proxy)
   const homeOrder = useApp((s) => s.settings.homeOrder), homeHide = useApp((s) => s.settings.homeHide)
   const { lang } = useLang() // t() below is non-reactive: rebuild on language change
 
@@ -52,7 +76,7 @@ export function useHomeData() {
     const genre = (k: Kind) => {
       const first = groups[k].slice(0, 6)
       const m = new Map<string, Item[]>(first.map((g) => [g, []]))
-      for (const i of byKind[k]) { const l = m.get(i.group); if (l && l.length < CAP) l.push(i) }
+      for (const i of byKind[k]) for (const c of catsOf(i)) { const l = m.get(c); if (l && l.length < CAP) l.push(i) }
       return first.map((g) => ({ k, g, items: m.get(g)! })).filter((r) => r.items.length)
     }
     const cont = get(p), favs = get(d.favs), recents = get(d.recents), live = byKind.live.slice(0, CAP)

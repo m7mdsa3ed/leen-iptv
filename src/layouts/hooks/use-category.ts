@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { askPin, useOpen } from "@/components/tv/ui"
-import { findLock } from "@/lib/merge-pure"
+import { catsOf, findLock } from "@/lib/merge-pure"
 import { LOCALE, fold, useLang, useT, type Lang } from "@/lib/i18n"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
@@ -38,13 +38,13 @@ export function useCategory(id: string) {
   const open = useOpen()
   const locked = !!p?.pin && !!findLock(p.locked, kind, group)
   const [ok, setOk] = useState(!locked) // locked categories need the PIN even when reached by URL or refresh
-  const [sort, setSort] = useState<Sort>("default")
+  const [sort, setSort] = useState<Sort>("added")
   const [q, setQ] = useState("")
   useEffect(() => {
     if (ok || !p?.pin) return
     void askPin(p.pin).then((good) => (good ? setOk(true) : back()))
   }, [ok, p?.pin, back])
-  const all = useMemo(() => byKind[kind].filter((i) => i.group === group), [byKind, kind, group])
+  const all = useMemo(() => byKind[kind].filter((i) => catsOf(i).includes(group)), [byKind, kind, group])
   const sorts = useMemo(() => sortsFor(all, t), [all, t])
   const items = useMemo(() => {
     const f = fold(q.trim())

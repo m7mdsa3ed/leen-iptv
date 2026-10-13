@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Check as CheckIcon, Minus, TriangleAlert, X } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Pill, RoundButton, ConfirmButton, Field, Row, SectionCard, Segmented, Swatches, ToggleRow } from "../controls"
-import { detectPlex, retestPlex } from "@/lib/plex"
+import { detectPlex, ensureConnection, plexScan, retestPlex } from "@/lib/plex"
 import { connKind, isLanHost, plexMode, withRemote, type ConnMode } from "@/lib/plex-pure"
 import { explain } from "@/lib/net"
 import { useCatalog } from "@/lib/catalog"
@@ -13,21 +13,54 @@ import type { Source } from "@/lib/types"
 import { useRoute } from "@/lib/nav"
 import { fmt, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
+import { accountInfo } from "@/lib/xtream"
 import { SOURCE_SWATCHES, withMeta } from "@/lib/sources"
 import { SourceMark } from "@/components/source/SourceMark"
+
+/** Xtream only: account status, expiry date and connections in use, read live from the panel each time the card shows. */
+function XtreamAccount({ id }: { id: string }) {
+  const t = useT()
+  const s = useApp((st) => st.sources.find((x) => x.id === id))
+  const proxy = useApp((st) => st.settings.proxy)
+  const [a, setA] = useState<Awaited<ReturnType<typeof accountInfo>>>(null)
+  useEffect(() => { if (s) void accountInfo(s, proxy).then(setA) }, [s?.server, s?.user, s?.pass, proxy]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!a) return null
+  const bad = (a.status && !/active/i.test(a.status)) || (a.exp && a.exp < Date.now())
+  const soon = a.exp && a.exp - Date.now() < 7 * 86400000
+  return (
+    <Row label={t("settings.sources.account")} description={[
+      `${t("diag.src.xtream.status")}: ${a.status ?? "?"}`,
+      `${t("diag.src.xtream.expires")}: ${a.exp ? fmt.date(a.exp, { dateStyle: "medium" }) : t("diag.src.xtream.never")}`,
+      `${t("diag.src.xtream.conns")}: ${fmt.number(a.act)}/${a.max ? fmt.number(a.max) : "?"}`,
+    ].join(" · ")}>
+      {(bad || soon) ? <TriangleAlert aria-hidden className={`size-5 shrink-0 ${TONE[bad ? "fail" : "warn"]}`} /> : null}
+    </Row>
+  )
+}
 
 /** Plex only: which address is in use, which addresses are allowed, and a re-test (also re-picks after moving between home and away). */
 function PlexConnection({ id }: { id: string }) {
   const t = useT()
   const s = useApp((st) => st.sources.find((x) => x.id === id))!
   const updateSource = useApp((st) => st.updateSource)
-  const [busy, setBusy] = useState(false)
+  const [act, setAct] = useState<"" | "retest" | "scan">("")
   const [msg, setMsg] = useState("")
+  const busy = act !== ""
   const mode = plexMode(s.connMode)
   const retest = async () => {
-    setBusy(true); setMsg("")
+    setAct("retest"); setMsg("")
     try { setMsg(t("settings.sources.connected", { kind: t(`settings.sources.kind.${await retestPlex(s)}`) })) } catch (e) { setMsg(explain(e)) }
-    setBusy(false)
+    setAct("")
+  }
+  /** Ask the server to rescan its library folders (admin token), then reload this source so anything new shows up. */
+  const scan = async () => {
+    setAct("scan"); setMsg(t("settings.sources.scanning"))
+    try {
+      setMsg(fmt.plural("settings.sources.scanStarted", await plexScan(await ensureConnection(s))))
+      useCatalog.getState().forget(s.id)
+      void useCatalog.getState().retry(s.id)
+    } catch (e) { setMsg(explain(e)) }
+    setAct("")
   }
   return (
     <>
@@ -36,8 +69,9 @@ function PlexConnection({ id }: { id: string }) {
           options={(["auto", "norelay", "local"] as const).map((v) => ({ value: v, label: t(`settings.sources.mode.${v}`) }))} />
       </Row>
       <p className="text-sm text-muted-foreground">{t(`settings.sources.mode.${mode}.desc`)}</p>
-      <div className="flex flex-wrap items-center gap-3">
-        <Pill disabled={busy} onClick={() => void retest()}>{busy ? t("settings.sources.testing") : t("settings.sources.retest")}</Pill>
+      <div data-nav-group className="m-fill flex flex-wrap items-center gap-3">
+        <Pill disabled={busy} onClick={() => void retest()}>{act === "retest" ? t("settings.sources.testing") : t("settings.sources.retest")}</Pill>
+        <Pill disabled={busy} onClick={() => void scan()}>{act === "scan" ? t("settings.sources.scanning") : t("settings.sources.scan")}</Pill>
         {msg && <span role="status" className="text-sm text-muted-foreground">{msg}</span>}
       </div>
     </>
@@ -69,7 +103,7 @@ function JellyfinConnection({ id }: { id: string }) {
           options={(["auto", "local", "remote"] as const).map((v) => ({ value: v, label: t(`source.conn.mode.${v}`) }))} />}
       </Row>
       {both && <p className="text-sm text-muted-foreground">{t(`source.conn.mode.${mode}.desc`)}</p>}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="m-fill flex flex-wrap items-center gap-3">
         <Pill disabled={busy} onClick={() => void pick(s)}>{busy ? t("settings.sources.testing") : t("settings.sources.retest")}</Pill>
         {msg && <span role="status" className="text-sm text-muted-foreground">{msg}</span>}
       </div>
@@ -201,7 +235,7 @@ function EditConnection({ id }: { id: string }) {
       </>)}
       {err && <p role="alert" className="text-sm text-destructive">{err}</p>}
       {tests && <TestResults checks={tests.checks} out={tests.out} />}
-      <div data-nav-group className="flex flex-wrap gap-2">
+      <div data-nav-group className="m-fill flex flex-wrap gap-2">
         <Pill disabled={busy} onClick={() => void test()}>{busy && tests ? t("settings.sources.testing") : t("settings.sources.test")}</Pill>
         <Pill variant="primary" disabled={busy} onClick={() => void save()}>{busy && !tests ? t("common.loading") : t("settings.sources.save")}</Pill>
         <Pill variant="ghost" disabled={busy} onClick={() => setOpen(false)}>{t("common.cancel")}</Pill>
@@ -228,9 +262,10 @@ export default function SourcesSection() {
         const status = !s.enabled ? t("settings.sources.disabled") : st?.status === "ready" ? fmt.plural("settings.sources.items", st.count) : st?.status === "loading" ? st.msg || t("settings.sources.loading") : st?.status === "error" ? t("settings.sources.failed") : t("settings.sources.notLoaded")
         return (
           <SectionCard key={s.id} title={<span className="flex items-center gap-3"><SourceMark type={s.type} color={s.color} className="size-5" /><bdi>{s.name}</bdi></span>} description={`${s.type === "plex" ? "Plex" : s.type === "jellyfin" ? "Jellyfin" : s.type === "m3u" ? "M3U" : "Xtream"} - ${status}`}>
-            {st?.status === "error" && s.enabled && <p role="alert" className="text-sm text-destructive">{st.msg}</p>}
+            {(st?.status === "error" || (st?.status === "ready" && st.msg)) && s.enabled && <p role="alert" className="text-sm text-destructive">{st.msg}</p>}
             {s.type === "plex" && <PlexConnection id={s.id} />}
             {s.type === "jellyfin" && <JellyfinConnection id={s.id} />}
+            {s.type === "xtream" && s.enabled && <XtreamAccount id={s.id} />}
             <EditConnection id={s.id} />
             <Field label={t("settings.sources.name")} value={s.name} onChange={(v) => v.trim() && updateSource(s.id, { name: v })} error={s.name.trim() ? undefined : t("settings.sources.nameEmpty")} />
             <Row label={t("settings.sources.color")} stack><Swatches label={t("settings.sources.color")} value={s.color} colors={SOURCE_SWATCHES} onChange={(c) => updateSource(s.id, { color: c })} /></Row>
@@ -239,7 +274,7 @@ export default function SourcesSection() {
               <RoundButton label={t("settings.sources.moveUp")} aria-disabled={i === 0} className={i === 0 ? "opacity-50" : ""} onClick={() => i > 0 && moveSource(s.id, -1)}><ArrowUp /></RoundButton>
               <RoundButton label={t("settings.sources.moveDown")} aria-disabled={i === sources.length - 1} className={i === sources.length - 1 ? "opacity-50" : ""} onClick={() => i < sources.length - 1 && moveSource(s.id, 1)}><ArrowDown /></RoundButton>
             </Row>
-            <div className="flex flex-wrap gap-2">
+            <div className="m-fill flex flex-wrap gap-2">
               <Pill disabled={!s.enabled || st?.status === "loading"} onClick={() => void useCatalog.getState().retry(s.id)}>{t("settings.sources.refresh")}</Pill>
               <ConfirmButton confirmLabel={t("settings.sources.removeConfirm")} onConfirm={() => { useCatalog.getState().forget(s.id); removeSource(s.id); if (sources.length === 1) reset("sources") }}>{t("settings.sources.remove")}</ConfirmButton>
             </div>

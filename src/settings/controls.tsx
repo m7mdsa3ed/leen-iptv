@@ -24,16 +24,17 @@ export function SectionCard({ title, description, children, className }: { title
   )
 }
 
-/** Label/description left, control(s) right (wraps under on narrow screens). `stack` puts the control below. */
+/** Label/description left, control(s) right (wraps under on narrow screens). `stack` puts the control below.
+    The label grows 9999x faster than the controls: beside it they keep their own width, pushed onto a line of their own they fill it (.fill-wrap, index.css). */
 export function Row({ label, description, children, stack, className }: { label: ReactNode; description?: ReactNode; children?: ReactNode; stack?: boolean; className?: string }) {
   return (
     // a group: Up/Down treat a row's control as lying under the whole row, so a switch / button at its far end is never skipped by a later row's left-aligned control
     <div data-nav-group className={cn("flex gap-x-6 gap-y-3", stack ? "flex-col" : "flex-wrap items-center justify-between", className)}>
-      <div className={cn("min-w-0", !stack && "flex-1 basis-56")}>
+      <div className={cn("min-w-0", !stack && "shrink grow-[9999] basis-56")}>
         <div className="text-base font-medium">{label}</div>
         {description && <div className="text-sm text-muted-foreground">{description}</div>}
       </div>
-      {children != null && <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>}
+      {children != null && <div className={cn("flex min-w-0 flex-wrap items-center gap-2", stack ? "m-fill" : "fill-wrap grow")}>{children}</div>}
     </div>
   )
 }
@@ -57,7 +58,7 @@ export function Field({ label, value, onChange, error, hint, className, ...p }: 
 /** 2-5 mutually exclusive options as pills. */
 export function Segmented<T extends string | number>({ value, options, onChange, label }: { value: T; options: readonly { value: T; label: string }[]; onChange: (v: T) => void; label?: string }) {
   return (
-    <div role="radiogroup" aria-label={label} data-nav-group className="flex flex-wrap gap-2">
+    <div role="radiogroup" aria-label={label} data-nav-group className="m-fill flex flex-wrap gap-2">
       {options.map((o) => (
         <Pill key={String(o.value)} role="radio" aria-checked={o.value === value} variant={o.value === value ? "primary" : "tonal"} onClick={() => o.value !== value && onChange(o.value)}>{o.label}</Pill>
       ))}

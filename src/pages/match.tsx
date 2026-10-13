@@ -1,9 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react"
-import { ArrowLeft, CalendarClock, Flag, MapPin, Users, type LucideIcon } from "lucide-react"
+import { ArrowLeft, ArrowLeftRight, CalendarClock, ChevronRight, Database, Flag, Goal, MapPin, Star, Tv, Users, type LucideIcon } from "lucide-react"
 import { RoundButton, SkelBar } from "@/components/gtv"
-import { Countdown } from "@/components/tv/sports"
-import { SPORTS_PROVIDERS, type SportsMatch } from "@/lib/api"
-import { useApp } from "@/lib/store"
+import { Countdown, StandingsTable, TeamBadge } from "@/components/tv/sports"
+import { SPORTS_PROVIDERS, type FormGame, type Lineup, type MatchEvent, type SportsMatch } from "@/lib/api"
+import { useApp, useFollows } from "@/lib/store"
+import { teamKey } from "@/lib/sports/pure"
+import { matchSummary } from "@/lib/sports/games"
 import { useRoute } from "@/lib/nav"
 import { isTv } from "@/lib/device"
 import { fmt, useT } from "@/lib/i18n"
@@ -57,13 +59,14 @@ export default function MatchPage({ id }: { id?: string }) {
   const [m, setM] = useState<SportsMatch | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState("")
-  const load = () => prov!.summary!({ sport, league, id: eventId }, { id: prov!.id, enabled: true, proxy })
+  // the match's own provider, then every other one that finds it (FotMob) merged in; `first` paints the primary without waiting
+  const load = (first?: (r: SportsMatch) => void) => matchSummary(provider, { sport, league, id: eventId }, proxy, first)
 
   useEffect(() => {
     if (!prov || !sport || !league || !eventId) return
     let live = true
     setM(null); setErr(""); setBusy(true)
-    load()
+    load((r) => { if (live) { setM(r); setBusy(false) } })
       .then((r) => { if (live) { setM(r); setBusy(false) } })
       .catch((e) => { if (live) { setErr(e instanceof Error ? e.message : String(e)); setBusy(false) } })
     return () => { live = false }
@@ -78,13 +81,85 @@ export default function MatchPage({ id }: { id?: string }) {
     return () => { live = false; window.clearInterval(id) }
   }, [inPlay, eventId, onTop]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const side = (s: SportsMatch["home"], other: SportsMatch["home"]) => (
-    <button data-nav data-pill onClick={() => go("team", { id: `${provider}~${s.team.id}`, name: s.team.name, badge: s.team.badge })} className="flex min-w-0 flex-1 flex-col items-center gap-3 rounded-2xl p-2">
-      {s.team.badge
-        ? <img src={s.team.badge} alt="" decoding="async" className="size-16 object-contain drop-shadow md:size-24" />
-        : <span className="grid size-16 place-items-center rounded-full bg-surface-3 text-2xl font-medium md:size-24 md:text-4xl">{s.team.name.slice(0, 1)}</span>}
-      <span dir="auto" className={cn("line-clamp-2 w-full text-center text-base md:text-xl", s.winner && "font-semibold", other.winner && "text-muted-foreground")}>{s.team.name}</span>
-    </button>
+  const follows = useFollows()
+  const toggleFollow = useApp((s) => s.toggleFollow)
+  const [tab, setTab] = useState("summary")
+  const isFollowed = (id: string) => follows.some((f) => f.kind !== "league" && teamKey(f.teamId) === teamKey(id))
+  const side = (s: SportsMatch["home"], other: SportsMatch["home"]) => {
+    const on = isFollowed(s.team.id)
+    return (
+      <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+        <button data-nav data-pill onClick={() => go("team", { id: `${provider}~${s.team.id}`, name: s.team.name, badge: s.team.badge })} className="flex w-full flex-col items-center gap-3 rounded-2xl p-2">
+          <TeamBadge team={s.team} className="size-16 drop-shadow md:size-24" />
+          <span dir="auto" className={cn("line-clamp-2 w-full text-center text-base md:text-xl", s.winner && "font-semibold", other.winner && "text-muted-foreground")}>{s.team.name}</span>
+        </button>
+        <button data-nav data-pill aria-pressed={on} onClick={() => toggleFollow({ provider, teamId: s.team.id, name: s.team.name, badge: s.team.badge, league: s.team.league })}
+          className={cn("flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium", on ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-surface-3 text-muted-foreground")}>
+          <Star className={cn("size-3.5", on && "fill-current")} />{t(on ? "pages.match.following" : "pages.team.follow")}
+        </button>
+      </div>
+    )
+  }
+
+  // key events: the home side's on the start, the away side's on the end, the minute between
+  const icon = (e: MatchEvent) => e.kind === "yellow" || e.kind === "red"
+    ? <span aria-hidden className={cn("inline-block h-4 w-3 rounded-[2px]", e.kind === "yellow" ? "bg-yellow-400" : "bg-red-600")} />
+    : e.kind === "sub" ? <ArrowLeftRight aria-hidden className="size-4 text-muted-foreground" /> : <Goal aria-hidden className={cn("size-4", e.kind === "og" ? "text-destructive" : "text-emerald-500")} />
+  const eventText = (e: MatchEvent) => {
+    const [a, b] = e.players
+    const tag = e.kind === "og" ? ` (${t("pages.match.og")})` : e.kind === "pen" ? ` (${t("pages.match.pen")})` : ""
+    return (
+      <span className="min-w-0">
+        <span dir="auto" className="block truncate font-medium">{(a ?? t(`pages.match.ev.${e.kind}`)) + tag}</span>
+        {b && <span dir="auto" className="block truncate text-xs text-muted-foreground">{e.kind === "sub" ? `${t("pages.match.off")}: ${b}` : `${t("pages.match.assist")}: ${b}`}</span>}
+      </span>
+    )
+  }
+  const timeline = (evs: MatchEvent[]) => (
+    <div className="flex flex-col gap-1">
+      {evs.map((e, i) => (
+        <div key={i} data-nav tabIndex={0} aria-label={`${e.minute} ${t(`pages.match.ev.${e.kind}`)} ${e.players.join(", ")}`} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl px-2 py-1.5 text-sm outline-none [--s:1.01]">
+          <span className="flex min-w-0 items-center justify-end gap-2 text-end">{e.side === "home" && <>{eventText(e)}{icon(e)}</>}</span>
+          <span dir="ltr" className="min-w-12 rounded-full bg-surface-3 px-2 py-0.5 text-center text-xs font-semibold tabular-nums">{e.minute}</span>
+          <span className="flex min-w-0 items-center gap-2">{e.side === "away" && <>{icon(e)}{eventText(e)}</>}</span>
+        </div>
+      ))}
+    </div>
+  )
+  const lineup = (l: Lineup, team: SportsMatch["home"]["team"]) => (
+    <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-2xl bg-surface-2 p-3 md:p-4">
+      <div className="flex items-center gap-2"><TeamBadge team={team} className="size-6" /><span dir="auto" className="min-w-0 flex-1 truncate font-medium">{team.name}</span>{l.formation && <span dir="ltr" className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-semibold">{l.formation}</span>}</div>
+      {[["", l.starters], [t("pages.match.bench"), l.bench]].map(([head, ps]) => (ps as Lineup["starters"]).length > 0 && (
+        <div key={head as string} className="flex flex-col">
+          {head && <div className="mt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{head as string}</div>}
+          {(ps as Lineup["starters"]).map((p, i) => (
+            <div key={i} data-nav tabIndex={0} className="flex items-center gap-2 rounded-lg px-1 py-1 text-sm outline-none [--s:1.01]">
+              <span className="w-6 shrink-0 text-end text-xs tabular-nums text-muted-foreground">{p.number}</span>
+              <span dir="auto" className="min-w-0 flex-1 truncate">{p.name}</span>
+              {p.subIn && <ArrowLeftRight aria-label={t("pages.match.subIn")} className="size-3.5 shrink-0 text-emerald-500" />}
+              {p.subOut && <ArrowLeftRight aria-label={t("pages.match.subOut")} className="size-3.5 shrink-0 text-destructive" />}
+              {p.pos && <span className="w-8 shrink-0 text-end text-xs text-muted-foreground">{p.pos}</span>}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+  const form = (fs: FormGame[], team: SportsMatch["home"]["team"]) => fs.length > 0 && (
+    <div className="flex flex-col gap-2 rounded-2xl bg-surface-2 p-3 md:p-4">
+      <div className="flex items-center gap-2"><TeamBadge team={team} className="size-6" /><span dir="auto" className="min-w-0 flex-1 truncate font-medium">{team.name}</span>
+        <span className="flex gap-1">{fs.map((f, i) => <span key={i} title={`${f.opp} ${f.score}`} className={cn("grid size-6 place-items-center rounded-md text-xs font-bold text-white", f.result === "W" ? "bg-emerald-600" : f.result === "D" ? "bg-zinc-500" : "bg-red-600")}>{t(`pages.match.res.${f.result}`)}</span>)}</span>
+      </div>
+      {fs.map((f, i) => (
+        <div key={i} data-nav tabIndex={0} className="flex items-center gap-2 rounded-lg px-1 py-1 text-sm outline-none [--s:1.01]">
+          <span className="w-16 shrink-0 text-xs text-muted-foreground">{fmt.date(f.at, { day: "numeric", month: "short" })}</span>
+          <span className="w-5 shrink-0 text-xs text-muted-foreground">{f.home ? t("pages.match.homeShort") : t("pages.match.awayShort")}</span>
+          <TeamBadge team={{ name: f.opp, badge: f.oppBadge }} className="size-5" />
+          <span dir="auto" className="min-w-0 flex-1 truncate">{f.opp}</span>
+          <span dir="ltr" className="shrink-0 tabular-nums">{f.score}</span>
+        </div>
+      ))}
+    </div>
   )
 
   const scored = m && m.status !== "scheduled" && m.home.score != null && m.away.score != null
@@ -102,7 +177,7 @@ export default function MatchPage({ id }: { id?: string }) {
     const lead = !bar || hn === an ? "" : hn > an ? "h" : "a"
     // data-nav on the rows: TV scrolls a page only by moving focus down it
     return (
-      <div key={s.label} data-nav tabIndex={0} className="rounded-2xl p-2 outline-none [--s:1.01]">
+      <div key={s.key ?? s.label} data-nav tabIndex={0} className="rounded-2xl p-2 outline-none [--s:1.01]">
         <div dir="ltr" data-ltr className="grid grid-cols-[4rem_1fr_4rem] items-center gap-2 text-sm md:text-base">
           <span className={lead === "h" ? "font-semibold" : "text-muted-foreground"}>{s.home || "-"}</span>
           <span className="text-center text-muted-foreground">{s.label}</span>
@@ -127,7 +202,8 @@ export default function MatchPage({ id }: { id?: string }) {
         {m && !busy && (
           <>
             <header className="m-rise mt-6 overflow-hidden rounded-3xl bg-gradient-to-b from-accent-blue-container to-surface-2 p-4 md:p-8">
-              {m.league && <p dir="auto" className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground md:text-sm">{m.league}</p>}
+              {m.league && <p className="text-center"><button data-nav data-pill onClick={() => go("league", { id: `${provider}~${sport}/${league}`, name: m.league })} dir="auto" className="rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground md:text-sm">{m.league}</button></p>}
+              {m.note && <p dir="auto" className="mt-1 text-center text-xs text-muted-foreground md:text-sm">{m.note}</p>}
               <div className="mt-4 flex items-start gap-2" data-nav-group>
                 {side(m.home, m.away)}
                 <div className="flex shrink-0 flex-col items-center gap-3 pt-3 md:pt-6">
@@ -147,24 +223,81 @@ export default function MatchPage({ id }: { id?: string }) {
               </div>
             </header>
 
-            {m.stats.length > 0 ? (
-              <section className="m-rise mt-6 rounded-3xl bg-surface-2 p-4 md:p-6">
-                <div dir="ltr" data-ltr className="flex items-center gap-3">
-                  {m.home.team.badge && <img src={m.home.team.badge} alt="" className="size-7 object-contain" />}
-                  <h2 dir="auto" className="flex-1 text-center text-lg font-medium md:text-xl">{t("pages.match.stats")}</h2>
-                  {m.away.team.badge && <img src={m.away.team.badge} alt="" className="size-7 object-contain" />}
-                </div>
-                <div className="mt-5 flex flex-col gap-4">{m.stats.map(stat)}</div>
-              </section>
-            ) : <p className="mt-6 text-muted-foreground">{t("pages.match.none")}</p>}
-
-            <h2 className="mt-8 text-xl font-medium">{t("pages.match.info")}</h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Tile icon={CalendarClock} label={t("pages.match.kickoff")} value={`${fmt.date(m.startMs, { weekday: "short", day: "numeric", month: "short" })} · ${fmt.time(m.startMs)}`} />
-              {m.venue && <Tile icon={MapPin} label={t("pages.match.venue")} value={m.venue} />}
-              {m.attendance && <Tile icon={Users} label={t("pages.match.attendance")} value={Number.isFinite(Number(m.attendance)) ? fmt.number(Number(m.attendance)) : m.attendance} />}
-              {m.officials.length > 0 && <Tile icon={Flag} label={t("pages.match.officials")} value={m.officials.join(", ")} wide />}
-            </div>
+            {(() => {
+              const table = m.table.find((g) => g.rows.some((r) => teamKey(r.team.id) === teamKey(m.home.team.id) || teamKey(r.team.id) === teamKey(m.away.team.id))) ?? m.table[0]
+              const tabs = [
+                { k: "summary", label: t("pages.match.tab.summary") },
+                ...(m.lineups ? [{ k: "lineups", label: t("pages.match.tab.lineups") }] : []),
+                ...(m.stats.length ? [{ k: "stats", label: t("pages.match.stats") }] : []),
+                ...(m.form.home.length || m.form.away.length || m.h2h?.games.length ? [{ k: "h2h", label: t("pages.match.tab.h2h") }] : []),
+                ...(table ? [{ k: "table", label: t("pages.league.table") }] : []),
+              ]
+              const cur = tabs.some((x) => x.k === tab) ? tab : "summary"
+              const inMatch = (id: string) => teamKey(id) === teamKey(m.home.team.id) || teamKey(id) === teamKey(m.away.team.id)
+              return (
+                <>
+                  <div role="tablist" data-nav-group className="no-scrollbar m-rise -mx-1 mt-5 flex gap-2 overflow-x-auto p-1">
+                    {tabs.map((x) => <button key={x.k} role="tab" data-nav data-pill aria-selected={cur === x.k} onClick={() => setTab(x.k)} className={cn("min-h-11 shrink-0 rounded-full px-5 text-sm font-medium md:text-base", cur === x.k ? "bg-foreground text-background" : "bg-surface-2 text-muted-foreground")}>{x.label}</button>)}
+                  </div>
+                  {cur === "summary" && (
+                    <>
+                      {m.events.length > 0
+                        ? <section className="mt-4 rounded-3xl bg-surface-2 p-3 md:p-5">{timeline(m.events)}</section>
+                        : <p className="mt-4 text-muted-foreground">{t(m.status === "scheduled" ? "pages.match.notStarted" : "pages.match.noEvents")}</p>}
+                      <h2 className="mt-8 text-xl font-medium">{t("pages.match.info")}</h2>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <Tile icon={CalendarClock} label={t("pages.match.kickoff")} value={`${fmt.date(m.startMs, { weekday: "short", day: "numeric", month: "short" })} · ${fmt.time(m.startMs)}`} />
+                        {m.venue && <Tile icon={MapPin} label={t("pages.match.venue")} value={m.venue} />}
+                        {m.attendance && <Tile icon={Users} label={t("pages.match.attendance")} value={Number.isFinite(Number(m.attendance)) ? fmt.number(Number(m.attendance)) : m.attendance} />}
+                        {m.tv.length > 0 && <Tile icon={Tv} label={t("pages.match.tv")} value={m.tv.join(", ")} />}
+                        {m.officials.length > 0 && <Tile icon={Flag} label={t("pages.match.officials")} value={m.officials.join(", ")} wide />}
+                        {m.sources && m.sources.length > 1 && <Tile icon={Database} label={t("pages.match.sources")} value={m.sources.join(", ")} wide />}
+                      </div>
+                    </>
+                  )}
+                  {cur === "lineups" && m.lineups && <div className="mt-4 flex flex-col gap-3 md:flex-row" data-nav-group>{lineup(m.lineups.home, m.home.team)}{lineup(m.lineups.away, m.away.team)}</div>}
+                  {cur === "stats" && (
+                    <section className="mt-4 rounded-3xl bg-surface-2 p-4 md:p-6">
+                      <div dir="ltr" data-ltr className="flex items-center gap-3">
+                        <TeamBadge team={m.home.team} className="size-7" />
+                        <h2 dir="auto" className="flex-1 text-center text-lg font-medium md:text-xl">{t("pages.match.stats")}</h2>
+                        <TeamBadge team={m.away.team} className="size-7" />
+                      </div>
+                      <div className="mt-5 flex flex-col gap-4">{m.stats.map(stat)}</div>
+                    </section>
+                  )}
+                  {cur === "h2h" && (
+                    <div className="mt-4 flex flex-col gap-3">
+                      {(m.form.home.length > 0 || m.form.away.length > 0) && <h2 className="text-lg font-medium">{t("pages.match.form")}</h2>}
+                      {form(m.form.home, m.home.team)}
+                      {form(m.form.away, m.away.team)}
+                      {m.h2h && m.h2h.games.length > 0 && (
+                        <>
+                          <h2 className="mt-4 text-lg font-medium">{t("pages.match.tab.h2h")}</h2>
+                          {m.h2h.summary && <p dir="auto" className="text-sm text-muted-foreground">{m.h2h.summary}</p>}
+                          <div className="flex flex-col gap-1 rounded-2xl bg-surface-2 p-2">
+                            {m.h2h.games.map((g, i) => (
+                              <div key={i} data-nav tabIndex={0} className="grid grid-cols-[5rem_1fr_auto_1fr] items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none [--s:1.01]">
+                                <span className="text-xs text-muted-foreground">{fmt.date(g.at, { day: "numeric", month: "short", year: "numeric" })}</span>
+                                <span dir="auto" className="truncate text-end">{g.home}</span>
+                                <span dir="ltr" className="rounded-md bg-surface-3 px-2 py-0.5 font-semibold tabular-nums">{g.homeScore ?? "-"} - {g.awayScore ?? "-"}</span>
+                                <span dir="auto" className="truncate">{g.away}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {cur === "table" && table && (
+                    <div className="mt-4 flex flex-col gap-3">
+                      <StandingsTable group={table} mark={inMatch} onTeam={(tm) => go("team", { id: `${provider}~${tm.id}`, name: tm.name, badge: tm.badge })} />
+                      <button data-nav data-pill onClick={() => go("league", { id: `${provider}~${sport}/${league}`, name: m.league })} className="flex items-center gap-1 self-start rounded-full px-3 py-1.5 text-sm text-muted-foreground">{t("pages.match.fullLeague")}<ChevronRight className="rtl-flip size-4" /></button>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </>
         )}
       </div>

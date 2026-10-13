@@ -21,9 +21,10 @@ Enable Developer Mode on the TV, then:
 Arrows/OK navigate, Back goes up. Player: Up/Down or CH+/- zap, Left/Right seek (VOD), OK shows controls,
 digits jump to a channel, Red favorite, Green audio, Yellow aspect, Blue subtitles. Yellow in a category list locks it (needs a profile PIN).
 
-## CORS
-Most Xtream/M3U servers do not send CORS headers. If a source fails to load, run `pnpm proxy` somewhere on your LAN and set its URL under Settings > Network
-(turn on "Proxy streams too" only if playback itself is blocked).
+## CORS and HTTP IPTV
+The app automatically uses a same-origin `/p` proxy when the host provides one; no proxy URL is needed in Settings > Playback. Vite dev/preview, `pnpm proxy`, and the included Vercel function provide this endpoint. The proxy handles HTTP sources on an HTTPS app as well as hosts without CORS headers.
+
+A Vercel deployment can proxy IPTV servers reachable from Vercel over the public internet. It cannot reach a server available only on your home LAN; use `pnpm proxy` on that LAN for those sources. Vercel functions have a maximum execution time, so long-running raw-TS live streams may stop; HLS and typical VOD requests are a better fit. The included `/p` endpoint is an unauthenticated proxy: do not expose it publicly without adding suitable access controls and abuse limits.
 
 ## Platforms
 One codebase, three modes (`html[data-mode]`: `tv`, `desktop`, `mobile`). TV mode is picked from the webOS user agent, `?tv=1`, or `localStorage['iptv-mode']='tv'`.
@@ -40,6 +41,15 @@ Keyboard: arrows (after focusing an item), Enter, Esc = Back.
 ### Android
 Android uses the PWA (no native wrapper). Open the app in Chrome on the phone and choose "Install app" / "Add to Home screen". Chrome only offers install over HTTPS (or localhost), so put HTTPS in front, e.g. `tailscale serve --bg 4010` and open the `https://<machine>.<tailnet>.ts.net` address.
 `http://` IPTV servers are fetched through the built-in `/p` proxy (Vite dev/preview or `pnpm proxy`), which also handles CORS and mixed content. The hardware Back button pops the in-app stack.
+
+## Cloudflare Pages
+
+The app can be hosted as a static Cloudflare Pages site. In Cloudflare, create a Pages project and either connect this repository or deploy with Wrangler:
+
+- Repository build command: `pnpm build`; output directory: `dist`; production branch: `main`.
+- For a CLI deploy, authenticate Wrangler with `wrangler login`, create the Pages project named `leen-tv` once with `wrangler pages project create leen-tv`, then run `pnpm deploy:cloudflare`.
+- If using Supabase sync, set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and optionally `VITE_PUBLIC_APP_URL` in the Pages project's build environment before building. Only use the Supabase anon key in the client; never set service-role keys.
+- Pages hosts the static app but does not provide the `/p` IPTV proxy. Sources requiring proxying for CORS or HTTP will need a separately hosted proxy; do not expose the included unauthenticated `/p` proxy publicly. A proxy on Cloudflare would need deliberate access controls and streaming/runtime compatibility work.
 
 ## Supabase setup (optional cloud sync)
 1. Create a project at supabase.com (Authentication > Sign In / Providers: Email enabled and **"Confirm email" turned OFF** - the app does not send or require confirmation emails).

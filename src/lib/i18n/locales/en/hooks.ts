@@ -18,5 +18,8 @@ const d: Dict = {
   "hooks.detail.ep": "E{n}",
   "hooks.detail.rating": "Rating",
   "hooks.detail.refreshMeta": "Refresh metadata",
+  "hooks.expiry.title": "Subscription ending",
+  "hooks.expiry.soon": { one: "{name} ends within a day ({date})", other: "{name} ends in {n} days ({date})" },
+  "hooks.expiry.ended": "{name} ended on {date}",
 }
 export default d

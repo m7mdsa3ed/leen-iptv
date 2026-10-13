@@ -59,7 +59,8 @@ export const decadesOf = (items: Item[]) => [...new Set(items.map(decadeOf).filt
 export const RATINGS = [5, 6, 7, 8]
 // sort key: the release date, else the year alone ("2023" sorts after every dated 2023 title), "" = unknown (last)
 const relKey = (i: Item) => i.released ?? (yearNum(i) ? String(yearNum(i)) : "")
-/** Most recently added to the source first; titles with no date last. */
-export const byAdded = (a: Item, b: Item) => (b.added ?? 0) - (a.added ?? 0)
+/** Most recently added to the source first (a merged title counts its newest copy); titles with no date last. */
+const addedOf = (i: Item) => (i.alts ?? []).reduce((m, a) => Math.max(m, a.added ?? 0), i.added ?? 0)
+export const byAdded = (a: Item, b: Item) => addedOf(b) - addedOf(a)
 /** Newest release first: by release date, else year; titles with neither last. */
 export const byRelease = (a: Item, b: Item) => { const x = relKey(a), y = relKey(b); return x === y ? 0 : x < y ? 1 : -1 }

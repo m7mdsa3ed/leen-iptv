@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "deploy:cloudflare": "pnpm build && pnpm dlx wrangler pages deploy dist --project-name leen-tv",
     "proxy": "node server/proxy.mjs",
     "db:push": "node scripts/db.push.mjs",
     "package": "pnpm build && ares-package dist --no-minify -o out",

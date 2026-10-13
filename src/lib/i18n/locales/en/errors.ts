@@ -2,11 +2,12 @@ import type { Dict } from "../../pure.ts"
 
 const d: Dict = {
   "errors.http.notFound": "Not available on your provider (404). The title or channel may have been removed.",
+  "errors.http.blocked": "The provider's stream server ({host}) is blocked by Cloudflare. Your account is fine: report it to your provider.",
   "errors.http.denied": "Access denied ({status}). Check your subscription, expiry date and number of simultaneous connections.",
   "errors.http.tooMany": "Too many requests (429). Wait a moment and retry.",
   "errors.http.server": "The provider's server had an error ({status}). Try again later.",
   "errors.http.other": "Request failed ({status}).",
-  "errors.cors": "Couldn't reach the server. Check the address and your connection. If the browser is blocking it (CORS), set a proxy in Settings > Network.",
+  "errors.cors": "Couldn't reach the server. Check the address and your connection. If the browser is blocking it (CORS), set a proxy in Settings > Playback.",
   "errors.timeout": "The server took too long to answer. Try again.",
   "errors.stream.decode": "This device can't decode the stream.",
   "errors.maxConn": "Your provider refused the stream: {act} of {max} connections are in use. Stop playback on other devices, or wait a minute for a stale connection to expire, then retry.",

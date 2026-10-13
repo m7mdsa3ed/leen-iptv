@@ -1,4 +1,5 @@
-import { useDeferredValue, useMemo, useState } from "react"
+import { useDeferredValue, useMemo } from "react"
+import { create } from "zustand"
 import { useOpen } from "@/components/tv/ui"
 import { fold } from "@/lib/i18n"
 import { useSearchHistory } from "@/lib/search-history"
@@ -11,10 +12,14 @@ import { useCatalogView } from "./use-source-filter"
  *  open(item, from?) (PIN-aware; live items zap within `from`)
  * }
  */
+/** ponytail: the query lives outside the palette, so closing it to open a title and searching again shows the same results */
+const useQ = create<{ q: string }>(() => ({ q: "" }))
+const setQ = (q: string) => useQ.setState({ q })
+
 export function useSearch() {
   const { items } = useCatalogView()
   const open = useOpen()
-  const [q, setQ] = useState("")
+  const q = useQ((s) => s.q)
   const query = fold(useDeferredValue(q).trim())
   const results = useMemo(() => (query.length < 2 ? [] : items.filter((i) => fold(i.name).includes(query) || (!!i.srcName && fold(i.srcName).includes(query))).slice(0, 300)), [query, items])
   const live = useMemo(() => results.filter((i) => i.kind === "live"), [results])

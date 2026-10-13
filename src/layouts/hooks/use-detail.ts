@@ -114,7 +114,7 @@ export function useDetail(id: string) {
   const resumeOf = (x?: Item) => { const q = x && progress(x); return q && q.pos > 30 && q.pos / q.dur < 0.95 ? q.pos : !q && x?.resume && x.resume > 30 ? x.resume : 0 }
   const play = (queue: Episode[] | null, i: number, fromStart?: boolean) => selected && go("player", { queue: queue ? queue.map((e) => e.item) : [selected], index: i, start: fromStart || undefined })
   const dur = (d?: string | number) => (typeof d === "number" ? fmt.duration(d) : d)
-  const text = (k: string) => (info[k] ? String(info[k]) : "")
+  const text = (k: string) => (!matched && info[k] ? String(info[k]) : "") // matched by hand: the panel said something else, its text is not shown
   const named = (prefix: string, raw: string) => { const k = `gtv.${prefix}.${raw.toLowerCase().replace(/\W+/g, "-")}`; const v = t(k); return v === k ? raw : v } // localised when a key exists, else TMDB's English
   const crew = (meta?.crew?.length ? meta.crew : (meta?.directors ?? []).map((name) => ({ name, role: isSeries ? "Creator" : "Director" }))).map((c) => ({ ...c, role: c.role?.split(", ").map((r) => named("role", r)).join(", ") }))
   const plot = meta?.plot || text("plot") || text("description") || item?.plot

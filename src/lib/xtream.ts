@@ -18,48 +18,61 @@ export function xtreamUrl(s: Source, kind: "live" | "movie" | "series", sid: str
   return `${base(s)}/${kind}/${encodeURIComponent(s.user!)}/${encodeURIComponent(s.pass!)}/${sid}.${ext}`
 }
 
-export async function loadXtream(s: Source, proxy: string, step: (m: string) => void): Promise<Item[]> {
+/** The three parts of an Xtream catalog, in the order they load: a TV shows channels while the movies and the series are still coming. */
+export const XTREAM_KINDS = [
+  ["live", "get_live_categories", "get_live_streams", "errors.source.loadingChannels"],
+  ["movie", "get_vod_categories", "get_vod_streams", "errors.source.loadingMovies"],
+  ["series", "get_series_categories", "get_series", "errors.source.loadingSeries"],
+] as const
+export type XtreamKind = (typeof XTREAM_KINDS)[number][0]
+
+/** The login, asked once before the first part is fetched (a bad account must not look like an empty catalog). */
+export async function xtreamAuth(s: Source, proxy: string) {
   const auth = await call<{ user_info?: { auth?: number; status?: string } }>(s, proxy)
   if (!auth.user_info || auth.user_info.auth === 0) throw new Error(t("errors.source.loginFailed"))
+}
+
+/** One part of the catalog (live channels, movies or series). */
+export async function loadXtreamKind(s: Source, proxy: string, kind: XtreamKind, step: (m: string) => void): Promise<Item[]> {
+  const [, cats, list, msg] = XTREAM_KINDS.find((k) => k[0] === kind)!
+  step(t(msg))
+  const [c, l] = await Promise.all([call<R[]>(s, proxy, cats), call<R[]>(s, proxy, list)])
+  const names = new Map(arr<R>(c).map((x) => [String(x.category_id), String(x.category_name)]))
   const out: Item[] = []
-  for (const [kind, cats, list] of [
-    ["live", "get_live_categories", "get_live_streams"],
-    ["movie", "get_vod_categories", "get_vod_streams"],
-    ["series", "get_series_categories", "get_series"],
-  ] as const) {
-    step(t(kind === "live" ? "errors.source.loadingChannels" : kind === "movie" ? "errors.source.loadingMovies" : "errors.source.loadingSeries"))
-    const [c, l] = await Promise.all([call<R[]>(s, proxy, cats), call<R[]>(s, proxy, list)])
-    const names = new Map(arr<R>(c).map((x) => [String(x.category_id), String(x.category_name)]))
-    for (const x of arr<R>(l)) {
-      const sid = String(kind === "series" ? x.series_id : x.stream_id)
-      out.push({
-        id: `${s.id}|${kind}|${sid}`,
-        kind,
-        sid,
-        name: String(x.name ?? "?"),
-        group: names.get(String(x.category_id)) ?? "Other",
-        logo: String((kind === "series" ? x.cover : x.stream_icon) ?? "") || undefined,
-        epgId: x.epg_channel_id ? String(x.epg_channel_id) : undefined,
-        ext: x.container_extension ? String(x.container_extension) : undefined,
-        num: x.num ? Number(x.num) : undefined,
-        rating: x.rating ? String(x.rating) : undefined,
-        year: String(x.year ?? x.releaseDate ?? x.release_date ?? "").match(/^(?:19|20)\d{2}/)?.[0], // "2023" or "2023-05-01"
-        released: day(x.releaseDate ?? x.release_date),
-        added: Number(kind === "series" ? x.last_modified : x.added) || undefined, // series: last update = newest episode
-        plot: x.plot ? String(x.plot) : undefined,
-      })
-    }
+  for (const x of arr<R>(l)) {
+    const sid = String(kind === "series" ? x.series_id : x.stream_id)
+    out.push({
+      id: `${s.id}|${kind}|${sid}`,
+      kind,
+      sid,
+      name: String(x.name ?? "?"),
+      group: names.get(String(x.category_id)) ?? "Other",
+      logo: String((kind === "series" ? x.cover : x.stream_icon) ?? "") || undefined,
+      epgId: x.epg_channel_id ? String(x.epg_channel_id) : undefined,
+      ext: x.container_extension ? String(x.container_extension) : undefined,
+      num: x.num ? Number(x.num) : undefined,
+      rating: x.rating ? String(x.rating) : undefined,
+      year: String(x.year ?? x.releaseDate ?? x.release_date ?? "").match(/^(?:19|20)\d{2}/)?.[0], // "2023" or "2023-05-01"
+      released: day(x.releaseDate ?? x.release_date),
+      added: Number(kind === "series" ? x.last_modified : x.added) || undefined, // series: last update = newest episode
+      plot: x.plot ? String(x.plot) : undefined,
+    })
   }
   return out
 }
 
-/** Connections in use vs allowed, for the "max connections" message; null when the server won't say. */
-export async function connInfo(s: Source, proxy: string): Promise<{ act: number; max: number } | null> {
+/** Account status from the panel: expiry (ms, 0 = never), connections in use vs allowed (max 0 = unknown); null when unreachable. */
+export async function accountInfo(s: Source, proxy: string): Promise<{ status?: string; exp: number; act: number; max: number } | null> {
   try {
     const ui = (await (await fetchT(px(api(s), proxy), 8000)).json())?.user_info
-    const max = Number(ui?.max_connections) || 0
-    return max ? { act: Number(ui.active_cons) || 0, max } : null
+    return ui ? { status: ui.status, exp: Number(ui.exp_date) * 1000 || 0, act: Number(ui.active_cons) || 0, max: Number(ui.max_connections) || 0 } : null
   } catch { return null }
+}
+
+/** Connections in use vs allowed, for the "max connections" message; null when the server won't say. */
+export async function connInfo(s: Source, proxy: string): Promise<{ act: number; max: number } | null> {
+  const a = await accountInfo(s, proxy)
+  return a?.max ? { act: a.act, max: a.max } : null
 }
 
 export async function vodInfo(s: Source, proxy: string, sid: string) {

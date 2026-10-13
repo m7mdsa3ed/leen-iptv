@@ -147,6 +147,14 @@ export async function loadPlex(src: Source, px_: string, step: (m: string) => vo
   return out
 }
 
+/** Ask the server to rescan its movie/show library folders, so files added outside Plex (or that failed before) turn up.
+    Needs an admin token: a shared server answers 403. The scan runs in the background on the server; returns how many sections were asked. */
+export async function plexScan(s: Source): Promise<number> {
+  const secs = ((await get<Container>(s, proxy(), "/library/sections")).MediaContainer?.Directory ?? []).filter((d) => d.type === "movie" || d.type === "show")
+  for (const d of secs) await plexFetch(sUrl(s, `/library/sections/${d.key}/refresh`), proxy(), { headers: JSON_H }, 20000)
+  return secs.length
+}
+
 /** Watch history: watched movies/episodes of every library (newest 500 each) + in progress from On Deck. Pass the source the catalog load connected to. */
 // ponytail: On Deck drops titles older than the server's "weeks to consider for Continue Watching"; per-library inProgress=1 if that matters
 export async function plexHistory(s: Source, px_: string): Promise<Watch[]> {

@@ -23,6 +23,10 @@ const movie = mapMeta(
 )
 assert.deepEqual(movie, { id: "s1|movie|42", kind: "movie", sid: "42", name: "Heat", group: "Movies", logo: "IMG300x450/t", backdrop: "IMG1280x720/a", plot: "s", rating: "8.3", year: "1995", released: "1995-12-15", added: 1700000000, genres: ["Crime"], resume: 61, dur: 7200, ext: "mkv", part: undefined, codecs: undefined })
 assert.equal(mapMeta({ ratingKey: "7", type: "show", title: "X" }, { sourceId: "s1", group: "TV", img }).kind, "series")
+assert.equal(mapMeta({ ratingKey: "8", type: "movie", title: "Dune", editionTitle: "IMAX" }, { sourceId: "s1", group: "Movies", img }).imax, true)
+assert.equal(mapMeta({ ratingKey: "9", type: "movie", title: "Dune", Label: [{ tag: "IMAX Enhanced" }] }, { sourceId: "s1", group: "Movies", img }).imax, true)
+assert.equal(mapMeta({ ratingKey: "10", type: "movie", title: "Dune", Media: [{ Part: [{ file: "/movies/Dune (2021) - IMAX.mkv" }] }] }, { sourceId: "s1", group: "Movies", img }).imax, true)
+assert.equal(mapMeta({ ratingKey: "11", type: "movie", title: "Dune", editionTitle: "Theatrical" }, { sourceId: "s1", group: "Movies", img }).imax, undefined)
 
 const d = mapDetail({ summary: "p", year: 1995, duration: 7200000, Genre: [{ tag: "Crime" }], Director: [{ tag: "M" }], Role: [{ tag: "Al", role: "Hanna", thumb: "/p" }], Rating: [{ image: "imdb://image.rating", value: 8.3 }, { image: "rottentomatoes://image.rating.ripe", value: 8 }, { image: "other://", value: 1 }] }, img)
 assert.deepEqual(d.meta.ratings.map((r) => r.source), ["IMDb", "Rotten Tomatoes"])

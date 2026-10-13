@@ -1,6 +1,5 @@
 // Device, playback, network and service checks.
-import Hls from "hls.js"
-import mpegts from "mpegts.js"
+import { loadEngines } from "@/lib/engines"
 import pkg from "../../../package.json"
 import { fmt, t } from "@/lib/i18n"
 import { getOverride } from "@/lib/device"
@@ -52,7 +51,7 @@ export function deviceChecks(): Check[] {
 /* ---------- 2. playback capabilities ---------- */
 export function playbackChecks(): Check[] {
   const p = (id: string, run: Check["run"]) => mk("playback", id, t(`diag.pb.${id}`), run)
-  const feat = (id: string, ok: boolean, hint: string, soft = true) => p(id, async () => (ok ? res("ok", t("diag.supported")) : res(soft ? "warn" : "fail", t("diag.unsupported"), t(hint))))
+  const feat = (id: string, ok: boolean | (() => Promise<boolean>), hint: string, soft = true) => p(id, async () => ((typeof ok === "function" ? await ok() : ok) ? res("ok", t("diag.supported")) : res(soft ? "warn" : "fail", t("diag.unsupported"), t(hint))))
   const v = document.createElement("video")
   const can = (id: string, type: string, need: boolean, hint = "diag.pb.codec.hint") =>
     p(id, async () => {
@@ -62,8 +61,8 @@ export function playbackChecks(): Check[] {
   const doc = document as Document & { webkitFullscreenEnabled?: boolean }
   return [
     feat("mse", !!(window.MediaSource || (window as unknown as { ManagedMediaSource?: unknown }).ManagedMediaSource), "diag.pb.mse.hint", false),
-    feat("hlsjs", Hls.isSupported(), "diag.pb.mse.hint"),
-    feat("mpegts", mpegts.isSupported(), "diag.pb.mse.hint"),
+    feat("hlsjs", () => loadEngines().then((e) => e.Hls.isSupported()), "diag.pb.mse.hint"),
+    feat("mpegts", () => loadEngines().then((e) => e.mpegts.isSupported()), "diag.pb.mse.hint"),
     can("h264", 'video/mp4; codecs="avc1.640028"', true),
     can("hevc", 'video/mp4; codecs="hvc1.1.6.L150.B0"', false),
     can("vp9", 'video/mp4; codecs="vp09.00.10.08"', false),

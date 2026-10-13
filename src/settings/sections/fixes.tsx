@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ConfirmButton, Field, Pill, Row, SectionCard, Segmented } from "../controls"
 import { Logo } from "@/components/tv/ui"
+import { Art } from "@/components/gtv"
 import { openLogoMatch, openMatch } from "@/components/tv/match"
 import { logoState, useCatalog } from "@/lib/catalog"
 import { autoPick, exportFixes, failedKey, logoFixes, mergeFixes, metaFixes, newestMetaFixes, parseFixes } from "@/lib/fixes-pure"
@@ -125,7 +126,7 @@ export default function FixesSection() {
     <div className="flex flex-col gap-4">
       <SectionCard title={t("settings.fixes.yours")} description={sync.session ? t("settings.fixes.synced") : t("settings.fixes.notSynced")}>
         <Row label={t("settings.fixes.count", { logos: fmt.number(nLogo), titles: fmt.number(nMeta) })} description={msg || undefined}>
-          <div className="flex flex-wrap gap-2">
+          <div className="fill-wrap flex flex-wrap gap-2">
             <Pill disabled={!nLogo && !nMeta} onClick={exportFile}>{t("settings.fixes.export")}</Pill>
             <Pill onClick={() => file.current?.click()}>{t("settings.fixes.import")}</Pill>
             <ConfirmButton disabled={!nLogo && !nMeta} onConfirm={() => setSettings({ logoMatch: undefined, metaMatch: undefined })}>{t("settings.fixes.clear")}</ConfirmButton>
@@ -142,7 +143,7 @@ export default function FixesSection() {
           { value: "unchecked", label: t("settings.fixes.tab.unchecked", { n: fmt.number(unchecked.length) }) },
         ]} />
         {(tab === "meta" || tab === "unchecked") && hasTmdb && (auto || list.length > 0) && (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="m-fill flex flex-wrap items-center gap-3">
             {auto
               ? <Pill onClick={() => { stop.current = true }}>{t("settings.fixes.auto.stop")}</Pill>
               : <Pill onClick={() => void autoFix()}>{t("settings.fixes.auto", { n: fmt.number(list.length) })}</Pill>}
@@ -154,7 +155,7 @@ export default function FixesSection() {
           {!list.length && <div className="py-4 text-center text-muted-foreground">{t("settings.fixes.empty")}</div>}
           {list.slice(0, shown).map((r) => (
             <button key={r.k} data-nav disabled={!r.fix} onClick={r.fix} className="flex items-center gap-3 rounded-2xl bg-surface-2 p-2 text-start disabled:opacity-60">
-              <Logo item={r.item} className={r.item.kind === "live" ? "aspect-video h-12 shrink-0 rounded-lg bg-white/90 p-1" : "h-16 w-11 shrink-0 rounded-lg object-cover"} />
+              {r.item.kind === "live" ? <Logo item={r.item} className="aspect-video h-12 shrink-0 rounded-lg bg-white/90 p-1" /> : <Art item={r.item} className="w-11 shrink-0 rounded-lg" />}
               <div className="min-w-0 flex-1">
                 <div dir="auto" className="truncate text-base">{r.item.srcName ?? r.item.name}</div>
                 <div dir="auto" className="truncate text-sm text-muted-foreground">{r.sub.filter(Boolean).join("  ·  ")}</div>

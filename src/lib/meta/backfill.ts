@@ -8,6 +8,7 @@ import { localLookups } from "./cache"
 import { tmdbDetail } from "./providers"
 import { sharedLastError, sharedPut, sharedResume, sharedUsable } from "./shared"
 import { resolveKey } from "./shared-pure"
+import { foundOf, type Found } from "../merge-pure"
 
 /** Fill the shared table from this device's saved lookups.
     - title -> TMDB id rows come straight from the saved keys (no request to TMDB), only for ids found by title search (no panel id, no manual match);
@@ -51,12 +52,12 @@ export async function fetchPosters(stop: { current: boolean }, onState: (done: n
     const k = i.kind === "live" || own.has(i.srcId ?? i.id.split("|")[0]) ? "" : matchKey(i)
     if (k && !todo.has(k) && !hasPoster(k)) todo.set(k, i)
   }
-  const found: Record<string, string> = {}
+  const found: Record<string, Found> = {}
   const flush = () => { if (Object.keys(found).length) { addPosters(found); for (const k in found) delete found[k] } }
   let n = 0
   const done = await paced([...todo], async ([k, item]) => {
     const m = await titleMeta(item, cfgs)
-    if (m.poster) { found[k] = m.poster; n++ }
+    if (m.poster || m.backdrop || m.title) { found[k] = foundOf(m); n++ }
   }, { stop, onState: (d, w) => onState(d, todo.size, w), onBatch: flush })
   flush()
   return { done, total: todo.size, found: n, usable: true }

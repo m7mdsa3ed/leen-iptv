@@ -3,10 +3,11 @@
 import type { SportsProvider, SyncBackend } from "./ports"
 import { supabaseBackend } from "./supabase"
 import { espn } from "../sports/espn"
+import { fotmob } from "../sports/fotmob"
 
 export const syncBackend: SyncBackend = supabaseBackend
-/** Sports data sources, tried in order (ESPN today). */
-export const SPORTS_PROVIDERS: SportsProvider[] = [espn]
+/** Sports data sources in priority order: ESPN = schedules, follows, search; FotMob only fills match pages (`lookup`). */
+export const SPORTS_PROVIDERS: SportsProvider[] = [espn, fotmob]
 
 // Config helpers delegated to the active backend, so callers never reach for a specific one.
 export const loadConfig = () => syncBackend.loadConfig()

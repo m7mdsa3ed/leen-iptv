@@ -78,13 +78,14 @@ export default function MetadataSection() {
         )
       })}
       <SectionCard title={t("settings.meta.posters")} description={t("settings.meta.posters.desc")}>
-        <ToggleRow label={t("settings.meta.posters.use")} checked={!!settings.metaPosters} onChange={(v) => { setSettings({ metaPosters: v }); if (v) void runPosters() }} />
-        {settings.metaPosters && (
+        <ToggleRow label={t("settings.meta.auto")} description={t("settings.meta.auto.desc")} checked={settings.autoMeta !== false} onChange={(v) => setSettings({ autoMeta: v })} />
+        <ToggleRow label={t("settings.meta.posters.use")} checked={settings.metaPosters !== false} onChange={(v) => { setSettings({ metaPosters: v }); if (v) void runPosters() }} />
+        {settings.metaPosters !== false && (
           <Row label={pst ? t(pst.wait ? "settings.meta.posters.wait" : "settings.meta.posters.running", { done: fmt.number(pst.done), total: fmt.number(pst.total) }) : t("settings.meta.posters.run")} description={pst ? undefined : pMsg}>
             {pst ? <Pill onClick={() => { stop.current = true }}>{t("settings.meta.up.stop")}</Pill> : <Pill onClick={() => void runPosters()}>{t("settings.meta.posters.go")}</Pill>}
           </Row>
         )}
-        {settings.metaPosters && !pst && <Row label={t("settings.meta.posters.reset")} description={t("settings.meta.posters.reset.desc")}><Pill onClick={clearPosters}>{t("settings.meta.posters.resetGo")}</Pill></Row>}
+        {settings.metaPosters !== false && !pst && <Row label={t("settings.meta.posters.reset")} description={t("settings.meta.posters.reset.desc")}><Pill onClick={clearPosters}>{t("settings.meta.posters.resetGo")}</Pill></Row>}
       </SectionCard>
       <SectionCard title={t("settings.meta.cache")} description={t("settings.meta.cache.desc")}>
         <ToggleRow label={t("settings.meta.shared")} description={t("settings.meta.shared.desc")} checked={shared} onChange={(v) => { setSettings({ sharedMeta: v }); if (v) void upload() }} />

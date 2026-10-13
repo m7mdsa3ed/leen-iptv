@@ -7,6 +7,7 @@ const d: Dict = {
   "nav.movies": "أفلام",
   "nav.shows": "مسلسلات",
   "nav.library": "المكتبة",
+  "nav.recent": "الأخيرة",
   "nav.watchNow": "شوف دلوقتي",
   "nav.home": "الرئيسية",
   "nav.myList": "قايمتي",

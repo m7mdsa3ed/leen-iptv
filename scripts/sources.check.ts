@@ -1,7 +1,8 @@
 // node scripts/sources.check.ts
 import assert from "node:assert/strict"
-import { applyMatches, dedupeKey, groupKey, liveKey, mergeSources, versionTags, onlySource, srcOfId } from "../src/lib/merge-pure.ts"
+import { applyMatches, catsOf, dedupeKey, groupKey, liveKey, mergeSources, versionTags, onlySource, srcOfId } from "../src/lib/merge-pure.ts"
 import { matchKeyOf } from "../src/lib/meta/title.ts"
+import { byAdded } from "../src/lib/browse-pure.ts"
 import type { Item } from "../src/lib/types.ts"
 
 const it = (src: string, kind: Item["kind"], raw: string, name: string, group: string, year?: string): Item => ({ id: `${src}|${kind}|${raw}`, kind, name, group, year })
@@ -38,6 +39,13 @@ assert.equal(r.byId.get("b|movie|7")!.alts?.[0].id, "a|movie|1")
 // same-source duplicates are not merged
 const d = mergeSources([{ id: "a", items: [it("a", "movie", "1", "X (2020)", "g"), it("a", "movie", "2", "X (2020)", "g")] }])
 assert.equal(d.items.length, 2)
+// IPTV (self): one title under several categories becomes one tile listed in every category; another year stays apart
+const ds = mergeSources([{ id: "a", self: true, items: [{ ...it("a", "movie", "1", "X (2020)", "EN"), added: 5 }, { ...it("a", "movie", "2", "X", "4K"), added: 9 }, it("a", "movie", "3", "X (1999)", "EN")] }])
+assert.equal(ds.byKind.movie.length, 2)
+assert.deepEqual(catsOf(ds.byKind.movie[0]), ["EN", "4K"])
+assert.deepEqual(ds.groups.movie, ["EN", "4K"])
+assert.equal(ds.primaryOf.get("a|movie|2")!.id, "a|movie|1")
+assert.equal([...ds.byKind.movie].sort(byAdded)[0].id, "a|movie|1", "newest copy's added date counts")
 // conflicting known years remain distinct across sources
 const years = mergeSources([{ id: "a", items: [it("a", "movie", "1", "Remake (2020)", "g")] }, { id: "b", items: [it("b", "movie", "2", "Remake (2021)", "g")] }])
 assert.equal(years.items.length, 2)
@@ -76,6 +84,10 @@ assert.equal(onlySource(m.byKind.movie, ["a", "b"]).length, m.byKind.movie.lengt
   assert.equal(applyMatches(base, { [key]: { id: "1", title: "X", poster: "https://img/p.jpg" } }, { [key]: "https://meta/p.jpg" }).byId.get("a|movie|1")!.logo, "https://img/p.jpg")
   assert.equal(applyMatches(base, { [key]: { id: "1", title: "X" } }, { [key]: "https://meta/p.jpg" }).byId.get("a|movie|1")!.logo, "https://meta/p.jpg")
   assert.equal(applyMatches(base, undefined, {}), base)
+  // lookups also fill title, year, backdrop, plot, genres and rating (the source's name moves to srcName); a manual match keeps its own title
+  const fm = applyMatches(base, undefined, { [key]: { title: "El Fil El Azraq", year: "2014", poster: "https://meta/p.jpg", backdrop: "https://meta/b.jpg", plot: "P", genres: ["Drama"], rating: "7.4" } }).byId.get("a|movie|1")!
+  assert.ok(fm.name === "El Fil El Azraq" && fm.srcName === "AR - El Fil El Azraq (2014) 4K" && fm.year === "2014" && fm.backdrop === "https://meta/b.jpg" && fm.plot === "P" && fm.genres![0] === "Drama" && fm.rating === "7.4")
+  assert.equal(applyMatches(base, { [key]: { id: "1", title: "X" } }, { [key]: { title: "Other" } }).byId.get("a|movie|1")!.name, "X")
 }
 // grouping options: media off = every copy listed; live variants (same source too) only when asked
 {

@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react"
-import { Pill } from "@/components/gtv"
-import { Logo } from "@/components/tv/ui"
+import { Art, Pill } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
 import type { Item } from "@/lib/types"
 import { epOf, NEXT_SECS } from "./util"
@@ -15,8 +14,7 @@ export function NextCard({ item, secs, auto, autoAll, showOff, tv, onSkip, onCan
   const ep = epOf(item.name)
   return (
     <div ref={ref} data-next role="group" aria-label={t("player.nextEpisode")} className="pl-next m-rise absolute end-[var(--gx)] bottom-28 z-10 w-[min(26rem,calc(100%-2rem))] overflow-hidden rounded-[var(--pl-r)] bg-surface text-foreground shadow-2xl sm:bottom-40">
-      <div className="relative aspect-video w-full bg-surface-3">
-        <Logo item={item} className="size-full object-cover" />
+      <Art item={item} variant="wide" className="w-full bg-surface-3">
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute inset-x-4 bottom-3 text-white">
           <div className="pl-sub">{t("player.nextEpisode")}</div>
@@ -27,7 +25,7 @@ export function NextCard({ item, secs, auto, autoAll, showOff, tv, onSkip, onCan
             <div className="pl-count" style={{ transform: `scaleX(${Math.max(0, secs - 1) / NEXT_SECS})` }} />
           </div>
         )}
-      </div>
+      </Art>
       <div className="p-4">
         <div className="pl-sub mb-3">{auto ? t("player.nextIn", { n: Math.max(0, secs) }) : showOff ? t("player.autoOffShow") : ""}</div>
         <div className="flex gap-2">

@@ -1,5 +1,5 @@
 import { Children, useEffect, useState } from "react"
-import type { ButtonHTMLAttributes, ReactNode, SyntheticEvent, WheelEvent } from "react"
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode, SyntheticEvent, WheelEvent } from "react"
 import { ChevronRight, Info, Lock, Play, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/lib/store"
@@ -9,6 +9,7 @@ import { Logo, useLocked } from "@/components/tv/ui"
 import { useRemoveMenu } from "@/components/tv/card-menu"
 import { SourceBadge } from "@/components/source/SourceBadge"
 import type { Item } from "@/lib/types"
+import { wantMeta } from "@/lib/meta/queue"
 
 type Btn = ButtonHTMLAttributes<HTMLButtonElement>
 
@@ -78,6 +79,7 @@ export function RoundButton({ label, active, className, type = "button", ...p }:
     <button
       data-nav
       data-pill
+      data-round
       type={type}
       aria-label={label}
       {...p}
@@ -97,15 +99,35 @@ export const Avatar = ({ name, color, className }: { name: string; color: string
   </div>
 )
 
+/** The two artwork shapes of the app, used by every card, skeleton and detail poster: poster = 2:3 (VOD), wide = 16:9 (live, continue watching, episodes). */
+export type ArtVariant = "poster" | "wide"
+export const RATIO: Record<ArtVariant, string> = { poster: "aspect-[2/3]", wide: "aspect-video" }
+/** TMDB backdrops come as w1280: a card never needs more than w780. */
+const small = (u?: string) => u?.replace("/t/p/w1280/", "/t/p/w780/")
+
+/** One artwork frame. poster: the poster, cropped to 2:3. wide: a channel logo centred on a gradient (live), else the backdrop (16:9, cropped), else the poster whole.
+    Children (badges, progress bars) are laid over it; extra props (data-tile ...) go to the frame. */
+export function Art({ item, variant = "poster", className, children, ...rest }: { item: Item; variant?: ArtVariant; className?: string; children?: ReactNode } & HTMLAttributes<HTMLDivElement>) {
+  const live = item.kind === "live"
+  const back = variant === "wide" && !live ? small(item.backdrop) : undefined
+  return (
+    <div {...rest} className={cn("relative overflow-hidden bg-surface", RATIO[variant], live && "bg-gradient-to-br from-surface-3 to-surface", className)}>
+      <Logo item={back ? { ...item, logo: back, logoAlt: item.logo } : item} className={cn("relative size-full", live ? "p-6" : variant === "wide" && !back ? "object-contain" : "object-cover")} />
+      {children}
+    </div>
+  )
+}
+
 /** Rail card. wide = 16:9 (live, continue watching), poster = 2:3 (VOD). fluid = fill the parent width (grids) instead of the fixed rail width. */
 export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, fluid, className }: {
-  item: Item; variant?: "poster" | "wide"; pct?: number; onOpen: () => void; onFocus?: () => void; sub?: string; fluid?: boolean; className?: string
+  item: Item; variant?: ArtVariant; pct?: number; onOpen: () => void; onFocus?: () => void; sub?: string; fluid?: boolean; className?: string
 }) {
   const fav = useApp((s) => !!s.profileId && s.data[s.profileId]?.favs.includes(item.id))
   const locked = useLocked(item)
   const onMenu = useRemoveMenu(item)
   const live = item.kind === "live"
   const [loaded, setLoaded] = useState(false)
+  useEffect(() => wantMeta(item), [item]) // shown = looked up in the background (lib/meta/queue.ts)
   const chip = "absolute top-2 grid size-7 place-items-center rounded-full bg-black/60"
   return (
     <button
@@ -121,13 +143,12 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
       className={cn("block shrink-0 text-start", fluid ? "w-full" : variant === "wide" ? "w-64" : "w-[9.5rem]", className)}
     >
       <div data-tilewrap className="relative rounded-2xl">
-      <div data-tile data-fade data-loaded={loaded ? "" : undefined} onLoadCapture={(e: SyntheticEvent) => { if ((e.target as HTMLImageElement).loading === "lazy") setLoaded(true) }} className={cn("relative overflow-hidden rounded-[inherit] bg-surface", variant === "wide" ? "aspect-video" : "aspect-[2/3]", live && "bg-gradient-to-br from-surface-3 to-surface")}>
-        <Logo item={item} className={cn("relative size-full", live ? "p-6" : variant === "wide" ? "object-contain" : "object-cover")} />
+      <Art item={item} variant={variant} data-tile data-fade data-loaded={loaded ? "" : undefined} onLoadCapture={(e: SyntheticEvent) => { if ((e.target as HTMLImageElement).loading === "lazy") setLoaded(true) }} className="rounded-[inherit]">
         {fav && <span className={cn(chip, "end-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
         {locked && <span className={cn(chip, "start-2")}><Lock className="size-4 text-white" /></span>}
         <SourceBadge item={item} className={cn("absolute start-2", pct ? "bottom-3" : "bottom-2")} />
         {pct ? <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} /></div> : null}
-      </div>
+      </Art>
       <span data-ring aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit]" />
       </div>
       <div className="card-info mt-2 px-1">
@@ -206,16 +227,16 @@ const sk = "skel"
 
 export const SkelBar = ({ className }: { className?: string }) => <div aria-hidden className={cn(sk, "h-4 rounded-full", className)} />
 
-export function SkelCard({ variant = "poster", fluid }: { variant?: "poster" | "wide"; fluid?: boolean }) {
+export function SkelCard({ variant = "poster", fluid }: { variant?: ArtVariant; fluid?: boolean }) {
   return (
     <div aria-hidden className={cn("shrink-0", fluid ? "w-full" : variant === "wide" ? "w-64" : "w-[9.5rem]")}>
-      <div className={cn(sk, "rounded-2xl", variant === "wide" ? "aspect-video" : "aspect-[2/3]")} />
+      <div className={cn(sk, "rounded-2xl", RATIO[variant])} />
       <SkelBar className="mx-1 mt-3 w-3/4" />
     </div>
   )
 }
 
-export function SkelRail({ variant = "poster", n = 10, title = true }: { variant?: "poster" | "wide"; n?: number; title?: boolean }) {
+export function SkelRail({ variant = "poster", n = 10, title = true }: { variant?: ArtVariant; n?: number; title?: boolean }) {
   return (
     <section aria-hidden className="-mx-[var(--gx)] mb-2">
       {title && <div className={cn(sk, "mx-[var(--gx)] mb-1 h-7 w-56 rounded-full")} />}
@@ -224,7 +245,7 @@ export function SkelRail({ variant = "poster", n = 10, title = true }: { variant
   )
 }
 
-export function SkelGrid({ variant = "poster", n = 18 }: { variant?: "poster" | "wide"; n?: number }) {
+export function SkelGrid({ variant = "poster", n = 18 }: { variant?: ArtVariant; n?: number }) {
   return (
     <div aria-hidden className="grid gap-4 pt-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${variant === "wide" ? "14rem" : "9.5rem"}, 1fr))` }}>
       {Array.from({ length: n }, (_, i) => <SkelCard key={i} variant={variant} fluid />)}
@@ -232,19 +253,3 @@ export function SkelGrid({ variant = "poster", n = 18 }: { variant?: "poster" | 
   )
 }
 
-export function SkelHero() {
-  return (
-    <section aria-hidden className="relative -mx-[var(--gx)] mb-4 overflow-hidden bg-gradient-to-br from-accent-blue-container via-surface to-background">
-      <div className="relative flex min-h-[min(20rem,55vh)] flex-col justify-end gap-3 px-[var(--gx)] pb-6 pt-[calc(var(--hdr)+2.5rem)] md:min-h-[min(24rem,50vh)]">
-        <SkelBar className="w-28" />
-        <div className={cn(sk, "h-10 w-96 max-w-full rounded-full")} />
-        <SkelBar className="w-64 max-w-full" />
-        <div className="mt-2 flex items-center gap-3">
-          <div className={cn(sk, "h-12 w-32 rounded-full")} />
-          <div className={cn(sk, "size-12 rounded-full")} />
-          <div className={cn(sk, "size-12 rounded-full")} />
-        </div>
-      </div>
-    </section>
-  )
-}

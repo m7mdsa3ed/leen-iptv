@@ -12,6 +12,7 @@ export interface Item {
   ext?: string
   part?: string // Plex: key of the file (Media[0].Part[0]) for direct play
   codecs?: string // Plex: "<video>,<audio>" codecs of that file
+  imax?: boolean // Plex: edition, label or file name identifies an IMAX version
   epgId?: string // source channel id (tvg-id / epg_channel_id): used to match channel logos by iptv-org id
   num?: number
   rating?: string
@@ -26,9 +27,12 @@ export interface Item {
   srcId?: string // source id (also item.id.split("|")[0])
   origGroup?: string // category name in its own source when merged under another display name
   series?: string // episodes: id of the series item
+  cats?: string[] // every category its merged same-source copies sit in (first = group); unset = [group]. Read with catsOf
   alts?: Item[] // same title from lower-priority sources (movie/series primary), or the other variants of a channel (Settings > Sources > Group channel variants)
   epTitle?: string // episodes: the episode's own title (TMDB-enriched), shown by the player
   mposter?: boolean // `logo` is the metadata poster saved by Settings > Metadata > Replace posters
+  tmdb?: string // movie/series: TMDB id when the source's list carries one (Jellyfin ProviderIds, Plex Guid, Xtream tmdb); matches metadata lists to the catalog
+  imdb?: string // same, IMDb id (tt...)
   srcName?: string // the source's own name, kept when a manual metadata match renamed the item (match keys are built from it)
   stream?: import("./meta/facts-pure").StreamFacts // episode file facts when the source returns them with series data
 }

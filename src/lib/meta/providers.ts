@@ -1,4 +1,5 @@
 import { fetchT } from "@/lib/net"
+import { counted } from "./rate"
 import { cached, DAY, META_TTL } from "./cache"
 import { cleanTitle, norm, tmdbId } from "./title"
 import { pickTrailers } from "./trailers"
@@ -53,7 +54,7 @@ const tmdbApi = (cfg: ProviderCfg) => async (path: string, params: Record<string
     const u = new URL(TMDB + path)
     for (const [k, v] of Object.entries({ language: cfg.lang || "en-US", ...params })) u.searchParams.set(k, v)
     if (!bearer) u.searchParams.set("api_key", cfg.key!)
-    return (await fetchT(u.href, 20000, bearer ? { headers: { Authorization: `Bearer ${cfg.key}` } } : undefined)).json()
+    return (await counted("tmdb", () => fetchT(u.href, 20000, bearer ? { headers: { Authorization: `Bearer ${cfg.key}` } } : undefined))).json()
   }
   // small lookups are cached here (title -> id, genre lists, discover pages); details/person responses are big and cached as Meta/PersonInfo by the callers
   const ttl = /^\/(search|find)\b/.test(path) ? META_TTL : path.startsWith("/genre") ? META_TTL : path.startsWith("/discover") ? 3 * DAY : 0
@@ -290,7 +291,7 @@ const omdb: Provider = {
       if (q.year) u.searchParams.set("y", q.year)
     }
     const key = `om:${[...u.searchParams].filter(([k]) => k !== "apikey").map(([k, v]) => `${k}=${v}`).join("&")}`
-    const r: J = await cached(key, 7 * DAY, async () => (await fetchT(u.href, 20000)).json(), (j) => j.Response === "False")
+    const r: J = await cached(key, 7 * DAY, async () => (await counted("omdb", () => fetchT(u.href, 20000))).json(), (j) => j.Response === "False")
     if (r.Response === "False") return null
     const ratings: Rating[] = []
     if (str(r.imdbRating)) ratings.push({ source: "IMDb", value: r.imdbRating, votes: str(r.imdbVotes) })
@@ -321,7 +322,7 @@ const plexDiscover: Provider = {
   async fetch(q, cfg) {
     if (!cfg.key) return null
     const get = async (path: string, params: Record<string, string | number> = {}): Promise<J> =>
-      (await fetchT(plexUrl("https://metadata.provider.plex.tv", path, params, cfg.key), 20000, { headers: { Accept: "application/json" } })).json()
+      (await counted("plex", () => fetchT(plexUrl("https://metadata.provider.plex.tv", path, params, cfg.key), 20000, { headers: { Accept: "application/json" } }))).json()
     const find = async (year?: string) => (await get("/library/metadata/matches", { type: q.kind === "series" ? 2 : 1, title: q.title, ...(year ? { year } : {}) })).MediaContainer?.Metadata?.[0]
     const hit = (await find(q.year)) ?? (q.year ? await find() : undefined) // a wrong panel year matches nothing: ask again without it
     if (!hit?.ratingKey) return null

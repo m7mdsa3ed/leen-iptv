@@ -50,13 +50,21 @@ export function proxyHandler(req, res) {
       const type = up.headers.get("content-type") || ""
       const out = { ...CORS, "content-type": type }
       for (const h of ["content-range", "accept-ranges", "content-length"]) if (up.headers.get(h) && !(h === "content-length" && up.headers.get("content-encoding"))) out[h] = up.headers.get(h) // fetch already decoded the body
+      if (up.status === 403 && /html/i.test(type)) { // Cloudflare "Website Access Blocked" (zone banned): tell the player which domain, it can't read the page
+        const text = await up.text()
+        delete out["content-length"]
+        if (/Website Access Blocked|Cloudflare has restricted access/i.test(text)) out["x-leen-blocked"] = (/affected zone is <strong>([^<]+)</i.exec(text)?.[1] ?? new URL(cur).hostname).trim()
+        return res.writeHead(up.status, out).end(text)
+      }
       if (/mpegurl/i.test(type) || /\.m3u8(\?|$)/.test(cur)) {
         const wrap = (l) => "/p?url=" + encodeURIComponent(new URL(l, cur).href)
-        const body = (await up.text())
+        const text = await up.text()
+        delete out["content-length"]
+        if (!/^\uFEFF?\s*#EXTM3U/.test(text)) return res.writeHead(up.status, out).end(text) // error page (e.g. a Cloudflare 403) behind a .m3u8 URL: pass it through untouched
+        const body = text
           .split("\n")
           .map((l) => (l.startsWith("#") ? l.replace(/URI="([^"]+)"/g, (_, x) => `URI="${wrap(x)}"`) : l.trim() ? wrap(l.trim()) : l))
           .join("\n")
-        delete out["content-length"]
         return res.writeHead(up.status, out).end(body)
       }
       res.writeHead(up.status, out)

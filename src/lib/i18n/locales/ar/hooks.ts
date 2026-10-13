@@ -18,5 +18,8 @@ const d: Dict = {
   "hooks.detail.ep": "ح {n}",
   "hooks.detail.rating": "التقييم",
   "hooks.detail.refreshMeta": "حدّث البيانات",
+  "hooks.expiry.title": "الاشتراك بيخلص",
+  "hooks.expiry.soon": { zero: "{name} بيخلص النهارده ({date})", one: "{name} بيخلص خلال يوم ({date})", two: "{name} بيخلص بعد يومين ({date})", few: "{name} بيخلص بعد {n} أيام ({date})", many: "{name} بيخلص بعد {n} يوم ({date})", other: "{name} بيخلص بعد {n} يوم ({date})" },
+  "hooks.expiry.ended": "{name} خلص يوم {date}",
 }
 export default d

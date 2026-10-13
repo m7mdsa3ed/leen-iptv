@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react"
-import { ArrowLeft, Check, Plus } from "lucide-react"
+import { ArrowLeft, Check, Plus, Trophy } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { SPORTS_PROVIDERS, type SportsGame } from "@/lib/api"
-import { Countdown, liveNow } from "@/components/tv/sports"
+import { GameRow } from "@/components/tv/sports"
 import { useApp, useFollows } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
-import { teamKey } from "@/lib/sports/pure"
+import { refFor, teamKey } from "@/lib/sports/pure"
+import { matchIdOf } from "@/lib/sports/games"
 import { isTv } from "@/lib/device"
-import { fmt, useT } from "@/lib/i18n"
+import { useT } from "@/lib/i18n"
 
 const BACK = 30 * 864e5, FWD = 180 * 864e5 // recent results + future fixtures window
 
@@ -20,7 +21,7 @@ export default function TeamPage({ id, name, badge, league }: { id?: string; nam
   const toggleFollow = useApp((s) => s.toggleFollow)
   const proxy = useApp((s) => s.settings.proxy)
   const [provider, teamId] = String(id ?? "").split("~")
-  const prov = SPORTS_PROVIDERS.find((p) => p.id === provider)
+  const prov = SPORTS_PROVIDERS.find((p) => p.id === provider && p.schedule)
   const follow = follows.find((f) => f.provider === provider && f.teamId === teamId)
   const [games, setGames] = useState<SportsGame[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -31,7 +32,7 @@ export default function TeamPage({ id, name, badge, league }: { id?: string; nam
     let live = true
     setGames(null); setErr(""); setBusy(true)
     const now = Date.now()
-    prov.schedule([teamId], now - BACK, now + FWD, { id: prov.id, enabled: true, proxy })
+    prov.schedule!([teamId], now - BACK, now + FWD, { id: prov.id, enabled: true, proxy })
       .then((g) => { if (live) { setGames(g); setBusy(false) } })
       .catch((e) => { if (live) { setErr(e instanceof Error ? e.message : String(e)); setBusy(false) } })
     return () => { live = false }
@@ -40,28 +41,9 @@ export default function TeamPage({ id, name, badge, league }: { id?: string; nam
   const title = name ?? follow?.name ?? teamId
   const image = badge ?? follow?.badge
   const followed = !!follow
-  const when = (g: SportsGame) => `${fmt.date(g.startMs, { weekday: "short", month: "short", day: "numeric" })} · ${fmt.time(g.startMs)}`
-  const result = (g: SportsGame) => (g.homeScore != null && g.awayScore != null ? `${fmt.digits(g.homeScore)} - ${fmt.digits(g.awayScore)}` : "")
-  const status = (g: SportsGame) => (liveNow(g) ? [t("pages.team.live"), g.detail].filter(Boolean).join("  ·  ") : g.status === "final" ? t("pages.team.final") : <Countdown at={g.startMs} />)
-  const row = (g: SportsGame) => {
-    const [sp, lg] = g.home.id.split("/")
-    return (
-    <button key={g.id} data-nav onClick={() => go("match", { id: `${provider}~${sp}/${lg}/${g.id}` })} className="flex w-full flex-col gap-1.5 rounded-2xl bg-surface-2 p-3 text-start md:flex-row md:items-center md:gap-4">
-      <span dir="ltr" data-ltr className="text-xs text-muted-foreground md:w-44 md:shrink-0 md:text-sm">{when(g)}</span>
-      <span className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="min-w-0 flex-1">
-          <span dir="auto" className="block truncate text-base">
-            <bdi className={teamKey(g.home.id) === teamKey(teamId) ? "font-semibold" : ""}>{g.home.name}</bdi> <span className="text-muted-foreground">{t("pages.team.vs")}</span> <bdi className={teamKey(g.away.id) === teamKey(teamId) ? "font-semibold" : ""}>{g.away.name}</bdi>
-          </span>
-          {g.venue && <span dir="auto" className="block truncate text-sm text-muted-foreground">{g.venue}</span>}
-        </span>
-        <span dir="ltr" data-ltr className="shrink-0 text-end text-sm">
-          {result(g) && <span className="block text-base font-medium">{result(g)}</span>}
-          <span className={`block ${liveNow(g) ? "text-destructive" : "text-muted-foreground"}`}>{status(g)}</span>
-        </span>
-      </span>
-    </button>
-  ) }
+  const row = (g: SportsGame) => <GameRow key={g.id} g={g} date mine={(id) => teamKey(id) === teamKey(teamId)} onOpen={() => go("match", { id: matchIdOf(provider, g) })} />
+  const [sp, lg] = String(teamId ?? "").split("/")
+  const leagueName = league ?? follow?.league ?? (sp && lg ? refFor(sp, lg).name : "")
 
   const upcoming = (games ?? []).filter((g) => g.status !== "final")
   const results = (games ?? []).filter((g) => g.status === "final").sort((a, b) => b.startMs - a.startMs)
@@ -77,12 +59,15 @@ export default function TeamPage({ id, name, badge, league }: { id?: string; nam
               : <div className="grid size-16 shrink-0 place-items-center rounded-2xl bg-surface-2 text-2xl font-medium md:size-28 md:text-3xl">{title.slice(0, 1)}</div>}
             <div className="min-w-0 flex-1">
               <h1 dir="auto" className="truncate text-2xl font-medium tracking-tight text-foreground md:text-5xl">{title}</h1>
-              {(league ?? follow?.league) && <p dir="auto" className="mt-1 text-sm text-muted-foreground md:text-base">{league ?? follow?.league}</p>}
+              {leagueName && <p dir="auto" className="mt-1 text-sm text-muted-foreground md:text-base">{leagueName}</p>}
             </div>
           </div>
-          <Pill className="self-start md:ms-auto md:self-auto" variant={followed ? "tonal" : "primary"} data-autofocus onClick={() => toggleFollow({ provider, teamId, name: title, badge: image, league: league ?? follow?.league })}>
+          <div data-nav-group className="flex flex-wrap gap-2 md:ms-auto">
+          {sp && lg && <Pill onClick={() => go("league", { id: `${provider}~${sp}/${lg}`, name: leagueName })}><Trophy />{t("pages.team.league")}</Pill>}
+          <Pill variant={followed ? "tonal" : "primary"} data-autofocus onClick={() => toggleFollow({ provider, teamId, name: title, badge: image, league: league ?? follow?.league })}>
             {followed ? <Check className="size-5" /> : <Plus className="size-5" />}{followed ? t("pages.team.unfollow") : t("pages.team.follow")}
           </Pill>
+          </div>
         </div>
 
         <h2 className="mt-8 text-xl font-medium text-foreground">{t("pages.team.games")}</h2>
@@ -99,12 +84,12 @@ export default function TeamPage({ id, name, badge, league }: { id?: string; nam
         )}
         {err && <p role="alert" className="mt-3 text-destructive">{t("pages.team.error")}</p>}
         {games && upcoming.length === 0 && results.length === 0 && <p className="mt-3 text-muted-foreground">{t("pages.team.none")}</p>}
-        {upcoming.length > 0 && <div className="mt-3 flex flex-col gap-2" data-nav-group>{upcoming.map(row)}</div>}
+        {upcoming.length > 0 && <div className="mt-3 flex flex-col gap-0.5 rounded-2xl bg-surface-2 p-1.5" data-nav-group>{upcoming.map(row)}</div>}
 
         {results.length > 0 && (
           <>
             <h2 className="mt-8 text-xl font-medium text-foreground">{t("pages.sports.results")}</h2>
-            <div className="mt-3 flex flex-col gap-2" data-nav-group>{results.map(row)}</div>
+            <div className="mt-3 flex flex-col gap-0.5 rounded-2xl bg-surface-2 p-1.5" data-nav-group>{results.map(row)}</div>
           </>
         )}
       </div>

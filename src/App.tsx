@@ -11,6 +11,7 @@ import { TrailerModal, closeTrailer, useTrailer } from "@/components/TrailerModa
 import { RecoveryGate } from "@/settings/AccountSync"
 import { Toasts } from "@/components/tv/toast"
 import { startReminders } from "@/lib/sports/reminders"
+import { startEpisodeWatch } from "@/lib/new-episodes"
 import { CardMenu, closeCardMenu, useCardMenu } from "@/components/tv/card-menu"
 import { ListModal } from "@/components/tv/list-modal"
 import { FilterPanel, closeFilterPanel, useFilterPanel } from "@/components/tv/filter-panel"
@@ -35,10 +36,12 @@ import StatsPage from "@/pages/stats"
 import DiagnosticsPage from "@/pages/diagnostics"
 import Home from "@/pages/home"
 import Library from "@/pages/library"
+import Recent from "@/pages/recent"
 import Live from "@/pages/live"
 import PersonPage from "@/pages/person"
 import TeamPage from "@/pages/team"
 import MatchPage from "@/pages/match"
+import LeaguePage from "@/pages/league"
 import { PlayerHost, PlayerRoute } from "@/player/host"
 import Profiles from "@/pages/profiles"
 import LinkPage from "@/pages/link"
@@ -64,7 +67,7 @@ const SHELL_PAGES = new Set(["home", "live", "sports", "movies", "series", "sear
 
 /** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
 const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, library: Library, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, detail: Detail, episode: EpisodePage, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage,
+  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, library: Library, recent: Recent, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, league: LeaguePage, detail: Detail, episode: EpisodePage, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage,
 }
 
 function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
@@ -116,7 +119,7 @@ export default function App() {
   useBackfillMatches()
   useEffect(() => installKeyboard(), [])
   useEffect(() => installPaletteKeys(), [])
-  useEffect(() => { startReminders() }, []) // sports reminders while the app is open
+  useEffect(() => { startReminders(); startEpisodeWatch() }, []) // sports alerts + new episodes while the app is open
   const catNav = useApp((s) => s.settings.catNav ?? "bar")
   useEffect(() => { document.documentElement.dataset.catnav = catNav }, [catNav])
   const cardSize = useApp((s) => s.settings.cardSize ?? "normal"), cardInfo = useApp((s) => s.settings.cardInfo ?? "show")

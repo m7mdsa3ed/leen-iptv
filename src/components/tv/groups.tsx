@@ -5,7 +5,7 @@ import { KEY } from "@/lib/nav"
 import { useApp, useLists, usePData, useProfile } from "@/lib/store"
 import { useCatalog } from "@/lib/catalog"
 import { useActiveFilter, useCatalogView, inSource } from "@/layouts/hooks/use-source-filter"
-import { findLock } from "@/lib/merge-pure"
+import { catsOf, findLock } from "@/lib/merge-pure"
 import type { Kind } from "@/lib/types"
 import { useMode } from "@/lib/device"
 import { useT } from "@/lib/i18n"
@@ -26,7 +26,7 @@ export function useGroupCount(kind: Kind) {
   const filter = useActiveFilter()
   const m = useMemo(() => {
     const m = new Map<string, number>([[ALL, byKind[kind].length]])
-    for (const i of byKind[kind]) m.set(i.group, (m.get(i.group) ?? 0) + 1)
+    for (const i of byKind[kind]) for (const c of catsOf(i)) m.set(c, (m.get(c) ?? 0) + 1)
     m.set(FAV, favs.filter((id) => { const i = byId.get(id); return i?.kind === kind && inSource(i, filter) }).length) // via byId, like the pages: favorites of merged copies count
     if (kind === "live") { const ids = new Set(byKind.live.map((i) => i.id)); for (const l of lists) m.set(l.name, l.items.filter((id) => ids.has(id)).length) }
     return m

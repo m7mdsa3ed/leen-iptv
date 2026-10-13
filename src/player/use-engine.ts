@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
-import Hls from "hls.js"
-import mpegts from "mpegts.js"
+import type Hls from "hls.js"
+import type mpegts from "mpegts.js"
+import { engines, loadEngines } from "@/lib/engines"
 import { useApp } from "@/lib/store"
 import { connInfo } from "@/lib/xtream"
 import { corsHint, statusMsg } from "@/lib/net"
@@ -8,6 +9,9 @@ import { rate } from "@/lib/quality"
 import { t as tn } from "@/lib/i18n"
 import type { Item, Source } from "@/lib/types"
 import { audioLabel, type Stats } from "./stats"
+
+/** Domain the proxy saw blocked by Cloudflare (x-leen-blocked, see server/proxy-core.mjs); "" otherwise. hls.js hands back an XHR or a fetch Response. */
+const blockedBy = (d: XMLHttpRequest | Response | null | undefined) => { try { return (d instanceof Response ? d.headers.get("x-leen-blocked") : d?.getResponseHeader("x-leen-blocked")) ?? "" } catch { return "" } }
 
 export type Track = { id: number; label: string; detail?: string; flags?: string[] }
 
@@ -28,6 +32,7 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
   const [retry, setRetry] = useState(0)
   const [viaHls, setViaHls] = useState("") // url whose native playback failed: some servers 302 a .mp4 to an HLS playlist
   const [stats, setStats] = useState<Stats | null>(null)
+  const [eng, setEng] = useState(engines) // hls.js/mpegts.js arrive on first playback (spinner meanwhile)
   const auto = useRef(0) // automatic restarts since the last good playback (watchdog, mpegts errors, resume); capped so a dead stream still reaches the error screen
   const timers = useRef<number[]>([])
   const gen = useRef(0)
@@ -50,8 +55,12 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
   }
   const again = (ms: number) => { timers.current.push(window.setTimeout(() => setRetry((r) => r + 1), ms)) }
 
+  useEffect(() => { if (!eng) loadEngines().then(setEng, () => fail(tn("errors.stream.unavailable"), false)) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const firstAttach = useRef(true)
   useEffect(() => {
+    if (!eng) return
+    const { Hls, mpegts } = eng
     const v = vref.current!
     gen.current++
     setErr(""); setBuf(true); setStarted(false); setStats(null); aud.current = {}
@@ -77,6 +86,7 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
           if (direct && d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && !h.levels?.length) setProxied(raw) // direct manifest failed (CORS / unreachable): retry through the proxy once (startLoad would not refetch it)
           else if (d.type === Hls.ErrorTypes.NETWORK_ERROR && !http && net++ < 3) h.startLoad()
           else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && net++ < 3) h.recoverMediaError()
+          else if (code === 403 && blockedBy(d.networkDetails)) fail(tn("errors.http.blocked", { host: blockedBy(d.networkDetails) }), false) // not the account: skip the connections check
           else fail(http ? statusMsg(code) : d.type === Hls.ErrorTypes.NETWORK_ERROR ? corsHint() : d.type === Hls.ErrorTypes.MEDIA_ERROR ? tn("errors.stream.decode") : tn("errors.stream.unavailable"))
         })
         stop = () => { h.stopLoad(); h.detachMedia(); h.destroy(); hls.current = null }
@@ -112,7 +122,7 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
       v.removeAttribute("src") // release the decoder and any buffered/blob source
       v.load()
     }
-  }, [url, live, retry, viaHls]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [url, live, retry, viaHls, eng]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Back online / app brought to the front: a dead or still-loading stream restarts (after a pause so the provider drops the old connection) */
   useEffect(() => {
@@ -154,7 +164,7 @@ export function useEngine(o: { vref: RefObject<HTMLVideoElement | null>; item: I
     onWaiting: () => { setBuf(true); if (played.current) { stalls.current.push(Date.now()); meas.current.stallTotal++ } },
     onPlaying: () => { auto.current = 0; setBuf(false); setStarted(true); setPaused(false); played.current = true; meas.current.startupMs ??= Date.now() - meas.current.attachAt },
     onPause: () => setPaused(true),
-    onError: () => fallback ? fallback() : (!live && !hls.current && viaHls !== url && Hls.isSupported() ? setViaHls(url) : fail(vref.current?.error?.code === 4 ? tn("errors.video.format") : vref.current?.error?.code === 3 ? tn("errors.video.corrupt") : tn("errors.video.cannotPlay"))),
+    onError: () => fallback ? fallback() : (!live && !hls.current && viaHls !== url && eng?.Hls.isSupported() ? setViaHls(url) : fail(vref.current?.error?.code === 4 ? tn("errors.video.format") : vref.current?.error?.code === 3 ? tn("errors.video.corrupt") : tn("errors.video.cannotPlay"))),
   }
 
   return { hls, mp, err, buf, started, paused, audio, subs, setSubs, stats, statsRef, meas, handlers, retry: () => { auto.current = 0; setRetry((r) => r + 1) } }

@@ -36,6 +36,7 @@ import { downloadSub, searchSubs, subQuery } from "@/lib/subs"
 import { DEFAULT_SUB_LANGS, sameLang } from "@/lib/subs-pure"
 import { BANNER_MS, fsEl, HIDE_MS, isEpisode } from "@/player/util"
 import { closePlayer, usePlayerHost } from "@/player/host"
+import type { NewEpisodesEvent } from "@/lib/new-episodes"
 import { Pause as PauseIcon, PictureInPicture2, Play as PlayIcon, X } from "lucide-react"
 import "./player.css"
 
@@ -490,6 +491,15 @@ export default function Player({ queue: q0, index, start, mini = false }: { queu
   const stopRef = useRef(stop)
   stopRef.current = stop
   useEffect(() => { usePlayerHost.setState({ cur: { queue, index: idx } }) }, [queue, idx])
+  // a new episode of the playing show (lib/new-episodes.ts) joins the end of the queue, so the Next card picks it up
+  useEffect(() => {
+    const f = (e: Event) => {
+      const { series, items } = (e as NewEpisodesEvent).detail
+      setQueue((q) => (q.some((i) => i.series === series) ? [...q, ...items.filter((n) => !q.some((i) => i.id === n.id))] : q))
+    }
+    window.addEventListener("leen:episodes", f)
+    return () => window.removeEventListener("leen:episodes", f)
+  }, [])
   useEffect(() => { usePlayerHost.setState({ canMini: E.started && !E.err }) }, [E.started, E.err])
   useEffect(() => { usePlayerHost.setState({ pip }) }, [pip]) // native PiP window open: the mini box hides
   useEffect(() => { if (mini && E.err) closePlayer() }, [mini, E.err]) // a dead stream does not linger in the corner

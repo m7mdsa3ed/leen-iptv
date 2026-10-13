@@ -1,3 +1,4 @@
+import { catsOf } from "@/lib/merge-pure"
 import { useEffect, useMemo, useState } from "react"
 import { create } from "zustand"
 import { Check } from "lucide-react"
@@ -42,7 +43,7 @@ export function FilterPanel() {
   useEffect(() => { if (kind) { setQ(""); requestAnimationFrame(focusFirst) } }, [kind])
 
   const k = kind ?? "movie"
-  const counts = useMemo(() => { const m = new Map<string, number>(); for (const i of byKind[k]) m.set(i.group, (m.get(i.group) ?? 0) + 1); return m }, [byKind, k])
+  const counts = useMemo(() => { const m = new Map<string, number>(); for (const i of byKind[k]) for (const c of catsOf(i)) m.set(c, (m.get(c) ?? 0) + 1); return m }, [byKind, k])
   const decades = useMemo(() => decadesOf(byKind[k]), [byKind, k])
   const hasRating = useMemo(() => byKind[k].some((i) => parseFloat(i.rating ?? "") > 0), [byKind, k])
   if (!kind) return null

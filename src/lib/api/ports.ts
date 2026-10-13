@@ -44,4 +44,4 @@ export interface SyncBackend {
 }
 
 // Sports ports live with the sports mappers (kept alias-free so the pure module stays node-runnable).
-export type { Follow, GameStatus, LeagueRef, MatchRef, MatchSide, MatchStatRow, SportsCompetition, SportsConfig, SportsGame, SportsMatch, SportsProvider, SportsTeam } from "../sports/types"
+export type { Follow, FormGame, GameStatus, H2HGame, LeagueRef, Lineup, LineupPlayer, MatchEvent, MatchRef, MatchSide, MatchStatRow, SportsCompetition, SportsConfig, SportsGame, SportsMatch, SportsProvider, SportsTeam, StandingGroup, StandingRow } from "../sports/types"

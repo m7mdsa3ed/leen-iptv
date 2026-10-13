@@ -25,7 +25,7 @@ export default function ProfilesSection() {
       </SectionCard>
       <SectionCard title={t("settings.profiles.pin")} description={t(isTv ? "settings.profiles.pin.tv" : "settings.profiles.pin.other")}>
         <Field label={t(p.pin ? "settings.profiles.pin.new" : "settings.profiles.pin.set")} dir="ltr" inputMode="numeric" maxLength={4} value={pin} onChange={(v) => setPin(v.replace(/\D/g, ""))} error={pin && pin.length !== 4 ? t("settings.profiles.pin.bad") : undefined} />
-        <div className="flex flex-wrap gap-2">
+        <div className="m-fill flex flex-wrap gap-2">
           <Pill variant="primary" disabled={pin.length !== 4} onClick={async () => { if (p.pin && !(await askPin(p.pin))) return; updateProfile(p.id, { pin }); setPin("") }}>{t("settings.profiles.pin.save")}</Pill>
           {p.pin && <Pill onClick={async () => (await askPin(p.pin!)) && updateProfile(p.id, { pin: undefined, locked: [] })}>{t("settings.profiles.pin.remove")}</Pill>}
         </div>

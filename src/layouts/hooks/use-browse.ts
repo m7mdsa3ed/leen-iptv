@@ -6,7 +6,7 @@ import { alphaIndex, byAdded, byRelease, matchMore, moreCount } from "@/lib/brow
 import { useGenres } from "@/lib/meta"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
-import { findLock } from "@/lib/merge-pure"
+import { catsOf, findLock } from "@/lib/merge-pure"
 import { useApp, usePData, useProfile } from "@/lib/store"
 import type { Item, Kind } from "@/lib/types"
 import { byName, sortsFor, type Sort } from "./use-category"
@@ -43,15 +43,15 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
   const genres = useGenres(kind)
   const [g, setG] = useState(ALL)
   const [q, setQ] = useState("")
-  const [sort, setSort] = useState<Sort>("default")
+  const [sort, setSort] = useState<Sort>("added")
   const { lang } = useLang()
   const lockKey = (c: string) => findLock(p?.locked ?? [], kind, c)
   const favorites = useMemo(() => d.favs.map((id) => byId.get(id)).filter((i): i is Item => !!i && i.kind === kind && inSource(i, filter)), [byId, kind, d.favs, filter]) // via byId: favorites of deduped (alt) items still show
-  const items = g === FAV ? favorites : g === ALL ? [] : byKind[kind].filter((i) => i.group === g)
+  const items = g === FAV ? favorites : g === ALL ? [] : byKind[kind].filter((i) => catsOf(i).includes(g))
   const rails = useMemo(() => {
     if (g !== ALL) return []
     const by = new Map<string, Item[]>()
-    for (const i of byKind[kind]) { const a = by.get(i.group); if (!a) by.set(i.group, [i]); else if (a.length < RAIL_ITEMS) a.push(i) }
+    for (const i of byKind[kind]) for (const c of catsOf(i)) { const a = by.get(c); if (!a) by.set(c, [i]); else if (a.length < RAIL_ITEMS) a.push(i) }
     return groups[kind].slice(0, MAX_RAILS).map((c) => [c, by.get(c) || []] as const).filter(([, a]) => a.length)
   }, [g, byKind, groups, kind])
   const cats = useApp((s) => s.catFilter[kind])
@@ -60,9 +60,9 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
   const setCatFilter = useApp((s) => s.setCatFilter)
   // every title the group can show: the source filter (useCatalogView) and the picked categories narrow it first
   const all = useMemo(() => {
-    const base = g === FAV ? favorites : g === ALL ? byKind[kind] : byKind[kind].filter((i) => i.group === g)
+    const base = g === FAV ? favorites : g === ALL ? byKind[kind] : byKind[kind].filter((i) => catsOf(i).includes(g))
     const want = new Set(cats)
-    return cats.length || nMore ? base.filter((i) => (!cats.length || want.has(i.group)) && (!nMore || matchMore(i, more, d.progress))) : base
+    return cats.length || nMore ? base.filter((i) => (!cats.length || catsOf(i).some((c) => want.has(c))) && (!nMore || matchMore(i, more, d.progress))) : base
   }, [g, favorites, byKind, kind, cats, more, nMore, d.progress])
   const sorts = useMemo(() => sortsFor(all, t), [all, t])
   // any refinement (picked categories, a query or a non-default order) drops the curated rails in favour of the flat grid

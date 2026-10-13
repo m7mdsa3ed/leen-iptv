@@ -1,8 +1,8 @@
 import { Backdrop } from "@/components/Backdrop"
-import { ArrowLeft, Clapperboard, MoreHorizontal, Play, Star } from "lucide-react"
+import { ArrowLeft, Clapperboard, MoreHorizontal, Play, RefreshCw, Star } from "lucide-react"
 import { ActionsMenu } from "@/components/tv/actions-menu"
-import { Chips, Logo } from "@/components/tv/ui"
-import { Card, Pill, Rail, RoundButton, SkelBar } from "@/components/gtv"
+import { Chips } from "@/components/tv/ui"
+import { Art, Card, Pill, Rail, RoundButton, SkelBar } from "@/components/gtv"
 import { SourceChooser } from "@/components/source/SourceChooser"
 import { isTv } from "@/lib/device"
 import { useT } from "@/lib/i18n"
@@ -24,16 +24,17 @@ export default function Detail({ id }: { id: string }) {
       <div className="relative">
         {!isTv && <RoundButton label={t("common.back")} onClick={back}><ArrowLeft className="rtl-flip" /></RoundButton>}
         <div className="mt-6 flex flex-col gap-6 md:mt-10 md:flex-row md:gap-10">
-          <Logo item={poster!} className="aspect-[2/3] w-36 shrink-0 self-start rounded-2xl object-cover shadow-2xl md:w-64" />
+          <Art item={poster!} className="w-36 shrink-0 self-start rounded-2xl shadow-2xl md:w-64" />
           <div className="min-w-0 md:flex-1">
             <TitleArt title={D.title} logo={D.logo} className="text-3xl font-medium tracking-tight text-foreground md:text-5xl" />
             <SourceChooser className="mt-4" alternatives={D.alternatives} selected={D.selected} onSelect={D.selectSource} />
-            {(chips.length > 0 || ratings.length > 0 || genreList.length > 0) && (
+            {(chips.length > 0 || ratings.length > 0 || genreList.length > 0 || loading) && (
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {item.group && <button data-nav data-pill onClick={() => D.openCategory()} className="inline-flex min-h-11 items-center rounded-full bg-accent-blue-container px-4 text-sm text-foreground"><bdi>{item.group}</bdi></button>}
                 {genreList.map((g) => <button key={g} data-nav data-pill onClick={() => D.openGenre(g)} className="inline-flex min-h-11 items-center rounded-full bg-surface-2 px-4 text-sm text-foreground/80"><bdi>{g}</bdi></button>)}
                 {chips.map((m) => <span key={m} className="inline-flex min-h-11 items-center rounded-full bg-surface-2 px-4 text-sm text-foreground/80"><bdi>{m}</bdi></span>)}
                 {ratings.map((r) => <span key={r.source} className="rounded-full bg-accent-blue-container px-3 py-1 text-sm text-foreground">{r.source} <b>{r.value}</b></span>)}
+                {loading && <span role="status" aria-label={t("pages.detail.loading")} className="inline-flex min-h-11 items-center rounded-full bg-surface-2 px-4"><RefreshCw className="size-4 animate-spin text-muted-foreground" /></span>}
               </div>
             )}
             {plot && <p dir="auto" className="mt-5 line-clamp-6 max-w-3xl text-base text-foreground/80 md:text-lg">{plot}</p>}

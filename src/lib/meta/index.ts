@@ -48,17 +48,20 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[], onFail?: () => voi
 const sigOf = (cfgs: ProviderCfg[]) => cfgs.filter((c) => c.enabled).map((c) => `${c.id}:${c.key ? 1 : 0}:${c.lang ?? ""}`).join(",")
 /** Cache key of a title lookup: what the title IS (kind + cleaned name + year), not the item id, so the same movie from another source / profile reuses the entry. A panel-provided id (`xid`) tells remakes apart. */
 const lookupKey = (kind: string, ct: { title: string; year?: string }, xid: string, matched: string | undefined, sig: string) => `meta5:${kind}:${norm(ct.title)}:${ct.year ?? ""}:${xid}:${matched ?? ""}:${sig}`
-const isEmptyMeta = (x: Meta) => !(x.plot || x.cast.length)
+/** no provider knew the title (a lookup that found it has a plot or a cast) */
+export const isEmptyMeta = (x: Meta) => !(x.plot || x.cast.length)
 
 /** Settings > Fix matches: look a title up the way Detail would (same cache entry, no panel info) so it counts as checked. true = a provider knew it. */
 export async function checkTitle(item: Item, cfgs: ProviderCfg[]): Promise<boolean> {
   return !isEmptyMeta(await titleMeta(item, cfgs))
 }
+/** Cache key of titleMeta's lookup (the background queue drops it to try a title again). */
+export const titleLookupKey = (item: Item, cfgs: ProviderCfg[]) => lookupKey(item.kind === "series" ? "series" : "movie", cleanTitle(item.srcName ?? item.name), "", undefined, sigOf(cfgs))
 /** The cached lookup behind checkTitle (and Replace posters, which wants its poster). Panel info is not used, so the panel's own poster never shows up here. */
 export async function titleMeta(item: Item, cfgs: ProviderCfg[]): Promise<Meta> {
   const ct = cleanTitle(item.srcName ?? item.name)
   const kind = item.kind === "series" ? "series" : "movie"
-  return cached(lookupKey(kind, ct, "", undefined, sigOf(cfgs)), META_TTL, async () => {
+  return cached(titleLookupKey(item, cfgs), META_TTL, async () => {
     let failed = false
     const r = await loadMeta({ kind, title: ct.title, year: ct.year, ids: {} }, cfgs, () => (failed = true))
     if (failed && isEmptyMeta(r)) throw new Error("lookup failed") // rate limited / offline: not cached as "nothing found"
@@ -94,8 +97,9 @@ export function useBackfillMatches() {
   const setSettings = useApp((s) => s.setSettings)
   const cfg = useMemo(() => normalizeCfg(saved).find((c) => c.id === "tmdb" && c.enabled && c.key), [saved])
   const tried = useRef(new Set<string>())
+  const status = useCatalog((s) => s.status) // on a cold start nothing else competes with the catalog: these lookups wait for it
   useEffect(() => {
-    if (!cfg || !matches) return
+    if (status !== "ready" || !cfg || !matches) return
     const todo = Object.entries(matches).filter(([k, v]) => !tried.current.has(k) && (typeof v === "string" || !v.poster)).slice(0, 25)
     if (!todo.length) return
     let live = true
@@ -111,7 +115,7 @@ export function useBackfillMatches() {
       }
     })()
     return () => { live = false }
-  }, [matches, cfg]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [matches, cfg, status]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /** Details for a movie/series, cached for META_TTL (30 days); `refresh()` drops this title's cached data and fetches it again. `ready` = the Xtream info has been fetched (or will not be). */
@@ -126,7 +130,7 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
   const keyRef = useRef("")
   const title = item ? cleanTitle(item.srcName ?? item.name) : undefined
   const titleKey = title ? `${item!.kind}:${norm(title.title)}:${title.year ?? ""}` : ""
-  const metaKey = identity ?? titleKey
+  const metaKey = `${identity ?? titleKey}|${matched ?? ""}` // a new manual match drops what was shown for the old one at once
   const meta = metaState?.key === metaKey ? metaState.value : null
   const online = cfgs.some((c) => c.enabled && c.id !== "xtream" && (c.key || !PROVIDERS.find((p) => p.id === c.id)?.needsKey))
   const sig = sigOf(cfgs)
@@ -135,7 +139,7 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
     if (!item || !ready || item.kind === "live") return
     let live = true
     const ct = cleanTitle(item.srcName ?? item.name) // the source's name: stable across a matched rename
-    const titleKey = identity ?? `${item.kind}:${norm(ct.title)}:${ct.year ?? ""}`
+    const titleKey = `${identity ?? `${item.kind}:${norm(ct.title)}:${ct.year ?? ""}`}|${matched ?? ""}` // = metaKey
     const q: Query = { kind: item.kind === "series" ? "series" : "movie", title: ct.title, year: ct.year, ids: matched ? { tmdb: matched } : {}, xtream }
     const run = matched ? cfgs.filter((c) => c.id !== "xtream") : cfgs // the user said the panel's data is wrong for this title
     const xid = String(xtream?.tmdb_id ?? xtream?.tmdb ?? xtream?.imdb_id ?? "")
@@ -146,7 +150,9 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
       const c = online ? await get<{ at: number; v: Meta }>(key).catch(() => undefined) : undefined
       if (c && live) setMetaState({ key: titleKey, value: withBase(c.v, matched ? undefined : base) }) // stale-while-revalidate: show what we have at once
       // fresh entries return without a request; misses/stale go through the shared cache (one in-flight call per title)
-      const m = online ? await cached(key, META_TTL, () => loadMeta(q, run), isEmptyMeta) : await loadMeta(q, run)
+      // a provider that failed (rate limit, offline) must not leave an empty answer in the cache for a day: the new match would show nothing until then
+      const load = async () => { let failed = false; const r = await loadMeta(q, run, () => (failed = true)); if (failed && isEmptyMeta(r)) throw new Error("lookup failed"); return r }
+      const m = online ? await cached(key, META_TTL, load, isEmptyMeta).catch(emptyMeta) : await loadMeta(q, run)
       if (live) setMetaState({ key: titleKey, value: withBase(m, matched ? undefined : base) }) // a manual match beats server data too. The cache holds the provider data only: source data (`base`) is merged fresh each time
       // older id-only matches: store what the catalog should show (title, poster, backdrop, year) now that we know it
       const cur = useApp.getState().settings.metaMatch

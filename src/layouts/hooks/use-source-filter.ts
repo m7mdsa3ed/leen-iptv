@@ -1,9 +1,9 @@
 import { useMemo } from "react"
 import { useCatalog } from "@/lib/catalog"
-import { onlySource, srcOfId } from "@/lib/merge-pure"
+import { catsOf, onlySource, srcOfId } from "@/lib/merge-pure"
 import { useSources } from "@/lib/sources"
 import { useApp } from "@/lib/store"
-import type { Item, Kind } from "@/lib/types"
+import type { Kind } from "@/lib/types"
 
 /**
  * Source filter state for the pill bar. Returns {
@@ -52,7 +52,7 @@ export function useCatalogView() {
   return useMemo(() => {
     if (!filter.length) return { items, byKind, groups }
     const k = { live: onlySource(byKind.live, filter), movie: onlySource(byKind.movie, filter), series: onlySource(byKind.series, filter) }
-    const g = (kind: Kind) => { const s = new Set(k[kind].map((i: Item) => i.group)); return groups[kind].filter((x) => s.has(x)) }
+    const g = (kind: Kind) => { const s = new Set(k[kind].flatMap(catsOf)); return groups[kind].filter((x) => s.has(x)) }
     return { items: [...k.live, ...k.movie, ...k.series], byKind: k, groups: { live: g("live"), movie: g("movie"), series: g("series") } }
   }, [filter, items, byKind, groups])
 }

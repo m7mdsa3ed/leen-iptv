@@ -1,10 +1,10 @@
 import { Backdrop } from "@/components/Backdrop"
 import { Fragment, type CSSProperties, type ReactNode } from "react"
-import { ArrowLeft, Bookmark, BookmarkCheck, Calendar, Check, Clapperboard, Clock, Film, MoreHorizontal, Play, Star } from "lucide-react"
+import { ArrowLeft, Bookmark, BookmarkCheck, Calendar, Check, Clapperboard, Clock, Film, MoreHorizontal, Play, RefreshCw, Star } from "lucide-react"
 import { ActionsMenu } from "@/components/tv/actions-menu"
-import { Empty, Logo } from "@/components/tv/ui"
+import { Empty } from "@/components/tv/ui"
 import { useCatalog } from "@/lib/catalog"
-import { Card, Pill, RoundButton, SkelBar } from "@/components/gtv"
+import { Art, Card, Pill, RoundButton, SkelBar } from "@/components/gtv"
 import { isTv } from "@/lib/device"
 import { fmt, useLang, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -91,10 +91,12 @@ export default function Detail({ id }: { id: string }) {
           )}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <SourceBadge item={D.selected ?? item} className="text-sm" />
+            {(D.selected ?? item).imax && <span className={chip}>IMAX</span>}
             {D.chips.map((c) => <span key={c} className={chip}>{c === cert ? <Film /> : /^\d{4}$/.test(c) ? <Calendar /> : <Clock />}{c}</span>)}
             {isSeries && seasons.length > 0 && <span className={chip}>{fmt.plural("gtv.detail.seasons", seasons.length)}</span>}
             {stream.res && <span className={chip}>{stream.res}</span>}
             {ratings.map((r) => <span key={r.source} className={chip}><Score r={r} name={D.ratingName(r.source)} /></span>)}
+            {loading && <span role="status" aria-label={t("gtv.detail.loading")} className={chip}><RefreshCw className="animate-spin text-muted-foreground" /></span>}
           </div>
 
           {plot && <p dir="auto" className="mt-4 line-clamp-3 text-base leading-relaxed text-foreground/85 md:text-lg">{plot}</p>}
@@ -149,7 +151,7 @@ export default function Detail({ id }: { id: string }) {
           <div className="grid gap-x-10 gap-y-6 md:grid-cols-[auto_minmax(0,1fr)] lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
             {poster && (
               <div className="w-48 max-md:hidden">
-                <Logo item={poster} className="aspect-[2/3] w-full rounded-xl object-cover shadow-xl" />
+                <Art item={poster} className="w-full rounded-xl shadow-xl" />
               </div>
             )}
             <div className="min-w-0 max-w-2xl">

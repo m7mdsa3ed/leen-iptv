@@ -1,5 +1,6 @@
-import { SPORTS_PROVIDERS, type Follow, type SportsGame, type SportsProvider } from "@/lib/api"
+import { SPORTS_PROVIDERS, type Follow, type MatchRef, type SportsGame, type SportsMatch, type SportsProvider } from "@/lib/api"
 import { teamKey } from "./pure"
+import { mergeGames, mergeMatch } from "./merge-pure"
 
 /** Games of one follow (a team or a competition) in [from, to]. The provider caches the month scoreboard (see espn.ts). */
 export function scheduleFor(follow: Follow, proxy: string, from: number, to: number): Promise<SportsGame[]> {
@@ -36,6 +37,32 @@ export async function liveScores(follows: Follow[], proxy: string): Promise<Spor
   return lists.flat()
 }
 
+/** Game-list rows with the gaps filled by every provider that lists games around them (`around`, in SPORTS_PROVIDERS
+ *  order): live minute, red cards, missing scores (mergeGames: both teams must match). A provider that fails changes nothing. */
+export async function withAlts(games: SportsGame[], proxy: string): Promise<SportsGame[]> {
+  let out = games
+  for (const p of SPORTS_PROVIDERS) {
+    if (!p.around || !out.length) continue
+    out = mergeGames(out, await p.around(out, { id: p.id, enabled: true, proxy }).catch(() => [] as SportsGame[]))
+  }
+  return out
+}
+
+/** One match from its own provider, with the gaps filled by every other provider that finds it (`lookup`, in
+ *  SPORTS_PROVIDERS order): the primary's values win, the others add what it lacks (line-ups, events, more stats...).
+ *  `first` gets the primary's answer at once, so the page shows it without waiting for the others. An alt that fails changes nothing. */
+export async function matchSummary(provider: string, ref: MatchRef, proxy: string, first?: (m: SportsMatch) => void): Promise<SportsMatch | null> {
+  const prov = SPORTS_PROVIDERS.find((p) => p.id === provider && p.summary)
+  if (!prov) return null
+  const m = await prov.summary!(ref, { id: prov.id, enabled: true, proxy })
+  if (!m) return null
+  const base = { ...m, sources: [prov.name] }
+  first?.(base)
+  const alts = await Promise.all(SPORTS_PROVIDERS.filter((p) => p !== prov && p.lookup).map((p) =>
+    p.lookup!(m, ref, { id: p.id, enabled: true, proxy }).then((x) => x && { ...x, sources: [p.name] }, () => null)))
+  return alts.reduce<SportsMatch>((acc, x) => mergeMatch(acc, x), base)
+}
+
 /** The followed team playing in this game (for bolding), or undefined for a competition game. */
 export const teamInGame = (follows: Follow[], g: SportsGame): string | undefined =>
   follows.find((f) => f.kind !== "league" && (teamKey(f.teamId) === teamKey(g.home.id) || teamKey(f.teamId) === teamKey(g.away.id)))?.teamId
@@ -57,3 +84,8 @@ export function gameRoute(follows: Follow[], g: SportsGame): { id: string; name:
   if (lg) return { id: `${lg.provider}~${g.home.id}`, name: g.home.name }
   return undefined
 }
+
+/** Route ids for any game / league (not only followed ones): match = `${provider}~sport/league/event`, league = `${provider}~sport/league`. */
+export const matchIdOf = (provider: string, g: SportsGame) => { const [sport, league] = g.home.id.split("/"); return `${provider}~${sport}/${league}/${g.id}` }
+export const leagueIdOf = (g: SportsGame) => g.home.id.split("/").slice(0, 2).join("/")
+export const sportOf = (id: string) => id.split("/")[0]

@@ -70,6 +70,13 @@ export const photoUrl = (server: string, token: string, path: string, w: number,
 
 export const tagList = (v: unknown): string[] => (Array.isArray(v) ? (v as J[]).map((x) => String(x.tag ?? "")).filter(Boolean) : [])
 
+const hasImax = (value: unknown) => typeof value === "string" && /(?:^|[^a-z0-9])imax(?:[^a-z0-9]|$)/i.test(value)
+/** Plex editions, user labels, and file names can identify an IMAX version. */
+export function isImax(m: J): boolean {
+  if (hasImax(m.editionTitle) || tagList(m.Label).some(hasImax)) return true
+  return ((m.Media ?? []) as J[]).some((media) => ((media.Part ?? []) as J[]).some((part) => hasImax(part.file)))
+}
+
 /** One Plex Metadata entry -> catalog Item. `img` builds (and proxies) image URLs. */
 export function mapMeta(m: J, o: { sourceId: string; group: string; img: (path: string, w: number, h: number) => string }): Item {
   const kind = m.type === "show" ? "series" : "movie"
@@ -89,6 +96,7 @@ export function mapMeta(m: J, o: { sourceId: string; group: string; img: (path: 
     released: day(m.originallyAvailableAt),
     added: Number(m.addedAt) || undefined,
     genres: tagList(m.Genre),
+    ...(isImax(m) ? { imax: true } : {}),
     resume,
     dur: m.duration ? Math.round(m.duration / 1000) : undefined,
     ...fileOf(m),
