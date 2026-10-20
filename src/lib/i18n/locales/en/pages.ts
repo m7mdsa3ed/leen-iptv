@@ -286,5 +286,13 @@ const d: Dict = {
   "pages.episode.writtenBy": "Written by",
   "pages.episode.series": "Back to {name}",
   "pages.episode.missing": "This episode is no longer in the list",
+  "pages.multi.title": "Multiview",
+  "pages.multi.add": "Add channel",
+  "pages.multi.search": "Search channels",
+  "pages.multi.none": "No channels found",
+  "pages.multi.empty": "Add a live channel to start. Most providers allow only a few streams at once.",
+  "pages.multi.sound": "Sound",
+  "pages.multi.full": "Full screen",
+  "pages.multi.remove": "Remove",
 }
 export default d

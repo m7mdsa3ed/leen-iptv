@@ -3,7 +3,7 @@
 export type Ent = { t: number; del?: 1; v?: unknown }
 export type Prog = { pos: number; dur: number; t: number }
 export type Day = { sec: number; sessions: number; live: number; movie: number; series: number }
-/** keys: p/<profileId> s/<sourceId> f/<profileId>/<itemId> r/<profileId>/<itemId> l/<profileId>/<list> t/<profileId>/<provider:teamId> m/<titleKey> g/<logoKey> c/<setting> */
+/** keys: p/<profileId> s/<sourceId> f/<profileId>/<itemId> r/<profileId>/<itemId> l/<profileId>/<list> t/<profileId>/<provider:teamId> m/<titleKey> g/<logoKey> c/<setting> u/<titleKey> */
 export type Snapshot = { v: 1; e: Record<string, Ent>; progress: Record<string, Prog>; days: Record<string, Day> }
 /** local stamp bookkeeping: h = hash of the value when it was last stamped */
 export type Stamp = { t: number; del?: 1; h: string }
@@ -57,10 +57,10 @@ export type AppSlice = {
   profiles: P[]
   sources: P[]
   data: Record<string, { favs: string[]; recents: string[]; progress: Record<string, Prog>; lists?: { name: string; items: string[] }[]; follows?: { provider: string; teamId: string; name: string; badge?: string; league?: string; kind?: "team" | "league" }[] }>
-  settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown; metaMatch?: Record<string, string | { id: string }>; logoMatch?: Record<string, string> } & Partial<Record<DisplayKey, unknown>>
+  settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown; metaMatch?: Record<string, string | { id: string }>; logoMatch?: Record<string, string>; unmatched?: Record<string, string> } & Partial<Record<DisplayKey, unknown>>
 }
 /** Display preferences that follow the account. Only written once set (an untouched device never overwrites a customised one); "reset" stores an empty value, not undefined. */
-export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext", "noAutoShows", "colorTheme", "subs", "notify", "sportsNotify"] as const
+export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext", "noAutoShows", "skipMarks", "colorTheme", "subs", "notify", "sportsNotify", "autoMeta", "metaPosters", "sharedMeta"] as const
 type DisplayKey = (typeof DISPLAY_KEYS)[number]
 export const RECENTS_MAX = 40
 
@@ -91,6 +91,7 @@ export function flatten(s: AppSlice): Record<string, { h: string; v?: unknown }>
   for (const k of DISPLAY_KEYS) if (s.settings[k] !== undefined) put(`c/${k}`, s.settings[k])
   for (const k in s.settings.metaMatch ?? {}) put(`m/${encodeURIComponent(k)}`, s.settings.metaMatch![k]) // one entity per manual TMDB match: two devices matching different titles both keep theirs
   for (const k in s.settings.logoMatch ?? {}) put(`g/${encodeURIComponent(k)}`, s.settings.logoMatch![k]) // one entity per manual channel logo
+  for (const k in s.settings.unmatched ?? {}) put(`u/${encodeURIComponent(k)}`, s.settings.unmatched![k]) // one entity per title no provider knew (value = item id)
   put("c/sourceOrder", s.sources.map((x) => x.id))
   return o
 }
@@ -204,6 +205,12 @@ export function applySnapshot(cur: AppSlice, m: Snapshot): { slice: AppSlice; da
     if (x && typeof x.v === "string") logoMatch[decodeURIComponent(k.slice(2))] = x.v
   }
   settings.logoMatch = Object.keys(logoMatch).length ? logoMatch : undefined
+  const unmatched: Record<string, string> = {}
+  for (const k in m.e) {
+    const x = k.startsWith("u/") && alive(k)
+    if (x && typeof x.v === "string") unmatched[decodeURIComponent(k.slice(2))] = x.v
+  }
+  settings.unmatched = Object.keys(unmatched).length ? unmatched : undefined
   const slice = { profiles, sources, data, settings }
   const flat = flatten(slice)
   const stamps: Record<string, Stamp> = {}

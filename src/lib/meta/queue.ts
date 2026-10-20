@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { get, set } from "idb-keyval"
+import { del, get } from "idb-keyval"
 import type { Item } from "../types"
 import { useApp } from "../store"
 import { addPosters, hasPoster, useCatalog } from "../catalog"
@@ -19,31 +19,39 @@ const todo = new Map<string, Item>() // match key -> item; newest last
 const seen = new Set<string>()
 let now: Item[] = [] // being looked up
 let recent: { item: Item; poster?: string }[] = [] // finished this session, newest first (last 30)
-/** Titles no provider could identify: kept on the device (match key -> the item as it was), listed in the activity panel for a manual match and never looked up again
+/** Titles no provider could identify (match key -> item id, `settings.unmatched`, synced across devices): listed in the activity panel for a manual match and never looked up again
     (until "Try again"). A manual match (settings.metaMatch) takes a title off the list. */
-let unmatched: Record<string, Item> = {}
-const UNMATCHED = "leen-meta-unmatched"
-const saveUnmatched = () => void set(UNMATCHED, unmatched).catch(() => {})
-void get<Record<string, Item>>(UNMATCHED).then((v) => { if (v) { unmatched = { ...v, ...unmatched }; bump() } }).catch(() => {})
+const unmatched = () => useApp.getState().settings.unmatched ?? {}
+const setUnmatched = (u: Record<string, string>) => { useApp.getState().setSettings({ unmatched: Object.keys(u).length ? u : undefined }); bump() }
+const UNMATCHED = "leen-meta-unmatched" // ponytail: old device-local list (key -> Item), moved into the setting once; drop this block after a release or two
+void get<Record<string, Item>>(UNMATCHED).then((v) => {
+  if (!v) return
+  const u = { ...unmatched() }
+  for (const k in v) u[k] ??= v[k].id
+  setUnmatched(u)
+  void del(UNMATCHED)
+}).catch(() => {})
 useApp.subscribe((s, p) => {
+  if (s.settings.unmatched !== p.settings.unmatched) bump() // a sync brought or removed some
   if (s.settings.metaMatch === p.settings.metaMatch) return
-  const done = Object.keys(unmatched).filter((k) => s.settings.metaMatch?.[k])
-  if (done.length) { for (const k of done) delete unmatched[k]; saveUnmatched(); bump() }
+  const u = { ...unmatched() }
+  const done = Object.keys(u).filter((k) => s.settings.metaMatch?.[k])
+  if (done.length) { for (const k of done) delete u[k]; setUnmatched(u) }
 })
 /** Look these titles up again (all when no keys): their cached "nothing found" is dropped and they rejoin the queue. */
-export async function retryUnmatched(keys = Object.keys(unmatched)) {
+export async function retryUnmatched(keys = Object.keys(unmatched())) {
   const cfgs = normalizeCfg(useApp.getState().settings.meta)
-  const items = keys.map((k) => unmatched[k]).filter(Boolean)
-  for (const k of keys) { delete unmatched[k]; seen.delete(k) }
-  saveUnmatched()
+  const u = { ...unmatched() }
+  const items = keys.map((k) => useCatalog.getState().byId.get(u[k])).filter((i): i is Item => !!i)
+  for (const k of keys) { delete u[k]; seen.delete(k) }
+  setUnmatched(u)
   await forget(items.map((i) => titleLookupKey(i, cfgs)))
-  for (const i of items) wantMeta(useCatalog.getState().byId.get(i.id) ?? i)
-  bump()
+  for (const i of items) wantMeta(i)
 }
 let running = false
-const bump = () => useMetaQueue.setState((s) => ({ n: todo.size + now.length, bad: Object.keys(unmatched).length, rev: s.rev + 1 })) // bad = titles waiting for a manual match
-/** What the activity panel lists: in progress, waiting (next first), finished. */
-export const queueSnapshot = () => ({ now, waiting: [...todo.values()].reverse(), recent, unmatched: Object.entries(unmatched).map(([k, i]) => ({ k, item: useCatalog.getState().byId.get(i.id) ?? i })) })
+const bump = () => useMetaQueue.setState((s) => ({ n: todo.size + now.length, bad: Object.keys(unmatched()).length, rev: s.rev + 1 })) // bad = titles waiting for a manual match
+/** What the activity panel lists: in progress, waiting (next first), finished. Unmatched titles not in the catalog (their source is off or unreachable) stay hidden. */
+export const queueSnapshot = () => ({ now, waiting: [...todo.values()].reverse(), recent, unmatched: Object.entries(unmatched()).flatMap(([k, id]) => { const item = useCatalog.getState().byId.get(id); return item ? [{ k, item }] : [] }) })
 const nap = (ms: number) => new Promise((r) => setTimeout(r, ms))
 /** nothing can run (turned off, no keyed provider): forget the waiting titles, unseen, so they queue again once it can */
 const drop = () => { for (const k of todo.keys()) seen.delete(k); todo.clear() }
@@ -53,7 +61,7 @@ export function wantMeta(item: Item) {
   const st = useApp.getState()
   if (st.settings.autoMeta === false) return
   const k = matchKey(item)
-  if (seen.has(k) || unmatched[k]) return
+  if (seen.has(k) || unmatched()[k]) return
   seen.add(k)
   const m = st.settings.metaMatch?.[k]
   if (hasPoster(k) || (m && typeof m !== "string" && m.poster)) return
@@ -82,7 +90,7 @@ async function run() {
       await Promise.all(batch.map(async ([k, item]) => {
         try {
           const m = await titleMeta(item, cfgs)
-          if (isEmptyMeta(m)) { unmatched[k] = item; saveUnmatched(); bump(); return } // nothing found: kept for a manual match, not retried
+          if (isEmptyMeta(m)) { setUnmatched({ ...unmatched(), [k]: item.id }); return } // nothing found: kept for a manual match, not retried
           if (m.poster || m.backdrop || m.title) found[k] = foundOf(m)
           recent = [{ item, poster: m.poster }, ...recent].slice(0, 30)
         }

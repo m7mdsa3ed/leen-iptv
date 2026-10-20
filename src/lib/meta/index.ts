@@ -166,7 +166,8 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
   const refresh = async () => {
     const tmdb = meta?.ids.tmdb
     if (tmdb) forceTmdb(tmdb) // fetch from TMDB, not from the shared cache
-    await forget([keyRef.current, ...(tmdb ? [`season:tmdb:${tmdb}:`] : [])].filter(Boolean))
+    if (meta?.ids.imdb) forceTmdb(meta.ids.imdb) // same for OMDb
+    await forget([keyRef.current, ...(meta?.ids.imdb ? [`om:plot=full&i=${meta.ids.imdb}`] : []), ...(tmdb ? [`season:tmdb:${tmdb}:`] : [])].filter(Boolean))
     setRev((n) => n + 1)
   }
   return { meta, loading, online, matched, refresh, rev }

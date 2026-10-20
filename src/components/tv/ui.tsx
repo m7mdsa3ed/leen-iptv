@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual"
 import { create } from "zustand"
-import { List, ListPlus, Lock, Star } from "lucide-react"
+import { History, List, ListPlus, Lock, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { isTv, useMode } from "@/lib/device"
@@ -68,7 +68,7 @@ export function TvButton({ className, ...p }: React.ComponentProps<typeof Button
 }
 
 /** Display name of a group chip: the FAV / ALL pseudo groups are localised, real categories are shown as-is. (FAV/ALL live in groups.tsx; literals here avoid an import cycle.) */
-export const groupLabel = (g: string, t: TFn) => (g === "Favorites" ? t("common.favorites") : g === "All" ? t("common.all") : g === "Other" ? t("common.other") : g)
+export const groupLabel = (g: string, t: TFn) => (g === "Continue watching" ? t("common.continueWatching") : g === "Favorites" ? t("common.favorites") : g === "All" ? t("common.all") : g === "Other" ? t("common.other") : g)
 
 /** Category lists can be shown as a start-side sidebar (Settings > Display > Categories): marks the page content so CSS reserves room for it, and hands it the sidebar's width (`--cat-w`, it follows the longest category name). */
 export function useCatSide() {
@@ -107,6 +107,7 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLi
           onContextMenu={onCtx && ((e) => onCtx(e, g))}
           className={cn("flex min-h-[44px] shrink-0 items-center gap-2 rounded-full px-5 py-2 text-base", g === active ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground/80")}
         >
+          {g === "Continue watching" && <History className="size-4" />}
           {g === "Favorites" && <Star className="size-4" />}
           {isList(g) && <List className="size-4" />}
           {locked?.(g) && <Lock className="size-4" />}

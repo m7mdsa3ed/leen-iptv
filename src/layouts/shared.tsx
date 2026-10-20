@@ -26,7 +26,7 @@ export function ProfileButton({ page, go, className, avatarClass = "size-10" }: 
   const t = useT()
   return (
     <button data-nav data-autofocus={page === "settings" ? "" : undefined} aria-label={t("common.settings")} onClick={() => go("settings")} className={className ?? "grid size-11 shrink-0 place-items-center rounded-full"}>
-      <Avatar name={profile?.name ?? "?"} color={profile?.color ?? "#5f6368"} className={avatarClass} />
+      <Avatar name={profile?.name ?? "?"} color={profile?.color ?? "#5f6368"} photo={profile?.photo} className={avatarClass} />
     </button>
   )
 }

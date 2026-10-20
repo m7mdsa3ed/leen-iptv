@@ -109,6 +109,20 @@ console.log("meta match ok")
 }
 console.log("logo match ok")
 
+// titles no provider knew: both devices' lists merge, a manual match (removal) reaches the other device
+{
+  const a = slice({ settings: { theme: "system", trackHistory: true, unmatched: { "movie:a:": "s1|1" } } })
+  const b = slice({ settings: { theme: "system", trackHistory: true, unmatched: { "movie:b:": "s1|2" } } })
+  const M = merge(buildSnapshot(a, stamp({}, flatten(a), 10), {}, 30), buildSnapshot(b, stamp({}, flatten(b), 20), {}, 30))
+  const ap = applySnapshot(a, M)
+  assert.deepEqual(ap.slice.settings.unmatched, { "movie:a:": "s1|1", "movie:b:": "s1|2" })
+  assert.equal(stamp(ap.stamps, flatten(ap.slice), 99), ap.stamps)
+  const a2 = slice({ settings: { theme: "system", trackHistory: true, unmatched: { "movie:b:": "s1|2" } } })
+  const M2 = merge(M, buildSnapshot(a2, stamp(ap.stamps, flatten(a2), 40), {}, 50))
+  assert.deepEqual(applySnapshot(b, M2).slice.settings.unmatched, { "movie:b:": "s1|2" })
+}
+console.log("unmatched ok")
+
 // sports follows: one entity per team, per profile; unfollow tombstones; two devices union
 {
   const liv = { provider: "espn", teamId: "soccer/eng.1/364", name: "Liverpool", badge: "https://cdn/liv.png", league: "Premier League" }

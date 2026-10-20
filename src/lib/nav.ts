@@ -19,7 +19,7 @@ interface R {
 /* URL <-> stack. Each history entry carries a hash (#/live, #/detail/<id>, #/player/<id>) so a refresh lands on the same page.
    Hash routing works from file:// (webOS) and any static host. Entry d=0 is a guard (Back never leaves the app),
    entry d=n shows stack[n-1]. */
-const PAGES = ["profiles", "sources", "home", "live", "movies", "series", "library", "recent", "settings", "detail", "player", "person", "team", "match", "league", "sports", "category", "genre", "history", "stats", "diagnostics", "welcome", "link", "episode"]
+const PAGES = ["profiles", "sources", "home", "live", "movies", "series", "library", "recent", "settings", "detail", "player", "person", "team", "match", "league", "sports", "category", "genre", "history", "stats", "diagnostics", "welcome", "link", "episode", "multi"]
 const hashOf = (r: Route) => {
   const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "team" || r.name === "match" || r.name === "league" ? r.p?.id : r.name === "detail" || r.name === "episode" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "settings" ? r.p?.sec : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
   return `#/${r.name}${id ? "/" + encodeURIComponent(String(id)) : ""}`

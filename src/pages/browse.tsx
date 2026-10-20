@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ALL, FAV, useGroupCount } from "@/components/tv/groups"
+import { ALL, CONT, FAV, useGroupCount } from "@/components/tv/groups"
 import { Card, Rail, SectionTitle } from "@/components/gtv"
 import { AlphaRail, Chips, Empty, Shell, VGrid, Pending } from "@/components/tv/ui"
 import { BrowseFilters } from "@/components/tv/filter-bar"
@@ -26,9 +26,9 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
       {status !== "ready" ? <Pending /> : (
         (() => {
           const filters = (<>
-            <Chips cat count={count} items={[ALL, FAV, ...groups]} active={g} onPick={(c) => (c === ALL || c === FAV ? setG(c) : openCategory(c))} locked={isLocked}
+            <Chips cat count={count} items={[ALL, ...(count(CONT) || g === CONT ? [CONT] : []), FAV, ...groups]} active={g} onPick={(c) => (c === ALL || c === CONT || c === FAV ? setG(c) : openCategory(c))} locked={isLocked}
               onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
-              onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
+              onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== CONT && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
             <BrowseFilters kind={kind} q={q} setQ={setQ} sort={sort} setSort={setSort} sorts={sorts} cats={cats} toggleCat={toggleCat} clearCats={clearCats} activeCount={activeCount} label={t("pages.browse.filter")} />
           </>)
           // mobile: filters scroll with the content, which starts under the top bar and runs under the bottom bar (under-top / under-bottom)

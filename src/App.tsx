@@ -31,6 +31,7 @@ import Browse from "@/pages/browse"
 import CategoryPage from "@/pages/category"
 import Detail from "@/pages/detail"
 import GenrePage from "@/pages/genre"
+import MultiviewPage from "@/pages/multiview"
 import HistoryPage from "@/pages/history"
 import StatsPage from "@/pages/stats"
 import DiagnosticsPage from "@/pages/diagnostics"
@@ -67,7 +68,7 @@ const SHELL_PAGES = new Set(["home", "live", "sports", "movies", "series", "sear
 
 /** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
 const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, library: Library, recent: Recent, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, league: LeaguePage, detail: Detail, episode: EpisodePage, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage,
+  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, library: Library, recent: Recent, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, league: LeaguePage, detail: Detail, episode: EpisodePage, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage, multi: MultiviewPage,
 }
 
 function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {

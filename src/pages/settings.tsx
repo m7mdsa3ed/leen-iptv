@@ -30,7 +30,7 @@ export default function SettingsPage() {
     <nav data-nav-group="memory" aria-label={t("settings.title")} className={cn("under-top under-bottom flex flex-col gap-2 overflow-y-auto p-1", !mobile && "shrink-0 md:w-72")}>
       {p && (
         <div className="mb-2 flex items-center gap-3 px-4 py-2">
-          <Avatar name={p.name} color={p.color} className="size-12 text-xl" />
+          <Avatar name={p.name} color={p.color} photo={p.photo} className="size-12 text-xl" />
           <div dir="auto" className="min-w-0 truncate text-lg font-medium">{p.name}</div>
         </div>
       )}

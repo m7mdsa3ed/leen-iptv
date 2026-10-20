@@ -10,4 +10,6 @@ export type MoreActions = {
   details: (id: string) => void
   person: (c: { id?: string; name: string }) => void
   trailer: (t: { key: string; name: string }) => void
+  /** save the playhead as the show's intro start / intro end / credits start, or forget the show's marks */
+  mark: (k: "is" | "ie" | "ce" | "reset") => void
 }

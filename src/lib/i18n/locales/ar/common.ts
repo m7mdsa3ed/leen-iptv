@@ -57,5 +57,11 @@ const d: Dict = {
   "search.none": "مفيش نتايج",
   "common.moreOptions": "اختيارات تانية",
   "common.alpha": "اقفز لحرف",
+  "common.update.downloading": "بننزّل نسخة جديدة من Leen TV",
+  "common.update.downloadingNote": "كمّل تفرّج، مفيش حاجة هتتحمّل من الأول غير لما تقول.",
+  "common.update.ready": "فيه نسخة جديدة من Leen TV جاهزة",
+  "common.update.readyNote": "حمّل الصفحة من الأول عشان تستخدمها.",
+  "common.update.reload": "حمّل من الأول",
+  "common.update.applying": "بنحدّث Leen TV...",
 }
 export default d

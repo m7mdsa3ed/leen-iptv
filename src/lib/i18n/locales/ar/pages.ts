@@ -286,5 +286,13 @@ const d: Dict = {
   "pages.episode.writtenBy": "تأليف",
   "pages.episode.series": "ارجع لـ {name}",
   "pages.episode.missing": "الحلقة دي مبقتش في القايمة",
+  "pages.multi.title": "مشاهدة متعددة",
+  "pages.multi.add": "ضيف قناة",
+  "pages.multi.search": "دوّر على قناة",
+  "pages.multi.none": "مفيش قنوات",
+  "pages.multi.empty": "ضيف قناة لايف عشان تبدأ. أغلب المزوّدين بيسمحوا بكام بث بس في نفس الوقت.",
+  "pages.multi.sound": "الصوت",
+  "pages.multi.full": "ملء الشاشة",
+  "pages.multi.remove": "شيل",
 }
 export default d

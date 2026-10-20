@@ -70,9 +70,5 @@
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-  <script>
-      if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !/Web0S|webOS|SmartTV/i.test(navigator.userAgent))
-        window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js") })
-    </script>
   </body>
 </html>

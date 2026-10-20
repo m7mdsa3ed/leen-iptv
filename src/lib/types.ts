@@ -67,6 +67,7 @@ export interface Profile {
   id: string
   name: string
   color: string
+  photo?: string // data URL, square JPEG from lib/photo.ts
   pin?: string
   locked: string[] // `${kind}|${group}`
 }

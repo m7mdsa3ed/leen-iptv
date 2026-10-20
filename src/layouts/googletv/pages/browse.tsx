@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ALL, FAV, useGroupCount } from "@/components/tv/groups"
+import { ALL, CONT, FAV, useGroupCount } from "@/components/tv/groups"
 import { Card } from "@/components/gtv"
 import { AlphaRail, Chips, Empty, Shell, VGrid, Pending } from "@/components/tv/ui"
 import { BrowseFilters } from "@/components/tv/filter-bar"
@@ -25,10 +25,10 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
         (() => {
           const filters = (<>
             {/* one pill row: All, Favorites, genres (open the TMDB genre page), then categories (open their PIN-gated page; yellow key / right-click locks one) */}
-            <Chips cat count={count} items={[ALL, FAV, ...genres.filter((x) => !groups.includes(x)), ...groups]} active={g} locked={isLocked}
-              onPick={(c) => (c === ALL || c === FAV || (groups.includes(c) && !isLocked(c)) ? setG(c) : groups.includes(c) ? openCategory(c) : openGenre(c))}
+            <Chips cat count={count} items={[ALL, ...(count(CONT) || g === CONT ? [CONT] : []), FAV, ...genres.filter((x) => !groups.includes(x)), ...groups]} active={g} locked={isLocked}
+              onPick={(c) => (c === ALL || c === CONT || c === FAV || (groups.includes(c) && !isLocked(c)) ? setG(c) : groups.includes(c) ? openCategory(c) : openGenre(c))}
               onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
-              onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
+              onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== CONT && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
             {/* filter bar: the Filters button opens the multi-select panel, then the title search, the sort pills and the picked chips */}
             <BrowseFilters kind={kind} q={q} setQ={setQ} sort={sort} setSort={setSort} sorts={sorts} cats={cats} toggleCat={toggleCat} clearCats={clearCats} activeCount={activeCount} label={t("gtv.browse.filter")} />
           </>)

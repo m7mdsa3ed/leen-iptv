@@ -8,7 +8,7 @@ import { tmdbExtras } from "./facts-pure"
 import { mapDiscover } from "./plex-discover-pure"
 import { plexUrl } from "@/lib/plex"
 import { sharedGet, sharedPut } from "./shared"
-import { resolveKey, shareable, sharedKey } from "./shared-pure"
+import { omdbKey, resolveKey, shareable, sharedKey } from "./shared-pure"
 import type { Credit, EpisodeMeta, Person, PersonInfo, PersonRef, Provider, ProviderCfg, Rating, SimilarRef } from "./types"
 
 const list = (v: unknown) => String(v ?? "").split(/\s*,\s*/).map((x) => x.trim()).filter((x) => x && x !== "N/A")
@@ -291,7 +291,13 @@ const omdb: Provider = {
       if (q.year) u.searchParams.set("y", q.year)
     }
     const key = `om:${[...u.searchParams].filter(([k]) => k !== "apikey").map(([k, v]) => `${k}=${v}`).join("&")}`
-    const r: J = await cached(key, 7 * DAY, async () => (await counted("omdb", () => fetchT(u.href, 20000))).json(), (j) => j.Response === "False")
+    const sk = omdbKey({ imdb: q.ids.imdb, kind: q.kind, title: q.title, year: q.year })
+    const r: J = await cached(key, 7 * DAY, async () => {
+      if ((forced.get(q.ids.imdb ?? "") ?? 0) < Date.now()) { const hit = await sharedGet(sk.key, sk.path, 7 * DAY); if (hit) return hit } // another device already asked OMDb: no request, no daily quota
+      const j: J = await (await counted("omdb", () => fetchT(u.href, 20000))).json()
+      if (j.Response === "True") sharedPut(sk.key, sk.path, j)
+      return j
+    }, (j) => j.Response === "False")
     if (r.Response === "False") return null
     const ratings: Rating[] = []
     if (str(r.imdbRating)) ratings.push({ source: "IMDb", value: r.imdbRating, votes: str(r.imdbVotes) })

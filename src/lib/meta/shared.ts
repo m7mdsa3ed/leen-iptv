@@ -18,13 +18,13 @@ const pause = (e?: unknown) => { pausedUntil = Date.now() + 5 * 60000; lastErr =
 export const sharedResume = () => { pausedUntil = 0; lastErr = "" }
 export const sharedLastError = () => lastErr
 
-export async function sharedGet(key: string, path: string): Promise<J | null> {
+export async function sharedGet(key: string, path: string, ttl = META_TTL): Promise<J | null> {
   if (!on()) return null
   try {
     const a = await sharedAuth()
     if (!a) return null
     const row = await limit(api.metaGet(a.cfg, a.session, key))
-    if (!row || Date.now() - Date.parse(row.fetched_at) > META_TTL) return null // missing or older than the TTL: ask TMDB (and write it back)
+    if (!row || Date.now() - Date.parse(row.fetched_at) > ttl) return null // missing or older than the TTL: ask TMDB (and write it back)
     return validShared(path, row.data) ? row.data : null
   } catch (e) { pause(e); return null }
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { ALL, FAV } from "@/components/tv/groups"
+import { ALL, CONT, FAV, useContinue } from "@/components/tv/groups"
 import { askPin, useOpen } from "@/components/tv/ui"
 import { fold, useLang, useT } from "@/lib/i18n"
 import { alphaIndex, byAdded, byRelease, matchMore, moreCount } from "@/lib/browse-pure"
@@ -14,7 +14,7 @@ import { useActiveFilter, useCatalogView, inSource } from "./use-source-filter"
 
 const MAX_RAILS = 30
 const RAIL_ITEMS = 20
-export { ALL, FAV }
+export { ALL, CONT, FAV }
 
 /**
  * Movies / Series browse data.
@@ -47,7 +47,8 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
   const { lang } = useLang()
   const lockKey = (c: string) => findLock(p?.locked ?? [], kind, c)
   const favorites = useMemo(() => d.favs.map((id) => byId.get(id)).filter((i): i is Item => !!i && i.kind === kind && inSource(i, filter)), [byId, kind, d.favs, filter]) // via byId: favorites of deduped (alt) items still show
-  const items = g === FAV ? favorites : g === ALL ? [] : byKind[kind].filter((i) => catsOf(i).includes(g))
+  const cont = useContinue(kind)
+  const items = g === CONT ? cont : g === FAV ? favorites : g === ALL ? [] : byKind[kind].filter((i) => catsOf(i).includes(g))
   const rails = useMemo(() => {
     if (g !== ALL) return []
     const by = new Map<string, Item[]>()
@@ -60,10 +61,10 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
   const setCatFilter = useApp((s) => s.setCatFilter)
   // every title the group can show: the source filter (useCatalogView) and the picked categories narrow it first
   const all = useMemo(() => {
-    const base = g === FAV ? favorites : g === ALL ? byKind[kind] : byKind[kind].filter((i) => catsOf(i).includes(g))
+    const base = g === CONT ? cont : g === FAV ? favorites : g === ALL ? byKind[kind] : byKind[kind].filter((i) => catsOf(i).includes(g))
     const want = new Set(cats)
     return cats.length || nMore ? base.filter((i) => (!cats.length || catsOf(i).some((c) => want.has(c))) && (!nMore || matchMore(i, more, d.progress))) : base
-  }, [g, favorites, byKind, kind, cats, more, nMore, d.progress])
+  }, [g, cont, favorites, byKind, kind, cats, more, nMore, d.progress])
   const sorts = useMemo(() => sortsFor(all, t), [all, t])
   // any refinement (picked categories, a query or a non-default order) drops the curated rails in favour of the flat grid
   const refined = cats.length > 0 || nMore > 0 || !!q.trim() || sort !== "default"
@@ -72,6 +73,7 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
     const f = fold(q.trim())
     if (g === ALL && !refined) return [...new Set(rails.flatMap(([, a]) => a))]
     const l = f ? all.filter((i) => fold(i.name).includes(f)) : all
+    if (g === CONT) return l // most recently watched first, whatever the sort
     if (sort === "az") return [...l].sort(byName(lang))
     if (sort === "rating") return [...l].sort((a, b) => (parseFloat(b.rating ?? "") || 0) - (parseFloat(a.rating ?? "") || 0))
     if (sort === "year") return [...l].sort(byRelease)
@@ -94,7 +96,7 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
     isLocked: (c: string) => !!lockKey(c),
     canLock: !!p?.pin,
     toggleLock: async (c: string) => {
-      if (c === FAV || c === ALL || !p?.pin || !groups[kind].includes(c)) return // only real categories lock: a genre pill would store a stray lock
+      if (c === CONT || c === FAV || c === ALL || !p?.pin || !groups[kind].includes(c)) return // only real categories lock: a genre pill would store a stray lock
       const k = lockKey(c)
       if (k && !(await askPin(p.pin))) return
       toggleLockStore(k ?? `${kind}|${c}`)

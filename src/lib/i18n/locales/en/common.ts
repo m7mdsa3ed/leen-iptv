@@ -57,5 +57,11 @@ const d: Dict = {
   "search.none": "No matches",
   "common.moreOptions": "More options",
   "common.alpha": "Jump to letter",
+  "common.update.downloading": "Downloading a new version of Leen TV",
+  "common.update.downloadingNote": "Keep watching. Nothing reloads until you say so.",
+  "common.update.ready": "A new version of Leen TV is ready",
+  "common.update.readyNote": "Reload to use it.",
+  "common.update.reload": "Reload",
+  "common.update.applying": "Updating Leen TV...",
 }
 export default d

@@ -78,7 +78,7 @@ export default function Shell({ page, title, children }: ShellProps) {
           <div className="m-rise w-full rounded-t-[28px] border-t border-[var(--fg-10)] bg-surface px-[var(--gx)] pb-[calc(var(--safe-b)+1rem)] pt-3 shadow-2xl">
             <div aria-hidden className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--fg-30)]" />
             <div className="flex items-center gap-3">
-              <Avatar name={profile?.name ?? "?"} color={profile?.color ?? "#5f6368"} className="size-12 text-lg" />
+              <Avatar name={profile?.name ?? "?"} color={profile?.color ?? "#5f6368"} photo={profile?.photo} className="size-12 text-lg" />
               <div className="min-w-0 flex-1">
                 <div dir="auto" className="truncate text-lg font-medium">{profile?.name}</div>
                 <div className="truncate text-sm text-muted-foreground">{state}</div>

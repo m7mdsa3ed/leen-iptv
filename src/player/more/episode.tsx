@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import { Info, Star } from "lucide-react"
+import { groupKey } from "@/lib/merge-pure"
 import { Card, Pill, SkelGrid } from "@/components/gtv"
 import { useDetail } from "@/layouts/hooks/use-detail"
 import { fmt, useT } from "@/lib/i18n"
@@ -19,6 +20,7 @@ export function EpisodeMore({ item, act }: { item: Item; act: MoreActions }) {
   const sid = series?.id ?? item.id
   const isFav = useApp((s) => !!s.profileId && !!s.data[s.profileId]?.favs.includes(sid))
   const toggleFav = useApp((s) => s.toggleFav)
+  const hasMarks = useApp((s) => !!s.settings.skipMarks?.[groupKey(item.group)])
   const cur = D.episodes.find((e) => e.item.id === item.id)
 
   // open on the season being watched, with the current episode in view
@@ -36,6 +38,13 @@ export function EpisodeMore({ item, act }: { item: Item; act: MoreActions }) {
         <div className="mt-4 flex flex-wrap gap-3">
           <Pill data-autofocus="" className="pl-btn pl-act" onClick={() => toggleFav(sid)}><Star className={isFav ? "fill-yellow-400 text-yellow-400" : ""} />{t(isFav ? "player.more.removeFav" : "player.more.addFav")}</Pill>
           <Pill className="pl-btn pl-act" onClick={() => act.details(sid)}><Info />{t("player.more.details")}</Pill>
+        </div>
+      </Section>
+
+      <Section title={t("player.mark.title")}>
+        <div className="flex flex-wrap gap-3">
+          {(["is", "ie", "ce"] as const).map((k) => <Pill key={k} className="pl-btn pl-act" onClick={() => act.mark(k)}>{t(`player.mark.${k}`)}</Pill>)}
+          {hasMarks && <Pill className="pl-btn pl-act" onClick={() => act.mark("reset")}>{t("player.mark.reset")}</Pill>}
         </div>
       </Section>
 

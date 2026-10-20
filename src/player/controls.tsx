@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode, type RefObject } from "react"
-import { Expand, Info, ListVideo, MessageSquareText, Minimize, MoonStar, Pause, Play, RotateCcw, RotateCw, Settings2, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
+import { Cast, Expand, Info, LayoutGrid, ListVideo, MessageSquareText, Minimize, MoonStar, Pause, Play, RotateCcw, RotateCw, Settings2, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
 import { useVideoTime } from "./use-time"
@@ -40,6 +40,7 @@ export type ControlsProps = {
   onPrev: () => void; onNext: () => void; onToggle: () => void; onSeek: (d: number) => void; onSeekFrac: (f: number) => void
   onMute: () => void; onVolume: (x: number) => void; onMenu: (m: MenuKind) => void
   onFs: () => void; onMore: () => void; onChannels: () => void
+  canCast: boolean; casting: boolean; onCast: () => void; onMulti: () => void
 }
 
 /** Minutes left on an active sleep timer ("30 min", "1 min"). Ticks on its own so Player never re-renders every second. */
@@ -85,6 +86,8 @@ export function Controls(c: ControlsProps) {
         </div>
         <div className="pl-tools">
           {c.live && <Tool label={t("player.channels")} text={t("player.channels")} onClick={c.onChannels}><ListVideo /></Tool>}
+          {c.live && !c.tv && <Tool label={t("player.multi")} text={t("player.multi")} onClick={c.onMulti}><LayoutGrid /></Tool>}
+          {c.canCast && <Tool label={t("player.cast")} text={t("player.cast")} active={c.casting} onClick={c.onCast}><Cast /></Tool>}
           <Tool label={t("player.av")} text={t("player.av")} onClick={() => c.onMenu("av")}><MessageSquareText /></Tool>
           <Tool label={t("player.settings")} text={t("player.settings")} onClick={() => c.onMenu("settings")}><Settings2 /></Tool>
           {c.sleepAt && <Tool label={t("player.sleep.title")} text={<SleepLeft at={c.sleepAt} />} active onClick={() => c.onMenu("sleep")}><MoonStar /></Tool>}

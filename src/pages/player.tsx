@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { isTv, useTouch } from "@/lib/device"
 import { navState, useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
-import { srcOfId } from "@/lib/merge-pure"
+import { groupKey, srcOfId } from "@/lib/merge-pure"
+import { useNotify } from "@/lib/notify"
+import { castStart, castStop, castSupported } from "@/lib/cast"
+import { useMulti } from "@/lib/multi"
+import { setMark } from "@/player/skip-pure"
 import type { Item } from "@/lib/types"
 import { STREAM_QS, type StreamQ } from "@/lib/quality"
 import { plexStopTranscode } from "@/lib/plex"
@@ -34,7 +38,7 @@ import { langName } from "@/player/menus"
 import { useCatalog } from "@/lib/catalog"
 import { downloadSub, searchSubs, subQuery } from "@/lib/subs"
 import { DEFAULT_SUB_LANGS, sameLang } from "@/lib/subs-pure"
-import { BANNER_MS, fsEl, HIDE_MS, isEpisode } from "@/player/util"
+import { BANNER_MS, fsEl, HIDE_MS, isEpisode, mmss } from "@/player/util"
 import { closePlayer, usePlayerHost } from "@/player/host"
 import type { NewEpisodesEvent } from "@/lib/new-episodes"
 import { Pause as PauseIcon, PictureInPicture2, Play as PlayIcon, X } from "lucide-react"
@@ -157,9 +161,10 @@ export default function Player({ queue: q0, index, start, mini = false }: { queu
   }, [showBanner])
   const zap = useCallback((d: number) => { const n = qref.current.length; zapTo((idxRef.current + d + n) % n) }, [zapTo])
   const advance = () => { setIdx((i) => Math.min(i + 1, qref.current.length - 1)); showBanner() }
-  const nu = useNextUp({ vref, enabled: hasNext && showNext, itemId: item.id, onNext: advance, auto: autoNext })
+  const mk = groupKey(item.group), marks = useApp((s) => s.settings.skipMarks)
+  const sg = useSegments({ vref, item, live, plex: S.plex, jf: S.jf, mark: marks?.[mk] })
+  const nu = useNextUp({ vref, enabled: hasNext && showNext, itemId: item.id, onNext: advance, auto: autoNext, creditsAt: sg.creditsAt })
   const nextOn = hasNext && nu.show
-  const sg = useSegments({ vref, item, live, plex: S.plex, jf: S.jf })
   const skipOn = !!sg.seg && !nextOn // credits give way to the Next card
   const nextItem = queue[idx + 1]
   const next_ = () => (live ? zap(1) : idx < queue.length - 1 && setIdx(idx + 1))
@@ -386,11 +391,32 @@ export default function Player({ queue: q0, index, start, mini = false }: { queu
   const person = (c: { id?: string; name: string }) => useRoute.getState().replace("person", { id: c.id, name: c.name })
   const trailer = (x: { key: string; name: string }) => { vref.current?.pause(); openTrailer(x) }
   const impl = useRef<MoreActions>(null as unknown as MoreActions)
-  impl.current = { close: closeMore, closed: finishMore, play: playItem, details, person, trailer }
+  const [casting, setCasting] = useState(false)
+  const cast = async () => {
+    const toast = useNotify.getState().push
+    if (casting) { castStop(); setCasting(false); return toast({ title: t("player.cast.stopped") }) } // ponytail: a session ended from the TV side is not noticed; the next press just resets
+    try {
+      const dev = await castStart({ url: S.url, raw: S.raw, title: item.name, image: item.logo, live, at: vref.current?.currentTime ?? 0 })
+      vref.current?.pause(); setCasting(true); toast({ title: t("player.cast.to", { name: dev }) })
+    } catch (e) {
+      const m = e instanceof Error ? e.message : ""
+      if (m !== "cancel") toast({ title: t("player.cast.failed"), body: m === "unavailable" ? t("player.cast.unavailable") : m })
+    }
+  }
+  const multi = () => { useMulti.getState().add(item.id); useRoute.getState().go("multi") }
+  const mark = (k: "is" | "ie" | "ce" | "reset") => {
+    const v = vref.current, st = useApp.getState(), cur = st.settings.skipMarks ?? {}, toast = useNotify.getState().push
+    if (k === "reset") { const rest = { ...cur }; delete rest[mk]; st.setSettings({ skipMarks: rest }); return toast({ title: t("player.mark.cleared") }) }
+    const m = v && setMark(cur[mk], k, v.currentTime, v.duration || 0)
+    if (!m) return toast({ title: t("player.mark.bad"), body: t("player.mark.badHint") })
+    st.setSettings({ skipMarks: { ...cur, [mk]: m } })
+    toast({ title: t("player.mark.saved", { time: mmss(v!.currentTime) }), body: t(`player.mark.${k}`) })
+  }
+  impl.current = { close: closeMore, closed: finishMore, play: playItem, details, person, trailer, mark }
   const act = useMemo<MoreActions>(() => ({
     close: () => impl.current.close(), closed: () => impl.current.closed(),
     play: (i, q, k) => impl.current.play(i, q, k), details: (id) => impl.current.details(id),
-    person: (c) => impl.current.person(c), trailer: (x) => impl.current.trailer(x),
+    person: (c) => impl.current.person(c), trailer: (x) => impl.current.trailer(x), mark: (k) => impl.current.mark(k),
   }), [])
 
   /* ---------- live overlays: guide + channel strip ---------- */
@@ -520,7 +546,7 @@ export default function Player({ queue: q0, index, start, mini = false }: { queu
     off: mini, stop,
     live, show, menu, err: E.err, help, more, nextShow: nextOn, canPip, overlay: ov,
     back, hide, closeMenu: () => { const up = menuBack(); if (up) up(); else setMenu(null) }, closeHelp: () => setHelp(false), toggleHelp: () => setHelp((h) => !h),
-    closeMore, openMore, cancelNext: nu.cancel, skipSeg: skipOn ? sg.skip : undefined, closeOverlay, openStrip: () => openOverlay("strip"),
+    closeMore, openMore, cancelNext: nu.cancel, skipSeg: skipOn && sg.seg!.kind !== "jump" ? sg.skip : undefined, closeOverlay, openStrip: () => openOverlay("strip"),
     play, pause, toggle, seek, zap, toggleFav: () => toggleFav(item.id), openMenu, cycleFit, poke,
     toggleFs, togglePip, toggleMute, setVolume: bumpVolume, digit,
   })
@@ -602,6 +628,7 @@ export default function Player({ queue: q0, index, start, mini = false }: { queu
           onPrev={prev_} onNext={next_} onToggle={toggle} onSeek={(d) => { seek(d); poke() }} onSeekFrac={seekFrac}
           onMute={toggleMute} onVolume={(x) => setVolume(x, false)} onMenu={openMenu}
           onFs={toggleFs} onMore={openMore} onChannels={() => openOverlay("strip")}
+          canCast={castSupported()} casting={casting} onCast={cast} onMulti={multi}
         />
       </div>
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { cleanTitle, norm, tmdbId } from "../src/lib/meta/title.ts"
 import { enrichEpisodes, isGenericEpTitle } from "../src/lib/meta/episodes.ts"
 import { mapDiscover } from "../src/lib/meta/plex-discover-pure.ts"
-import { resolveKey, shareable, sharedKey, shareBody, validShared } from "../src/lib/meta/shared-pure.ts"
+import { omdbKey, resolveKey, shareable, sharedKey, shareBody, validShared } from "../src/lib/meta/shared-pure.ts"
 
 assert.deepEqual(cleanTitle("AR - The Weight (2023) 4K"), { title: "The Weight", year: "2023" })
 assert.deepEqual(cleanTitle("|EN| Hellfire [FHD]"), { title: "Hellfire", year: undefined })
@@ -64,6 +64,15 @@ for (const p of ["/search/movie", "/movie/abc", "/person/1", "/movie/550/credits
   assert.ok(/^tmdb:v[0-9]+:[A-Za-z-]{2,10}:(\/(movie|tv)\/[0-9]+(\/season\/[0-9]+)?|\/resolve\/(movie|series))\?/.test(rk))
   assert.ok(validShared("/resolve/movie", { id: 550 }) && !validShared("/resolve/movie", { id: "abc" }) && !validShared("/resolve/movie", { id: 0 }) && !validShared("/resolve/movie", {}))
   assert.deepEqual(shareBody("/resolve/tv", { id: 5, junk: 1 }), { id: 5 })
+}
+// OMDb rows: key shape the SQL CHECK expects, and only a found title with the asked-for IMDb id is believed
+{
+  const a = omdbKey({ imdb: "tt0137523", kind: "movie", title: "Fight Club" }), b = omdbKey({ kind: "series", title: "The Wire", year: "2002" })
+  assert.deepEqual(a, { key: "omdb:v1:any:/id/tt0137523?", path: "/id/tt0137523" })
+  assert.deepEqual(b, { key: "omdb:v1:any:/find/series?t=the wire&y=2002", path: "/find/series" })
+  for (const k of [a.key, b.key]) assert.match(k, /^omdb:v[0-9]+:any:\/(id\/tt[0-9]{5,10}|find\/(movie|series))\?/) // same pattern as schema.sql
+  assert.ok(validShared(a.path, { Response: "True", imdbID: "tt0137523" }) && validShared(b.path, { Response: "True", imdbID: "tt0306414" }))
+  assert.ok(!validShared(a.path, { Response: "True", imdbID: "tt0000001" }) && !validShared(a.path, { Response: "False", Error: "x" }) && !validShared(b.path, { Response: "True", imdbID: "abc" }))
 }
 // Plex Discover title (shape from metadata.provider.plex.tv)
 {

@@ -1,12 +1,12 @@
 import { useMemo } from "react"
-import { List, ListPlus, Lock, Star } from "lucide-react"
+import { History, List, ListPlus, Lock, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { KEY } from "@/lib/nav"
 import { useApp, useLists, usePData, useProfile } from "@/lib/store"
 import { useCatalog } from "@/lib/catalog"
 import { useActiveFilter, useCatalogView, inSource } from "@/layouts/hooks/use-source-filter"
 import { catsOf, findLock } from "@/lib/merge-pure"
-import type { Kind } from "@/lib/types"
+import type { Item, Kind } from "@/lib/types"
 import { useMode } from "@/lib/device"
 import { useT } from "@/lib/i18n"
 import { askPin, CatCount, groupLabel, useCatSide } from "./ui"
@@ -16,6 +16,18 @@ export { liveRowMenu } from "./lists"
 
 export const FAV = "Favorites"
 export const ALL = "All"
+export const CONT = "Continue watching" // pseudo group, like FAV: live = recently watched channels, movies / shows = started and not finished (same rule as Home's Continue watching row)
+
+/** What the Continue watching group lists for a kind, newest first, narrowed by the source filter. Series progress is also saved under the series id (setProgress), so shows resolve here. */
+export function useContinue(kind: Kind): Item[] {
+  const byId = useCatalog((s) => s.byId)
+  const d = usePData()
+  const filter = useActiveFilter()
+  return useMemo(() => {
+    const ids = kind === "live" ? d.recents : Object.entries(d.progress).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
+    return ids.map((id) => byId.get(id)).filter((i): i is Item => !!i && i.kind === kind && inSource(i, filter))
+  }, [kind, byId, d.recents, d.progress, filter])
+}
 
 /** Titles behind each category pill, counted like the pages list them (picked sources only): All, Favorites, the user's live lists, categories. undefined = no count (genre pills). Shown in the sidebar. */
 export function useGroupCount(kind: Kind) {
@@ -24,13 +36,15 @@ export function useGroupCount(kind: Kind) {
   const favs = usePData().favs
   const lists = useLists()
   const filter = useActiveFilter()
+  const cont = useContinue(kind).length
   const m = useMemo(() => {
     const m = new Map<string, number>([[ALL, byKind[kind].length]])
     for (const i of byKind[kind]) for (const c of catsOf(i)) m.set(c, (m.get(c) ?? 0) + 1)
+    m.set(CONT, cont)
     m.set(FAV, favs.filter((id) => { const i = byId.get(id); return i?.kind === kind && inSource(i, filter) }).length) // via byId, like the pages: favorites of merged copies count
     if (kind === "live") { const ids = new Set(byKind.live.map((i) => i.id)); for (const l of lists) m.set(l.name, l.items.filter((id) => ids.has(id)).length) }
     return m
-  }, [byKind, kind, byId, favs, lists, filter])
+  }, [byKind, kind, byId, favs, lists, filter, cont])
   return (g: string) => m.get(g)
 }
 
@@ -41,26 +55,28 @@ export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups
   const toggleLock = useApp((s) => s.toggleLock)
   const lists = useLists()
   const isList = (g: string) => lists.some((l) => l.name === g)
-  const list = [FAV, ALL, ...groups]
+  const hasCont = useContinue(kind).length > 0
+  const list = [...(hasCont || active === CONT ? [CONT] : []), FAV, ALL, ...groups]
   const lockKey = (g: string) => findLock(p?.locked ?? [], kind, g)
   const mode = useMode()
   const ref = useCatSide()
   const count = useGroupCount(kind)
   const toggle = async (g: string) => {
-    if (g === FAV || g === ALL || !p?.pin) return
+    if (g === CONT || g === FAV || g === ALL || !p?.pin) return
     const k = lockKey(g)
     if (k && !(await askPin(p.pin))) return
     toggleLock(k ?? `${kind}|${g}`)
   }
   const onKey = (e: React.KeyboardEvent, g: string) => { if (e.keyCode === KEY.yellow) toggle(g) }
   // right-click / touch long-press (contextmenu) toggles the lock outside tv
-  const onCtx = (e: React.MouseEvent, g: string) => { if (mode !== "tv" && p?.pin && g !== FAV && g !== ALL) { e.preventDefault(); toggle(g) } }
+  const onCtx = (e: React.MouseEvent, g: string) => { if (mode !== "tv" && p?.pin && g !== CONT && g !== FAV && g !== ALL) { e.preventDefault(); toggle(g) } }
   return (
     <div ref={ref} className="cat-side shrink-0">
       <div data-nav-group className="rail no-scrollbar -mb-2 !gap-2">
         {list.map((g) => (
           <button key={g} data-nav data-pill aria-pressed={g === active} onKeyDown={(e) => onKey(e, g)} onContextMenu={(e) => onCtx(e, g)} onClick={() => onPick(g)}
             className={cn("flex min-h-11 shrink-0 items-center gap-2 rounded-full px-5 py-2 text-base", g === active ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-foreground/80")}>
+            {g === CONT && <History className="size-4" />}
             {g === FAV && <Star className="size-4" />}
             {isList(g) && <List className="size-4" />}
             {lockKey(g) && <Lock className="size-4" />}

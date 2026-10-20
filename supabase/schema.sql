@@ -114,7 +114,7 @@ grant execute on function public.link_create(text, text), public.link_poll(uuid)
 grant execute on function public.link_lookup(text), public.link_approve(text, text, text) to authenticated;
 
 -- ---------------------------------------------------------------------------------------------
--- Shared metadata cache: raw TMDB title / season responses, plus which TMDB id a cleaned title resolved to (/resolve/), read by every signed-in device before it
+-- Shared metadata cache: raw TMDB title / season responses (and OMDb ratings responses, omdb:), plus which TMDB id a cleaned title resolved to (/resolve/), read by every signed-in device before it
 -- calls TMDB, so a title is fetched from TMDB once for everyone. Full provider responses (the provider is recorded per row). Public movie data only, never user
 -- data or keys. Clients cannot write the table: they call meta_put(), which validates the row, stamps
 -- the time on the server and refuses to replace a row that is younger than 7 days (so one bad client
@@ -132,7 +132,10 @@ alter table public.meta_cache add column if not exists provider text generated a
 alter table public.meta_cache drop constraint if exists meta_cache_data_check;
 alter table public.meta_cache add constraint meta_cache_data_check check (jsonb_typeof(data) = 'object' and pg_column_size(data) <= 2000000);
 alter table public.meta_cache drop constraint if exists meta_cache_key_check;
-alter table public.meta_cache add constraint meta_cache_key_check check (key ~ '^tmdb:v[0-9]+:[A-Za-z-]{2,10}:(/(movie|tv)/[0-9]+(/season/[0-9]+)?|/resolve/(movie|series))\?' and length(key) <= 300);
+alter table public.meta_cache add constraint meta_cache_key_check check ((key ~ '^tmdb:v[0-9]+:[A-Za-z-]{2,10}:(/(movie|tv)/[0-9]+(/season/[0-9]+)?|/resolve/(movie|series))\?' or key ~ '^omdb:v[0-9]+:any:/(id/tt[0-9]{5,10}|find/(movie|series))\?') and length(key) <= 300);
+-- OMDb rows (ratings, by IMDb id or title): the response as OMDb sent it, found titles only
+alter table public.meta_cache drop constraint if exists meta_cache_omdb_check;
+alter table public.meta_cache add constraint meta_cache_omdb_check check (key !~ '^omdb:' or (data->>'Response' = 'True' and data->>'imdbID' ~ '^tt[0-9]{5,10}$' and pg_column_size(data) <= 20000));
 alter table public.meta_cache drop constraint if exists meta_cache_resolve_check;
 alter table public.meta_cache add constraint meta_cache_resolve_check check (key !~ ':/resolve/' or (jsonb_typeof(data->'id') = 'number' and (data->>'id') ~ '^[1-9][0-9]{0,9}$' and data - 'id' = '{}'::jsonb));
 alter table public.meta_cache enable row level security;

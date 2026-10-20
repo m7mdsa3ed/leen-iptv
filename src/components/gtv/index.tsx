@@ -93,9 +93,9 @@ export function RoundButton({ label, active, className, type = "button", ...p }:
 }
 
 /** Coloured initial circle (not interactive; wrap in a button). Size via className, default size-10. */
-export const Avatar = ({ name, color, className }: { name: string; color: string; className?: string }) => (
-  <div style={{ background: color }} className={cn("grid size-10 shrink-0 place-items-center rounded-full font-medium text-white", className)}>
-    {(name.trim()[0] || "?").toUpperCase()}
+export const Avatar = ({ name, color, photo, className }: { name: string; color: string; photo?: string; className?: string }) => (
+  <div style={{ background: color }} className={cn("grid size-10 shrink-0 place-items-center overflow-hidden rounded-full font-medium text-white", className)}>
+    {photo ? <img src={photo} alt="" className="size-full object-cover" /> : (name.trim()[0] || "?").toUpperCase()}
   </div>
 )
 

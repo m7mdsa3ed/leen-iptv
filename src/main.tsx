@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { probeProxy } from './lib/net'
 import { initSync } from './lib/sync'
+import { registerPwa } from './lib/pwa'
 
 // Animated boot splash (markup + CSS live in index.html). Cold start plays the intro for ~2.6s; a refresh in the same session skips it.
 const splash = document.getElementById('splash')
@@ -24,6 +25,7 @@ void probeProxy().finally(() => {
     </StrictMode>,
   )
   initSync()
+  registerPwa()
   window.setTimeout(() => {
     splash?.classList.add('hide')
     window.setTimeout(() => splash?.remove(), 400)

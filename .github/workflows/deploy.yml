@@ -1,0 +1,41 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never run two deploys at once; let a running one finish.
+concurrency:
+  group: deploy-leen-tv
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Join the tailnet as an ephemeral node tagged tag:ci (auto-removed after the job).
+      # The tag is what the server's ACL trusts -- no long-lived auth key lives in the repo.
+      - name: Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      # Tailscale SSH is enabled on the server, so there is no key to manage: the
+      # tailnet ACL decides that tag:ci may log in as DEPLOY_USER. The clone and the
+      # pm2 process `leen-tv` belong to DEPLOY_APP_USER, so the work runs as that
+      # user via sudo (-H so HOME, and therefore nvm, resolves correctly).
+      - name: Deploy on the asterisk server
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}       # asterisk-server-office
+          SSH_USER: ${{ secrets.DEPLOY_USER }}       # root
+          APP_USER: ${{ vars.DEPLOY_APP_USER }}      # asterisk-server
+          REPO_DIR: ${{ vars.DEPLOY_REPO_DIR }}      # /home/asterisk-server/www/leen-iptv
+          BRANCH: main
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" \
+            "sudo -u $APP_USER -H bash -c 'cd $REPO_DIR && git fetch --prune origin && git reset --hard origin/$BRANCH && git clean -fd && bash deploy/remote-deploy.sh'"

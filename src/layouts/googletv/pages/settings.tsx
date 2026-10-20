@@ -40,7 +40,7 @@ export default function Settings() {
     <nav data-nav-group="memory" aria-label={t("gtv.settings.title")} className={cn("gtv-set-list", !mobile && UNDER)}>
       {p && (
         <button data-nav className="gtv-set-account text-start" onClick={() => pick("account")}>
-          <Avatar name={p.name} color={p.color} className="size-14 text-2xl" />
+          <Avatar name={p.name} color={p.color} photo={p.photo} className="size-14 text-2xl" />
           <div className="min-w-0">
             <div className="truncate text-xl font-medium">{p.name}</div>
             <div className="truncate text-sm text-muted-foreground">{email || t("gtv.settings.signIn")}</div>

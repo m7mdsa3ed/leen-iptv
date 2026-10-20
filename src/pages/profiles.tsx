@@ -30,7 +30,7 @@ export default function Profiles() {
         {profiles.map((p, i) => (
           <button key={p.id} data-nav data-card data-autofocus={i === 0 ? "" : undefined} onClick={() => pick(p.id)} className="flex flex-col items-center gap-4 rounded-2xl p-4">
             <div data-tile className="relative rounded-full">
-              <Avatar name={p.name} color={p.color} className="size-24 text-4xl md:size-36 md:text-6xl" />
+              <Avatar name={p.name} color={p.color} photo={p.photo} className="size-24 text-4xl md:size-36 md:text-6xl" />
               {p.pin && <span className="absolute bottom-1 end-1 grid size-8 place-items-center rounded-full bg-black/70 text-white"><Lock className="size-4" /></span>}
             </div>
             <span dir="auto" className="text-lg md:text-2xl">{p.name}</span>

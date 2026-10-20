@@ -15,9 +15,17 @@ export function sharedKey(lang: string, path: string, params: Record<string, str
   return `tmdb:v${SHARED_V}:${lang}:${path}?${q}`
 }
 
+/** OMDb (ratings) by IMDb id, else by cleaned title + year: key and the `path` that validShared / the SQL CHECK read. Only found titles are stored, never misses. */
+export function omdbKey(q: { imdb?: string; kind: "movie" | "series"; title: string; year?: string }): { key: string; path: string } {
+  if (q.imdb && /^tt\d{5,10}$/.test(q.imdb)) return { key: `omdb:v${SHARED_V}:any:/id/${q.imdb}?`, path: `/id/${q.imdb}` }
+  return { key: `omdb:v${SHARED_V}:any:/find/${q.kind}?t=${q.title.toLowerCase().slice(0, 120)}&y=${q.year ?? ""}`, path: `/find/${q.kind}` }
+}
+
 /** A row read from the shared table is somebody else's data: accept it only if it looks like the response asked for. */
 export function validShared(path: string, j: unknown): j is J {
   if (!j || typeof j !== "object" || Array.isArray(j)) return false
+  const o = path.match(/^\/(id\/(tt\d{5,10})|find\/(movie|series))$/)
+  if (o) return (j as J).Response === "True" && /^tt\d{5,10}$/.test(String((j as J).imdbID)) && (!o[2] || (j as J).imdbID === o[2])
   if (/^\/resolve\/(movie|series)$/.test(path)) return /^[1-9]\d{0,9}$/.test(String((j as J).id))
   const m = path.match(/^\/(movie|tv)\/(\d+)(\/season\/\d+)?$/)
   if (!m) return false
