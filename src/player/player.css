@@ -1,0 +1,92 @@
+/* Player (src/player/**). Minimal, Apple TV-like: clean video; on demand a title, one big scrubber and a row of tab chips; one panel
+   from the bottom for everything else; live adds a channel banner and a side channel list.
+   Compositor-friendly: only opacity / transform animate; Chrome 94 safe (no color-mix, :has, container queries). */
+
+.pl-root {
+  --pl-h: 2.75rem;                         /* control height: chips, round buttons, pills */
+  --pl-r: 24px;                            /* panel / card radius */
+  --pl-title: 1.25rem; --pl-sub: .9rem;
+  --pl-bar: 5px; --pl-thumb: 16px;
+  --pl-glass: rgba(18, 19, 22, .92);       /* panel, side list, cards */
+  --pl-btn: rgba(255, 255, 255, .14);
+  --pl-card-b: 8.5rem;                     /* Skip / Next sit above the chrome */
+  padding: 0;
+}
+@media (min-width: 640px) { .pl-root { --pl-h: 3rem; --pl-title: 1.75rem; --pl-sub: 1.05rem; --pl-card-b: 10rem; } }
+html[data-mode=tv] .pl-root { --pl-h: 3rem; --pl-title: 2rem; --pl-sub: 1.1rem; }  /* rem = 20px x --tv-scale on TV */
+@media (max-height: 520px) { .pl-root { --pl-h: 2.5rem; --pl-card-b: 6.5rem; } }       /* phone landscape */
+
+.pl-title { font-size: var(--pl-title); font-weight: 600; letter-spacing: -.01em; line-height: 1.2; }
+.pl-sub { font-size: var(--pl-sub); color: rgba(255, 255, 255, .72); }
+
+/* ---- layers: fade + a short slide, the same timing everywhere; hidden layers are not focusable (visibility) ---- */
+.pl-layer { opacity: 0; visibility: hidden; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur); }
+.pl-layer[data-on] { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.pl-top { position: absolute; inset: 0 0 auto; padding: max(1.25rem, var(--safe-t)) var(--gx) 4rem; background: var(--scrim-top); transform: translate3d(0, -8px, 0); }
+.pl-bottom { position: absolute; inset: auto 0 0; padding: 5rem var(--gx) max(1.25rem, var(--safe-b)); background: var(--scrim-bottom); transform: translate3d(0, 8px, 0); display: flex; flex-direction: column; gap: 1rem; }
+.pl-center { background: rgba(0, 0, 0, .25); }
+
+/* ---- round buttons on the video ---- */
+.pl-root .pl-rb { width: var(--pl-h); height: var(--pl-h); background: var(--pl-btn); color: #fff; }
+.pl-root .pl-rb-big { width: calc(var(--pl-h) * 1.6); height: calc(var(--pl-h) * 1.6); background: rgba(255, 255, 255, .2); }
+.pl-root .pl-rb-big svg { width: 2rem; height: 2rem; }
+.pl-root .pl-rb-on { background: #fff; color: #111; }
+
+/* ---- scrubber ---- */
+.pl-scrub { font-variant-numeric: tabular-nums; }
+.pl-time { min-width: 4.5rem; font-size: var(--pl-sub); color: rgba(255, 255, 255, .85); }
+.pl-bar { height: 2.75rem; border-radius: 999px; }
+.pl-track { height: var(--pl-bar); border-radius: 999px; background: rgba(255, 255, 255, .28); transition: height var(--dur-fast) var(--ease); }
+.pl-fill { border-radius: 999px; background: #fff; }
+.pl-thumb { width: var(--pl-thumb); height: var(--pl-thumb); margin: calc(var(--pl-thumb) / -2) 0 0 calc(var(--pl-thumb) / -2); border-radius: 999px; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, .5); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.pl-bar:hover .pl-thumb, .pl-bar:focus .pl-thumb, .pl-bar:active .pl-thumb { opacity: 1; }
+.pl-bar:focus .pl-track { height: calc(var(--pl-bar) * 1.8); }
+html .pl-root .pl-bar:focus { outline: none; box-shadow: none; }
+.pl-bubble { padding: .25rem .6rem; border-radius: .6rem; background: rgba(0, 0, 0, .8); font-size: var(--pl-sub); white-space: nowrap; }
+.pl-vol { width: 6rem; accent-color: #fff; }
+
+/* ---- the row under the scrubber: transport (desktop) | tab chips | fullscreen ---- */
+.pl-row { display: flex; align-items: center; gap: .75rem 1.25rem; flex-wrap: wrap; }
+.pl-chips { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.pl-chip { display: inline-flex; align-items: center; gap: .5rem; height: var(--pl-h); padding-inline: 1.1rem; border-radius: 999px; background: var(--pl-btn); color: #fff; font-size: 1rem; font-weight: 500; }
+.pl-chip svg { width: 1.2rem; height: 1.2rem; flex: none; }
+.pl-chip-on { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .7); }
+@media (max-width: 639px) { html:not([data-mode=tv]) .pl-chip-lbl { display: none; } html:not([data-mode=tv]) .pl-chip { padding-inline: 0; width: var(--pl-h); justify-content: center; } }
+
+/* ---- live: channel banner + side list ---- */
+.pl-banner { position: absolute; inset-inline-start: var(--gx); bottom: max(1.5rem, var(--safe-b)); max-width: min(46rem, calc(100% - 2 * var(--gx))); padding: 1rem 1.25rem; border-radius: var(--pl-r); background: var(--pl-glass); transform: translate3d(0, 8px, 0); }
+.pl-root[data-chrome] .pl-banner { bottom: calc(max(1.25rem, var(--safe-b)) + var(--pl-h) + 1.25rem); }
+.pl-logo { display: block; width: 3.5rem; height: 3.5rem; flex: none; overflow: hidden; border-radius: .9rem; background: rgba(255, 255, 255, .08); }
+.pl-logo-sm { width: 2.5rem; height: 2.5rem; border-radius: .6rem; }
+.pl-live { display: inline-flex; align-items: center; height: 1.4rem; padding-inline: .5rem; border-radius: .4rem; background: #e5484d; color: #fff; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.pl-prog { height: 4px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .2); }
+.pl-prog > span { display: block; height: 100%; border-radius: 999px; background: #fff; }
+.pl-side { width: min(44rem, 92vw); background: var(--pl-glass); box-shadow: 0 0 60px rgba(0, 0, 0, .6); }
+.pl-col { border-inline-end: 1px solid rgba(255, 255, 255, .08); }
+
+/* ---- rows (tracks, channels, episodes, versions): padded inside their scroller so the TV focus ring is never clipped ---- */
+.pl-row-btn { min-height: var(--pl-h); padding: .55rem .9rem; border-radius: calc(var(--pl-r) * .6); color: rgba(255, 255, 255, .9); font-size: 1.05rem; }
+.pl-row-btn:hover { background: rgba(255, 255, 255, .06); }
+.pl-row-on { background: rgba(255, 255, 255, .12); color: #fff; font-weight: 600; }
+
+/* ---- the panel ---- */
+.pl-panel { height: min(62%, 40rem); background: var(--pl-glass); border-radius: var(--pl-r) var(--pl-r) 0 0; box-shadow: 0 -10px 50px rgba(0, 0, 0, .5); }
+html[data-mode=mobile] .pl-panel { height: 82%; }
+.pl-tabs { display: flex; align-items: center; gap: .5rem; overflow-x: auto; padding: 1rem var(--gx) .75rem; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.pl-tab { flex: none; height: var(--pl-h); padding-inline: 1.25rem; border-radius: 999px; color: rgba(255, 255, 255, .7); font-size: 1.05rem; font-weight: 500; }
+.pl-tab:hover { color: #fff; }
+.pl-tab-on { background: #fff; color: #111; }
+.pl-body { padding: 1.25rem var(--gx) max(1.5rem, var(--safe-b)); }
+.pl-group { min-width: 0; }
+.pl-h3 { margin-bottom: .6rem; font-size: .85rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 255, 255, .55); }
+.pl-root .pl-pill { height: var(--pl-h); padding-inline: 1.1rem; }
+.pl-tag { display: inline-flex; align-items: center; padding: .25rem .75rem; border-radius: 999px; background: var(--pl-btn); font-size: .9rem; }
+
+/* ---- floating cards ---- */
+.pl-card { border-radius: var(--pl-r); background: var(--pl-glass); box-shadow: 0 10px 40px rgba(0, 0, 0, .55); }
+.pl-count { transition: transform 1s linear; }
+.pl-root .pl-skip { height: calc(var(--pl-h) * 1.1); padding-inline: 1.5rem; font-size: 1.05rem; }
+
+/* ---- transient centre indicator (indicators.tsx) ---- */
+@keyframes pl-flash-k { 0% { opacity: 0; transform: scale(.85); } 18% { opacity: 1; transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05); } }
+.pl-flash { animation: pl-flash-k 700ms var(--ease) both; }

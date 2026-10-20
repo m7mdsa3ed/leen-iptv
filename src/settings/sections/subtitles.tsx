@@ -4,7 +4,8 @@ import { useApp } from "@/lib/store"
 import { DEFAULT_SUB_LANGS, SUB_LANGS } from "@/lib/subs-pure"
 import { SUB_SIZES, SUB_STYLE, setPrefs, usePrefs, type SubStyleKey } from "@/player/prefs"
 import { subLook } from "@/player/subtitles"
-import { langName, subValue } from "@/player/menus"
+import { subValue } from "@/player/panel-av"
+import { langName } from "@/player/use-tracks"
 import { useSettingsNav } from "../sections"
 
 /** Subtitle providers, language preferences, and device-local subtitle appearance. */

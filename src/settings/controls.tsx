@@ -1,6 +1,6 @@
 import { useState, type ComponentProps, type ReactNode } from "react"
 import { Check } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { TextInput } from "@/components/tv/text-input"
 import { Pill, RoundButton } from "@/components/gtv"
 import { Toggle } from "@/components/gtv/toggle"
 import { cn } from "@/lib/utils"
@@ -45,11 +45,11 @@ export function ToggleRow({ label, description, checked, onChange, disabled }: {
 }
 
 /** Labelled text input with an inline validation message (shown when `error` is set). */
-export function Field({ label, value, onChange, error, hint, className, ...p }: Omit<ComponentProps<typeof Input>, "onChange" | "value" | "className"> & { label: string; value: string; onChange: (v: string) => void; error?: string; hint?: ReactNode; className?: string }) {
+export function Field({ label, value, onChange, error, hint, className, ...p }: Omit<ComponentProps<typeof TextInput>, "onChange" | "value" | "className"> & { label: string; value: string; onChange: (v: string) => void; error?: string; hint?: ReactNode; className?: string }) {
   return (
     <label className={cn("flex w-full max-w-[32rem] flex-col gap-1.5", className)}>
       <span className="text-sm text-muted-foreground">{label}</span>
-      <Input data-nav dir="auto" autoComplete="off" spellCheck={false} aria-invalid={error ? true : undefined} {...p} value={value} onChange={(e) => onChange(e.target.value)} className="h-12 w-full rounded-2xl text-base focus-visible:ring-0 md:text-lg [html[data-mode=mobile]_&]:text-[16px]" />
+      <TextInput data-nav dir="auto" autoComplete="off" spellCheck={false} aria-invalid={error ? true : undefined} {...p} value={value} onChange={(e) => onChange(e.target.value)} className="h-12 w-full rounded-2xl text-base focus-visible:ring-0 md:text-lg [html[data-mode=mobile]_&]:text-[16px]" />
       {error ? <span role="alert" className="text-sm text-destructive">{error}</span> : hint ? <span className="text-sm text-muted-foreground">{hint}</span> : null}
     </label>
   )

@@ -1,6 +1,6 @@
 import { SourceMark } from "@/components/source/SourceMark"
 import { useEffect, useRef, useState } from "react"
-import { Input } from "@/components/ui/input"
+import { TextInput } from "@/components/tv/text-input"
 import { Pill } from "@/components/gtv"
 import { fmt, t, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
@@ -144,7 +144,7 @@ export default function Sources() {
   const field = (k: keyof typeof f, ph: string, type = "text", inputMode?: "url", ac = "off") => (
     <label className="flex flex-col gap-1.5">
       <span className="ps-1 text-sm font-medium text-muted-foreground">{ph}</span>
-      <Input data-nav dir={k === "name" ? "auto" : "ltr"} className="h-12 rounded-2xl text-base md:h-14 md:text-xl" type={type} inputMode={inputMode} autoComplete={ac} spellCheck={false} value={f[k]} onChange={set(k)} autoCapitalize="off" autoCorrect="off" />
+      <TextInput data-nav dir={k === "name" ? "auto" : "ltr"} className="h-12 rounded-2xl text-base md:h-14 md:text-xl" type={type} inputMode={inputMode} autoComplete={ac} spellCheck={false} value={f[k]} onChange={set(k)} autoCapitalize="off" autoCorrect="off" />
     </label>
   )
   const detectBtn = <Pill className="shrink-0" disabled={!!scan} onClick={() => void jfDetect()}>{scan || tr("pages.sources.detect")}</Pill>

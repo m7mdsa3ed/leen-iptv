@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Lock, Plus } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { TextInput } from "@/components/tv/text-input"
 import { Avatar, LeenMark, Pill } from "@/components/gtv"
 import { askPin } from "@/components/tv/ui"
 import { useApp } from "@/lib/store"
@@ -48,8 +48,8 @@ export default function Profiles() {
       </div>
       {adding && (
         <div className="flex w-full max-w-[34rem] flex-col gap-3 rounded-[28px] bg-surface p-6">
-          <Input ref={nameRef} data-nav className="h-12 rounded-2xl text-base md:h-14 md:text-xl" dir="auto" placeholder={t("gtv.profiles.name")} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input data-nav className="h-12 rounded-2xl text-base md:h-14 md:text-xl" dir="ltr" placeholder={t("gtv.profiles.pin")} type="password" autoComplete="off" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} />
+          <TextInput ref={nameRef} data-nav className="h-12 rounded-2xl text-base md:h-14 md:text-xl" dir="auto" placeholder={t("gtv.profiles.name")} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
+          <TextInput data-nav className="h-12 rounded-2xl text-base md:h-14 md:text-xl" dir="ltr" placeholder={t("gtv.profiles.pin")} type="password" autoComplete="off" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} />
           <div className="flex gap-3 pt-1">
             <Pill variant="primary" disabled={!name.trim() || (pin.length > 0 && pin.length !== 4)} onClick={() => { addProfile(name.trim(), pin.length === 4 ? pin : undefined); setAdding(false); setName(""); setPin("") }}>{t("gtv.profiles.save")}</Pill>
             <Pill variant="ghost" onClick={() => setAdding(false)}>{t("gtv.profiles.cancel")}</Pill>

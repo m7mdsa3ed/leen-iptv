@@ -2,11 +2,11 @@ import type { ComponentType, ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 import type { LayoutId } from "@/lib/layouts"
 
-export type ShellProps = { page: string; title?: string; children: ReactNode }
+export type ShellProps = { page: string; title?: string; children: ReactNode; /** a page under a tab (detail, person...): the tab stays lit but first focus goes to the page */ sub?: boolean }
 /** A navigation item a layout shows: `key` = the Shell `page` it is active on, `route` = what reset(route) opens. */
 export type LayoutTab = { key: string; label: string; labelKey: string; route: string; icon: LucideIcon }
 /** Pages a layout may replace; an override gets the SAME props as the default page (Detail {id}, Browse {kind}, Category {id}, Genre {id}, Person {id?, name?}). */
-export type PageKey = "movies" | "series" | "live" | "detail" | "library" | "recent" | "profiles" | "settings" | "category" | "genre" | "person" | "episode" | "team" | "match" | "sports"
+export type PageKey = "movies" | "series" | "live" | "detail" | "profiles" | "settings" | "category" | "genre" | "person" | "team" | "match" | "sports"
 export type LayoutDef = {
   id: LayoutId
   Shell: ComponentType<ShellProps>

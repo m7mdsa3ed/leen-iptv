@@ -1,26 +1,7 @@
-// node scripts/browse.check.ts - browse side index letters and the extra filters
+// node scripts/browse.check.ts - the extra browse filters
 import assert from "node:assert/strict"
-import { alphaIndex, byAdded, byRelease, day, decadesOf, letterOf, matchMore, watchOf } from "../src/lib/browse-pure.ts"
+import { byAdded, byRelease, day, decadesOf, matchMore, watchOf } from "../src/lib/browse-pure.ts"
 import type { Item } from "../src/lib/types.ts"
-
-// accents and alef forms fold into the base letter, other scripts/digits go to "#"
-assert.equal(letterOf("Élan", "en"), "E")
-assert.equal(letterOf("eagle", "en"), "E")
-assert.equal(letterOf("أحمد", "ar"), "ا")
-assert.equal(letterOf("إبراهيم", "ar"), "ا")
-assert.equal(letterOf("1917", "en"), "#")
-assert.equal(letterOf("الفيل", "en"), "#")
-
-// the full alphabet, no duplicates, empty letters jump to the next one that has titles
-const names = ["1917", "Alien", "Élan", "Eagle", "Zodiac"]
-const ix = alphaIndex(names, "en")
-assert.equal(ix.length, 27)
-assert.equal(new Set(ix.map((x) => x.ch)).size, 27)
-assert.deepEqual(ix.find((x) => x.ch === "E"), { ch: "E", index: 2, has: true })
-assert.deepEqual(ix.find((x) => x.ch === "B"), { ch: "B", index: 2, has: false })
-assert.deepEqual(ix.find((x) => x.ch === "Z"), { ch: "Z", index: 4, has: true })
-assert.deepEqual(ix.at(-1), { ch: "#", index: 0, has: true })
-assert.deepEqual(alphaIndex(["Alien", "Aliens"], "en"), [])
 
 // filters
 const m = (id: string, year?: string, rating?: string, kind: Item["kind"] = "movie") => ({ id, kind, name: id, group: "g", year, rating }) as Item

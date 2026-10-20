@@ -19,15 +19,15 @@ interface R {
 /* URL <-> stack. Each history entry carries a hash (#/live, #/detail/<id>, #/player/<id>) so a refresh lands on the same page.
    Hash routing works from file:// (webOS) and any static host. Entry d=0 is a guard (Back never leaves the app),
    entry d=n shows stack[n-1]. */
-const PAGES = ["profiles", "sources", "home", "live", "movies", "series", "library", "recent", "settings", "detail", "player", "person", "team", "match", "league", "sports", "category", "genre", "history", "stats", "diagnostics", "welcome", "link", "episode", "multi"]
+const PAGES = ["profiles", "sources", "home", "live", "movies", "series", "settings", "detail", "player", "person", "team", "match", "league", "sports", "category", "genre", "history", "stats", "diagnostics", "welcome", "link", "multi"]
 const hashOf = (r: Route) => {
-  const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "team" || r.name === "match" || r.name === "league" ? r.p?.id : r.name === "detail" || r.name === "episode" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "settings" ? r.p?.sec : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
+  const id = r.name === "person" ? r.p?.id ?? r.p?.name : r.name === "team" || r.name === "match" || r.name === "league" ? r.p?.id : r.name === "detail" || r.name === "category" || r.name === "genre" ? r.p?.id : r.name === "settings" ? r.p?.sec : r.name === "player" ? (r.p?.queue as { id: string }[] | undefined)?.[r.p?.index as number]?.id ?? r.p?.id : undefined
   return `#/${r.name}${id ? "/" + encodeURIComponent(String(id)) : ""}`
 }
 const baseFor = (id: string): Route["name"] => (id.includes("|live|") ? "live" : id.includes("|movie|") ? "movies" : id.includes("|series|") ? "series" : "home")
 
 /** The page the app opens on (Settings > Display > Startup page); anything but Home needs a loaded profile and a source. */
-export const startPage = (): Route["name"] => useApp.getState().settings.startPage ?? "home"
+export const startPage = (): Route["name"] => { const p = useApp.getState().settings.startPage ?? "home"; return PAGES.includes(p) ? p : "home" } // a synced start page may name a removed page
 
 function initialStack(): Route[] {
   const { profileId, sources } = useApp.getState()
@@ -39,6 +39,7 @@ function initialStack(): Route[] {
   const id = raw ? decodeURIComponent(raw) : ""
   if (!sources.length) return [{ name: "sources" }]
   if (!name) return [{ name: startPage() }] // fresh launch: no page in the URL
+  if (name === "episode" && id.includes("~")) { const sid = id.slice(0, id.indexOf("~")); return [{ name: baseFor(sid) }, { name: "detail", p: { id: sid } }] } // the old episode page: its show
   if (!PAGES.includes(name) || name === "profiles" || name === "sources") return [{ name: "home" }]
   if ((name === "detail" || name === "player") && id) return [{ name: baseFor(id) }, { name, p: { id } }]
   if ((name === "category" || name === "genre") && id) return [{ name: id.startsWith("series|") ? "series" : "movies" }, { name, p: { id } }]
@@ -46,7 +47,6 @@ function initialStack(): Route[] {
   if (name === "team" && id) return [{ name: "home" }, { name, p: { id } }]
   if (name === "match" && id) return [{ name: "home" }, { name, p: { id } }]
   if (name === "league" && id) return [{ name: "home" }, { name, p: { id } }]
-  if (name === "episode" && id.includes("~")) { const sid = id.slice(0, id.indexOf("~")); return [{ name: baseFor(sid) }, { name: "detail", p: { id: sid } }, { name, p: { id } }] } // <seriesId>~<episodeItemId>
   if (name === "settings" && id) return [{ name, p: { sec: id } }] // #/settings/<section>: the sidebar lands on that section (an unknown one falls back to the first)
   return [{ name }]
 }
@@ -380,7 +380,8 @@ export function installNav(onBack: () => void) {
     const dir = DIRS[e.keyCode]
     const t = e.target as HTMLElement
     // typing = text entry only: checkboxes, radios, ranges, buttons... are plain controls (Enter activates, arrows navigate)
-    const typing = t instanceof HTMLTextAreaElement || t.isContentEditable || (t instanceof HTMLInputElement && TEXT.test(t.type))
+    // a read-only field (TextInput before it is clicked / OK'd) is not text entry: arrows pass over it
+    const typing = (t instanceof HTMLTextAreaElement && !t.readOnly) || t.isContentEditable || (t instanceof HTMLInputElement && TEXT.test(t.type) && !t.readOnly)
     const page = e.keyCode === KEY.chUp ? -1 : e.keyCode === KEY.chDown ? 1 : 0
     if (typing && e.keyCode === KEY.enter && e.isTrusted && !e.repeat && navHooks.text?.(t as HTMLInputElement)) { e.preventDefault(); return }
     if (dir || (page && isTv)) {

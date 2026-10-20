@@ -64,7 +64,7 @@ export default function Detail({ id }: { id: string }) {
             <Chips items={seasons.map((s) => t("pages.detail.season", { n: s }))} active={t("pages.detail.season", { n: season })} onPick={(l) => setSeason(seasons.find((s) => t("pages.detail.season", { n: s }) === l) ?? season)} />
             <Rail>
               {shown.map((e) => {
-                return <Card key={e.id} item={e.item} variant="wide" pct={pct(e.item)} onOpen={() => D.openEpisode(e)} sub={epLabel(e)} />
+                return <Card key={e.id} item={e.item} variant="wide" pct={pct(e.item)} onOpen={() => D.playEp(e)} sub={epLabel(e)} />
               })}
             </Rail>
           </div>

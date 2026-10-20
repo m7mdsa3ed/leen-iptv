@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { TextInput } from "@/components/tv/text-input"
 import { Search } from "lucide-react"
 import { Pill } from "@/components/gtv"
 import { focusFirst } from "@/lib/nav"
@@ -60,7 +61,7 @@ export function MatchModal() {
         <div className="text-center text-2xl font-semibold">{t("nav.match.title")}</div>
         <div dir="auto" className="truncate text-center text-base text-muted-foreground">{item.srcName ?? item.name}</div>
         <div className="flex items-center gap-2">
-          <input data-nav value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (isSubmit(e)) void run(q) }} type="search" enterKeyHint="search" autoComplete="off"
+          <TextInput unstyled data-nav value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (isSubmit(e)) void run(q) }} type="search" enterKeyHint="search" autoComplete="off"
             placeholder={t("common.search")} aria-label={t("common.search")} dir="auto" className="min-h-11 min-w-0 flex-1 rounded-full bg-surface-2 px-4 text-base outline-none" />
           <Pill data-nav variant="primary" onClick={() => void run(q)}><Search className="size-4" />{t("common.search")}</Pill>
         </div>

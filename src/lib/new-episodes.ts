@@ -61,7 +61,7 @@ export async function episodeTick() {
       const first = r.fresh[0], last = r.fresh[r.fresh.length - 1]
       const se = t("pages.episode.code", { s: fmt.number(first.season), e: fmt.number(first.num) })
       notify(r.fresh.length > 1 ? fmt.plural("pages.episode.newMany", r.fresh.length, { show: item.name }) : t("pages.episode.new", { show: item.name }), se,
-        { kind: "episode", key: `ep:${last.id}`, route: { name: "episode", id: `${id}~${first.id}` } })
+        { kind: "episode", key: `ep:${last.id}`, route: { name: "detail", id } })
       const fresh = new Set(r.fresh.map((e) => e.id))
       window.dispatchEvent(new CustomEvent("leen:episodes", { detail: { series: id, items: eps.filter((e) => fresh.has(e.item.id)).map((e) => e.item) } }))
     }

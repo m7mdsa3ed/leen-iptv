@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react"
+import { TextInput } from "@/components/tv/text-input"
 import { ChevronRight, Plus, RefreshCw, Search, Star, Trophy, X } from "lucide-react"
 import { Pill, Rail } from "@/components/gtv"
 import { GameCard, GameRow, SkelGames, TeamBadge } from "@/components/tv/sports"
@@ -93,12 +94,13 @@ export default function Sports() {
 
   return (
     <Shell page="sports" title={t("pages.sports.title")}>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 pt-1">
+      {/* the page's own scroller, full width like every other page (under-top / under-bottom: runs under the bars) */}
+      <div className="under-top under-bottom no-scrollbar -mx-[var(--gx)] flex flex-col gap-5 overflow-y-auto px-[var(--gx)]">
         {/* search: any team or tournament */}
         <div className="flex items-center gap-2">
           <div className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-full bg-surface-2 pe-1 ps-4 focus-within:ring-2 focus-within:ring-[var(--ring)]">
             <Search className="size-5 shrink-0 text-muted-foreground" />
-            <input ref={searchRef} data-nav dir="auto" type="search" enterKeyHint="search" autoComplete="off" value={S.q} onChange={(e) => S.setQ(e.target.value)} placeholder={t("pages.sports.searchPh")}
+            <TextInput unstyled ref={searchRef} data-nav dir="auto" type="search" enterKeyHint="search" autoComplete="off" value={S.q} onChange={(e) => S.setQ(e.target.value)} placeholder={t("pages.sports.searchPh")}
               style={{ outline: "none", boxShadow: "none" }} className="h-full min-w-0 flex-1 bg-transparent text-base placeholder:text-muted-foreground [html[data-mode=mobile]_&]:text-[16px] [&::-webkit-search-cancel-button]:hidden" />
             {S.busy && <RefreshCw className="size-4 shrink-0 animate-spin text-muted-foreground" />}
             {S.q && <button data-nav data-pill aria-label={t("search.clear")} onClick={() => S.setQ("")} className="grid size-10 shrink-0 place-items-center rounded-full text-muted-foreground"><X className="size-5" /></button>}
@@ -167,7 +169,7 @@ export default function Sports() {
         ) : !groups.length ? (
           <p className="rounded-3xl bg-surface-2 p-8 text-center text-muted-foreground">{t(scope === "mine" ? "pages.sports.noGamesMine" : "pages.sports.noGamesDay")}</p>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="grid items-start gap-4 xl:grid-cols-2">
             {groups.map(([lid, gs]) => {
               const [sp, lg] = lid.split("/")
               const name = gs[0]?.league || refFor(sp, lg).name

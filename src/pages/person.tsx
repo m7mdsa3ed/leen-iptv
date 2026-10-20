@@ -1,3 +1,4 @@
+import { Shell } from "@/components/tv/ui"
 import { useState } from "react"
 import { ArrowLeft } from "lucide-react"
 import { Card, Pill, Rail, RoundButton, SkelBar, SkelRail } from "@/components/gtv"
@@ -25,7 +26,8 @@ export default function PersonPage({ id, name }: { id?: string; name?: string })
 
   const title = hookName
   return (
-    <div className="relative h-full overflow-y-auto bg-background px-[var(--gx)] pb-[max(2.5rem,var(--safe-b))] pt-[max(1.5rem,var(--safe-t))]">
+    <Shell page="" title={title} sub>
+    <div className="under-top under-bottom relative -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
       {info?.photo && <img src={info.photo} alt="" aria-hidden decoding="async" className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] w-full object-cover object-top opacity-20" />}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-t from-background via-transparent to-transparent" />
       <div className="relative">
@@ -77,6 +79,7 @@ export default function PersonPage({ id, name }: { id?: string; name?: string })
         {all.length > 0 && <div className="m-rise mt-4" style={{ "--i": 3 } as React.CSSProperties}><Rail title={t("pages.person.filmography")}>{all.map(credit)}</Rail></div>}
       </div>
     </div>
+    </Shell>
   )
 }
 

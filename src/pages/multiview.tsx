@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { TextInput } from "@/components/tv/text-input"
 import { ArrowLeft, Expand, Plus, Volume2, VolumeX, X } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
 import { useCatalog } from "@/lib/catalog"
@@ -10,15 +11,15 @@ import { STREAM_QS } from "@/lib/quality"
 import { usePData, useProfile } from "@/lib/store"
 import type { Item } from "@/lib/types"
 import { closePlayer } from "@/player/host"
-import { useEngine } from "@/player/use-engine"
-import { useStream } from "@/player/use-stream"
+import { usePlayback } from "@/player/use-playback"
+import { useSource } from "@/player/use-source"
 
 /** One live channel in the grid: the player's own stream + engine hooks, muted unless it has the sound. */
 function Tile({ item, sound, onSound, onRemove }: { item: Item; sound: boolean; onSound: () => void; onRemove: () => void }) {
   const t = useT()
   const vref = useRef<HTMLVideoElement>(null)
-  const S = useStream(item, STREAM_QS[0], {})
-  const E = useEngine({ vref, item, live: true, raw: S.raw, url: S.url, direct: S.direct, setProxied: S.setProxied, src: S.src })
+  const S = useSource(item, STREAM_QS[0], {})
+  const E = usePlayback({ vref, item, live: true, raw: S.raw, url: S.url, direct: S.direct, toProxy: S.toProxy, src: S.src })
   useEffect(() => { if (vref.current) vref.current.muted = !sound }, [sound])
   return (
     <div className="relative min-h-0 overflow-hidden rounded-2xl bg-black">
@@ -53,7 +54,7 @@ function Picker({ have, onPick, onClose }: { have: string[]; onPick: (i: Item) =
   return (
     <div data-modal role="dialog" aria-modal="true" aria-label={t("pages.multi.add")} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="flex max-h-full w-full max-w-[32rem] flex-col gap-3 rounded-[28px] bg-surface p-6 shadow-2xl">
-        <input data-nav data-autofocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("pages.multi.search")} aria-label={t("pages.multi.search")} dir="auto" className="min-h-11 rounded-full bg-surface-2 px-4 text-base outline-none" />
+        <TextInput unstyled data-nav data-autofocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("pages.multi.search")} aria-label={t("pages.multi.search")} dir="auto" className="min-h-11 rounded-full bg-surface-2 px-4 text-base outline-none" />
         <div data-nav-group className="flex min-h-0 flex-col gap-2 overflow-y-auto">
           {rows.map((i) => <Pill key={i.id} data-nav className="w-full justify-start" onClick={() => onPick(i)}><span dir="auto" className="truncate">{i.name}</span></Pill>)}
           {!rows.length && <div className="py-2 text-center text-muted-foreground">{t("pages.multi.none")}</div>}

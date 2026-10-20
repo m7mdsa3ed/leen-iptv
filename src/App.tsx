@@ -15,7 +15,6 @@ import { startEpisodeWatch } from "@/lib/new-episodes"
 import { CardMenu, closeCardMenu, useCardMenu } from "@/components/tv/card-menu"
 import { ListModal } from "@/components/tv/list-modal"
 import { FilterPanel, closeFilterPanel, useFilterPanel } from "@/components/tv/filter-panel"
-import EpisodePage from "@/pages/episode"
 import { MatchModal } from "@/components/tv/match-modal"
 import { useBackfillMatches } from "@/lib/meta"
 import { closeLogoMatch, closeMatch, useLogoMatch, useMatch } from "@/components/tv/match"
@@ -36,8 +35,6 @@ import HistoryPage from "@/pages/history"
 import StatsPage from "@/pages/stats"
 import DiagnosticsPage from "@/pages/diagnostics"
 import Home from "@/pages/home"
-import Library from "@/pages/library"
-import Recent from "@/pages/recent"
 import Live from "@/pages/live"
 import PersonPage from "@/pages/person"
 import TeamPage from "@/pages/team"
@@ -64,11 +61,11 @@ function RestorePlayer({ id }: { id: string }) {
 }
 
 // pages rendered inside a layout Shell: their top bar stays put and only [data-page-content] (the Shell's <main>) animates
-const SHELL_PAGES = new Set(["home", "live", "sports", "movies", "series", "search", "library", "settings", "category", "genre", "history", "stats", "diagnostics"])
+const SHELL_PAGES = new Set(["home", "live", "sports", "movies", "series", "search", "settings", "category", "genre", "history", "stats", "diagnostics", "detail", "person", "team", "match", "league"])
 
 /** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
 const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, library: Library, recent: Recent, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, league: LeaguePage, detail: Detail, episode: EpisodePage, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage, multi: MultiviewPage,
+  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, league: LeaguePage, detail: Detail, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage, multi: MultiviewPage,
 }
 
 function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {

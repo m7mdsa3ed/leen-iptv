@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react"
+import { TextInput } from "@/components/tv/text-input"
 import { create } from "zustand"
 import { Clock, Search as SearchIcon, X } from "lucide-react"
 import { Card } from "@/components/gtv"
@@ -42,7 +43,7 @@ function Panel() {
         <div className="flex items-center gap-2">
           <div className="flex h-14 min-w-0 flex-1 items-center gap-3 rounded-full bg-surface-2 ps-5 pe-1 focus-within:ring-2 focus-within:ring-[var(--ring)]">
             <SearchIcon className="size-5 shrink-0 text-muted-foreground" />
-            <input ref={ref} dir="auto" data-nav data-autofocus="" type="search" enterKeyHint="search" autoComplete="off" value={S.q} placeholder={t("search.hint")}
+            <TextInput unstyled autoEdit ref={ref} dir="auto" data-nav data-autofocus="" type="search" enterKeyHint="search" autoComplete="off" value={S.q} placeholder={t("search.hint")}
               onChange={(e) => S.setQ(e.target.value)}
               onKeyDown={(e) => { if (isSubmit(e)) { if (first) pick(first); else H.add(S.q) } }}
               style={{ outline: "none", boxShadow: "none" }} className="h-full min-w-0 flex-1 bg-transparent text-xl outline-none placeholder:text-base placeholder:text-muted-foreground [html[data-mode=mobile]_&]:text-[16px] [&::-webkit-search-cancel-button]:hidden" />

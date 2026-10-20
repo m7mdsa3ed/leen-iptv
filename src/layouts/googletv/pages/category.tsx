@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react"
 import { Card, Pill, RoundButton } from "@/components/gtv"
 import { Empty, Pending, Shell, VGrid } from "@/components/tv/ui"
-import { Input } from "@/components/ui/input"
+import { TextInput } from "@/components/tv/text-input"
 import { useCategory } from "@/layouts/hooks/use-category"
 import { SourceFilter } from "../source-ui"
 import { isTv } from "@/lib/device"
@@ -25,7 +25,7 @@ export default function CategoryPage({ id }: { id: string }) {
             {sorts.map(([s, label]) => (
               <Pill key={s} variant={sort === s ? "primary" : "tonal"} onClick={() => setSort(s)}>{label}</Pill>
             ))}
-            <Input data-nav aria-label={t("gtv.category.filter")} dir="auto" className="h-11 w-48 rounded-full text-base focus-visible:ring-0 md:w-64 [html[data-mode=mobile]_&]:text-[16px]" type="search" autoComplete="off" placeholder={t("gtv.category.filter")} value={q} onChange={(e) => setQ(e.target.value)} />
+            <TextInput data-nav aria-label={t("gtv.category.filter")} dir="auto" className="h-11 w-48 rounded-full text-base focus-visible:ring-0 md:w-64 [html[data-mode=mobile]_&]:text-[16px]" type="search" autoComplete="off" placeholder={t("gtv.category.filter")} value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <SourceFilter />
           </>)

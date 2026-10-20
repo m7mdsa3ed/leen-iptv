@@ -3,7 +3,7 @@ import { create } from "zustand"
 import { useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
 import type { Item } from "@/lib/types"
-import Player from "@/pages/player"
+import Player from "./player"
 
 type Q = { queue: Item[]; index: number }
 type Box = { x: number; y: number; w: number } // mini player: top-left + width in px (height = 16:9)

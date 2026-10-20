@@ -14,8 +14,8 @@ import { inSource, useActiveFilter, useCatalogView } from "./hooks/use-source-fi
 const CAP = 20
 
 /** Home rows the user can reorder / hide (Settings > Display). A rail key maps to one of these. */
-export const HOME_ROWS = ["cont", "favs", "recents", "live", "movies", "series"] as const
-export const homeRowOf = (key: string) => (["cont", "favs", "recents", "live"].includes(key) ? key : key.startsWith("movie") ? "movies" : "series")
+export const HOME_ROWS = ["cont", "favs", "games", "movies", "series"] as const
+export const homeRowOf = (key: string) => (["cont", "favs", "games"].includes(key) ? key : key.startsWith("movie") ? "movies" : "series")
 
 export type HeroPick = { item: Item; kicker: string }
 export type HomeRail = {
@@ -79,7 +79,7 @@ export function useHomeData() {
       for (const i of byKind[k]) for (const c of catsOf(i)) { const l = m.get(c); if (l && l.length < CAP) l.push(i) }
       return first.map((g) => ({ k, g, items: m.get(g)! })).filter((r) => r.items.length)
     }
-    const cont = get(p), favs = get(d.favs), recents = get(d.recents), live = byKind.live.slice(0, CAP)
+    const cont = get(p), favs = get(d.favs), live = byKind.live.slice(0, CAP)
     // hero: last continue-watching, else a favorite, else a day-stable VOD pick, else first channel
     const vod = [...byKind.movie, ...byKind.series]
     const day = Math.floor(Date.now() / 864e5)
@@ -98,8 +98,7 @@ export function useHomeData() {
     const card = (l: Item[]) => (l.some((i) => i.kind !== "live") ? "poster" : "wide") as "wide" | "poster"
     if (cont.length) rails.push({ key: "cont", title: t("common.continueWatching"), kind: "wide", card: card(cont), items: cont, pct })
     if (favs.length) rails.push({ key: "favs", title: t("common.favorites"), kind: "wide", card: card(favs), items: favs })
-    if (recents.length) rails.push({ key: "recents", title: t("common.recents"), kind: "wide", card: card(recents), items: recents })
-    if (live.length) rails.push({ key: "live", title: t("common.liveNow"), kind: "wide", items: live })
+    rails.push({ key: "games", title: "", kind: "wide", items: [] }) // slot only: the layout fills it with sports games, so it orders/hides like any row
     for (const r of [...genre("movie"), ...genre("series")]) {
       const title = t(r.k === "movie" ? "common.moviesIn" : "common.showsIn", { g: r.g })
       rails.push({ key: r.k + r.g, title, kind: "poster", items: r.items, seeAll: seeAll(r.k, r.g) })

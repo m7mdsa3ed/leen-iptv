@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react"
 import { ALL, CONT, FAV, useGroupCount } from "@/components/tv/groups"
 import { Card, Rail, SectionTitle } from "@/components/gtv"
-import { AlphaRail, Chips, Empty, Shell, VGrid, Pending } from "@/components/tv/ui"
+import { Chips, Empty, Shell, VGrid, Pending } from "@/components/tv/ui"
 import { BrowseFilters } from "@/components/tv/filter-bar"
 import { useBrowse } from "@/layouts/hooks/use-browse"
 import { useMode } from "@/lib/device"
@@ -11,14 +10,10 @@ import type { Item, Kind } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
-  const { groups, status, g, setG, items, list, alpha, cats, toggleCat, clearCats, activeCount, refined, q, setQ, sort, setSort, sorts, rails, genres: genreNames, pct, isLocked, canLock, toggleLock: toggle, open, openCategory, openGenre, kindLabel, page } = useBrowse(kind)
+  const { groups, status, g, setG, items, list, cats, toggleCat, clearCats, activeCount, refined, q, setQ, sort, setSort, sorts, rails, genres: genreNames, pct, isLocked, canLock, toggleLock: toggle, open, openCategory, openGenre, kindLabel, page } = useBrowse(kind)
   const mode = useMode()
   const count = useGroupCount(kind)
   const t = useT()
-  const jump = useRef<((index: number) => void) | null>(null)
-  const [pending, setPending] = useState<number | null>(null)
-  // a letter needs the list in A-Z order: sort first, then jump once that list has rendered
-  useEffect(() => { if (pending == null) return; jump.current?.(pending); setPending(null) }, [pending, list])
   // yellow key (tv) or right-click / long-press (elsewhere) toggles the parental lock on a category
   const card = (i: Item) => <Card key={i.id} item={i} pct={pct(i)} onOpen={() => open(i)} />
   return (
@@ -33,10 +28,8 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
           </>)
           // mobile: filters scroll with the content, which starts under the top bar and runs under the bottom bar (under-top / under-bottom)
           const up = "under-top"
-          // A-Z grid + side index; picking a letter switches the sort so the letters line up with the rows
           const grid = (it: Item[], head?: React.ReactNode) => (<>
-            <VGrid items={it} render={card} head={head} className={head ? up : undefined} scrollRef={jump} />
-            <AlphaRail letters={alpha} onPick={(index) => { setSort("az"); setPending(index) }} />
+            <VGrid items={it} render={card} head={head} className={head ? up : undefined} />
           </>)
           const body = (head?: React.ReactNode) => refined
             ? list.length ? grid(list, head) : null

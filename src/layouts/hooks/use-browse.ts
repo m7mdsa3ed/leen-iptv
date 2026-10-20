@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { ALL, CONT, FAV, useContinue } from "@/components/tv/groups"
 import { askPin, useOpen } from "@/components/tv/ui"
 import { fold, useLang, useT } from "@/lib/i18n"
-import { alphaIndex, byAdded, byRelease, matchMore, moreCount } from "@/lib/browse-pure"
+import { byAdded, byRelease, matchMore, moreCount } from "@/lib/browse-pure"
 import { useGenres } from "@/lib/meta"
 import { useCatalog } from "@/lib/catalog"
 import { useRoute } from "@/lib/nav"
@@ -80,15 +80,9 @@ export function useBrowse(kind: Exclude<Kind, "live">) {
     if (sort === "added") return [...l].sort(byAdded)
     return l
   }, [g, all, rails, refined, q, sort, lang])
-  // side index over the title-filtered list in A-Z order (base letters: É under E, أ under ا)
-  const alpha = useMemo(() => {
-    const f = fold(q.trim())
-    const l = f ? all.filter((i) => fold(i.name).includes(f)) : all
-    return alphaIndex([...l].sort(byName(lang)).map((i) => i.name), lang)
-  }, [all, q, lang])
   const toggleCat = (c: string) => setCatFilter(kind, cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c])
   return {
-    status, groups: groups[kind], genres, g, setG, items, list, alpha, cats, toggleCat, clearCats: () => setCatFilter(kind, []), refined, activeCount: filter.length + cats.length + nMore,
+    status, groups: groups[kind], genres, g, setG, items, list, cats, toggleCat, clearCats: () => setCatFilter(kind, []), refined, activeCount: filter.length + cats.length + nMore,
     q, setQ, sort, setSort,
     sorts, rails, favorites,
     pct: (i: Item) => d.progress[i.id] && (d.progress[i.id].pos / d.progress[i.id].dur) * 100,

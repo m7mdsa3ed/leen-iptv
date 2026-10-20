@@ -9,7 +9,7 @@ import { useApp } from "@/lib/store"
 
 // each block is focusable (data-nav) so the D-pad can scroll through the page; --s keeps the TV focus scale tiny on big blocks
 const Block = ({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) => (
-  <section data-nav tabIndex={0} className={`rounded-[28px] bg-surface p-5 outline-none [--s:1.01] md:p-6 ${className}`}>
+  <section data-nav tabIndex={0} className={`rounded-[28px] bg-surface p-5 outline-none md:p-6 ${className}`}>
     <h3 className="mb-4 text-xl font-medium">{title}</h3>
     {children}
   </section>
@@ -48,7 +48,7 @@ export default function StatsPage() {
   const qTotal = q.good + q.fair + q.poor
 
   return (
-    <Shell page="library" title={t("pages.stats.title")}>
+    <Shell page="settings" title={t("pages.stats.title")}>
       <div className="flex h-full flex-col">
         <div className="flex flex-wrap items-center gap-3 pb-3">
           <h2 className="me-auto text-3xl font-medium tracking-tight">{t("pages.stats.heading")}</h2>

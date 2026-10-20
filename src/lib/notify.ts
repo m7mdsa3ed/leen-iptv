@@ -24,7 +24,11 @@ useInbox.subscribe((b) => { try { localStorage.setItem(IKEY, JSON.stringify(b)) 
 export const markRead = (key?: string) => useInbox.setState((b) => ({ list: b.list.map((n) => (!key || n.key === key ? { ...n, read: true } : n)) }))
 /** Empty the list; fired keys are kept so nothing fires again. */
 export const clearInbox = () => useInbox.setState({ list: [] })
-export const openNote = (r?: NoteRoute) => { if (r) useRoute.getState().go(r.name, r.id ? { id: r.id } : undefined) }
+export const openNote = (r?: NoteRoute) => {
+  if (!r) return
+  const ep = r.name === "episode" && r.id // saved before the episode page was removed: open the show
+  useRoute.getState().go(ep ? "detail" : r.name, r.id ? { id: ep ? r.id.split("~")[0] : r.id } : undefined)
+}
 
 /** Settings > Notifications: master switch (device-local) + one per kind (synced; kickoff = the Sports reminder; new episodes on by default). */
 export function notifyOn(k: NoteKind): boolean {

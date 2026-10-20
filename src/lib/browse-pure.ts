@@ -1,27 +1,7 @@
 import type { Item } from "./types"
-import { fold, type Lang } from "./i18n/pure.ts"
 import { yearOf } from "./meta/title.ts"
 
-/** Browse side index + the extra filters of the filter panel. Pure (node scripts/browse.check.ts). */
-
-/** The standard alphabet of each app language: the side index always shows all of it, then "#" (digits, symbols, other scripts). */
-export const ALPHABET: Record<Lang, string[]> = { en: [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"], ar: [..."ابتثجحخدذرزسشصضطظعغفقكلمنهوي"] }
-
-/** Base letter of a title: accents dropped (É -> E) and Arabic alef/hamza forms folded (أ إ آ -> ا), the way the A-Z collator already orders them. */
-export const letterOf = (name: string, lang: Lang) => {
-  const c = (fold(name.trim().slice(0, 2)).replace(/[\u0300-\u036f]/g, "")[0] ?? "").toUpperCase()
-  return ALPHABET[lang].includes(c) ? c : "#"
-}
-
-/** Side index over a list already in A-Z order: every letter of the alphabet + "#", `has` = some title starts with it; an empty letter jumps to the next letter that has titles. [] when fewer than 2 letters have titles. */
-export function alphaIndex(names: string[], lang: Lang) {
-  const first = new Map<string, number>()
-  names.forEach((n, i) => { const ch = letterOf(n, lang); if (!first.has(ch)) first.set(ch, i) })
-  if (first.size < 2) return []
-  let next = Math.max(0, names.length - 1)
-  const out = ALPHABET[lang].slice().reverse().map((ch) => { const i = first.get(ch); if (i != null) next = i; return { ch, index: next, has: i != null } }).reverse()
-  return [...out, { ch: "#", index: first.get("#") ?? 0, has: first.has("#") }]
-}
+/** The extra filters of the browse filter panel. Pure (node scripts/browse.check.ts). */
 
 export type Watch = "new" | "started" | "done"
 /** Extra browse filters (unset = any): watch state, decade (1990 = 1990-1999) and minimum rating (out of 10). */

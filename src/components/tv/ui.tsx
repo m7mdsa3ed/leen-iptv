@@ -195,7 +195,7 @@ const keepSize: typeof observeElementRect = (inst, cb) => observeElementRect(ins
 export const useK = () => useApp((s) => (isTv ? s.settings.tvScale : 1))
 
 /** `head` scrolls with the grid (above the first row); `className` extends the scroller (e.g. under the mobile top bar). */
-export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, head, className, scrollRef }: { items: T[]; cols?: number; minW?: number; ratio?: number; label?: number; render: (t: T) => ReactNode; head?: ReactNode; className?: string; scrollRef?: { current: ((index: number) => void) | null } }) {
+export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, head, className }: { items: T[]; cols?: number; minW?: number; ratio?: number; label?: number; render: (t: T) => ReactNode; head?: ReactNode; className?: string }) {
   const mode = useMode()
   minW ??= mode === "tv" ? 190 : mode === "mobile" ? 110 : 170
   const ref = useRef<HTMLDivElement>(null)
@@ -213,7 +213,7 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
     return () => ro.disconnect()
   }, [])
   const k = useK()
-  const ck = CARD_K[useApp((s) => s.settings.cardSize) ?? "normal"]
+  const ck = CARD_K[useApp((s) => s.settings.gridSize ?? s.settings.cardSize) ?? "normal"] // grids: their own size (filter bar / Settings), else the card size
   const gap = isTv ? 24 * k : mode === "mobile" ? 12 : 16
   const c = cols ?? Math.max(1, Math.floor((w + gap) / (minW * ck + gap)))
   const rowH = Math.round(((w - gap * (c - 1)) / c) * ratio + label * k) + gap
@@ -231,12 +231,6 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
   }, [!!head]) // eslint-disable-line react-hooks/exhaustive-deps
   const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3, scrollMargin: hh, observeElementRect: keepSize })
   useEffect(() => v.measure(), [rowH, v])
-  // scrollRef: jump to the row holding item `index` (item -> row needs the column count, so it lives here). Used by the AlphaRail index.
-  useEffect(() => {
-    if (!scrollRef) return
-    scrollRef.current = (index: number) => v.scrollToIndex(Math.max(0, Math.floor(index / c)), { align: "start" })
-    return () => { scrollRef.current = null }
-  }, [scrollRef, c, v])
   return (
     <div ref={ref} data-vscroll className={cn("under-bottom -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4", className)}>
       {head && <div ref={headRef}>{head}</div>}
@@ -248,19 +242,6 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
         ))}
       </div>
     </div>
-  )
-}
-
-/** Side A-Z index for a long alphabetical grid: a slim capsule with the whole alphabet, each letter jumps the grid to its first title (letters with no titles are dimmed and jump to the next one). */
-export function AlphaRail({ letters, onPick, className }: { letters: { ch: string; index: number; has?: boolean }[]; onPick: (index: number) => void; className?: string }) {
-  const t = useT()
-  if (letters.length < 2) return null
-  return (
-    <nav aria-label={t("common.alpha")} data-nav-aside className={cn("no-scrollbar fixed end-2 top-1/2 z-20 flex max-h-[calc(100%_-_var(--content-t)_-_var(--content-b)_-_2rem)] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-border bg-surface-2/85 p-[3px] shadow-lg", className)}>
-      {letters.map(({ ch, index, has }) => (
-        <button key={ch} data-nav data-pill onClick={() => onPick(index)} className={cn("grid size-4 shrink-0 place-items-center rounded-full text-[0.5625rem] leading-none font-semibold text-muted-foreground transition-colors hover:bg-accent-blue-container hover:text-foreground", has === false && "opacity-35")}>{ch}</button>
-      ))}
-    </nav>
   )
 }
 
@@ -281,7 +262,7 @@ export function VList<T>({ items, rowH: baseH, render, head, className }: { item
   const v = useVirtualizer({ count: items.length, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 8, scrollMargin: hh, observeElementRect: keepSize })
   useEffect(() => v.measure(), [rowH, v])
   return (
-    <div ref={ref} data-vscroll className={cn("under-bottom h-full overflow-y-auto [--s:1.025]", className)}>
+    <div ref={ref} data-vscroll className={cn("under-bottom h-full overflow-y-auto", className)}>
       {head && <div ref={headRef}>{head}</div>}
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((r) => (
@@ -303,7 +284,7 @@ export function Clock() {
 }
 
 /** Delegates to the active layout (src/layouts). */
-export function Shell(p: { page: string; title?: string; children: ReactNode }) {
+export function Shell(p: { page: string; title?: string; children: ReactNode; sub?: boolean }) {
   const L = useLayoutDef().Shell
   return <L {...p} />
 }

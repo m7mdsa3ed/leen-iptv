@@ -1,3 +1,4 @@
+import { Shell } from "@/components/tv/ui"
 import { useEffect, useState } from "react"
 import { ArrowLeft, Check, Plus, Trophy } from "lucide-react"
 import { Pill, RoundButton } from "@/components/gtv"
@@ -49,7 +50,8 @@ export default function TeamPage({ id, name, badge, league }: { id?: string; nam
   const results = (games ?? []).filter((g) => g.status === "final").sort((a, b) => b.startMs - a.startMs)
 
   return (
-    <div className="relative h-full overflow-y-auto bg-background px-[var(--gx)] pb-[max(2.5rem,var(--safe-b))] pt-[max(1.5rem,var(--safe-t))]">
+    <Shell page="sports" title={title} sub>
+    <div className="under-top under-bottom relative -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
       <div className="relative mx-auto w-full max-w-4xl">
         {!isTv && <RoundButton label={t("common.back")} onClick={back}><ArrowLeft className="rtl-flip" /></RoundButton>}
         <div className="m-rise mt-6 flex flex-col gap-4 md:flex-row md:items-center">
@@ -94,5 +96,6 @@ export default function TeamPage({ id, name, badge, league }: { id?: string; nam
         )}
       </div>
     </div>
+    </Shell>
   )
 }

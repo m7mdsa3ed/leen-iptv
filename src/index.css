@@ -188,27 +188,26 @@ body { -webkit-tap-highlight-color: transparent; }
 html[data-mode=tv], html[data-mode=tv] body, html[data-mode=tv] #root { overflow: hidden; user-select: none; }
 html:not([data-mode=tv]) button, html:not([data-mode=tv]) [role=button] { touch-action: manipulation; }
 
-/* focus: desktop/mobile = 2px ring; TV = Google TV (scale + white ring, pills turn white). Cards ring their [data-tile]. */
+/* focus: desktop/mobile = 2px ring; TV = white ring + shadow, no zoom (pills turn white). Cards ring their [data-tile]. */
 [data-nav]:focus { outline: none; }
 [data-nav]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 [data-card]:focus-visible { outline: none; }
 [data-card]:focus-visible [data-tile] { outline: 2px solid var(--ring); outline-offset: 2px; }
-html[data-mode=tv] [data-nav] { transition: transform var(--dur-fast) var(--ease); }
 html[data-mode=tv] [data-nav]:focus, html[data-mode=tv] [data-nav][data-focused="true"] {
   outline: none;
-  transform: scale(var(--s, 1.06)); /* --s: wide containers (lists) set a smaller scale so they never outgrow their padding */
   z-index: 5;
   /* shadow kept small (<= ~24px) so it fits inside the padding of scroll containers: overflow clips shadows */
   box-shadow: 0 0 0 3px var(--focus-bg), 0 6px 16px rgba(0, 0, 0, .45);
 }
 html[data-mode=tv] [data-card]:focus, html[data-mode=tv] [data-card][data-focused="true"] { box-shadow: none; transform: none; }
 html[data-mode=tv] [data-card]:focus [data-tile], html[data-mode=tv] [data-card][data-focused="true"] [data-tile] { outline: none; }
-/* Card focus: the tile wrapper scales (transform) and the ring/shadow overlay fades in (opacity). Nothing animates box-shadow. */
+/* Card focus: the ring/shadow overlay fades in (opacity), nothing zooms; the tile wrapper only moves on press. Nothing animates box-shadow. */
 [data-tilewrap] { transition: transform var(--dur-fast) var(--ease); }
 [data-ring] { opacity: 0; box-shadow: 0 0 0 3px var(--focus-bg), 0 8px 20px rgba(0, 0, 0, .55); transition: opacity var(--dur-fast) var(--ease); }
-html[data-mode=tv] [data-card]:focus [data-tilewrap], html[data-mode=tv] [data-card][data-focused="true"] [data-tilewrap] { transform: scale(1.06); will-change: transform; }
 html[data-mode=tv] [data-card]:focus [data-ring], html[data-mode=tv] [data-card][data-focused="true"] [data-ring] { opacity: 1; }
 html[data-mode=tv] [data-pill]:focus, html[data-mode=tv] [data-pill][data-focused="true"] { background: var(--focus-bg) !important; color: var(--focus-fg) !important; box-shadow: none; } /* the white fill is the focus: no drop shadow, so pills inside scrolling rows/headers are never clipped */
+/* secondary text inside a focused pill (notification body/date, queue rows) follows the fill instead of staying light-on-white; chips with their own background keep their colours */
+html[data-mode=tv] [data-pill]:is(:focus, [data-focused="true"]) .text-muted-foreground:not([class*="bg-"]) { color: inherit !important; opacity: .7; }
 
 html[data-mode=tv] [data-pill][data-primary]:focus, html[data-mode=tv] [data-pill][data-primary][data-focused="true"] { box-shadow: 0 0 0 3px var(--accent-blue), 0 0 0 6px var(--focus-bg); }
 

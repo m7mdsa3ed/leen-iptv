@@ -1,3 +1,4 @@
+import { Shell } from "@/components/tv/ui"
 import { useEffect, useState, type ReactNode } from "react"
 import { ArrowLeft, ArrowLeftRight, CalendarClock, ChevronRight, Database, Flag, Goal, MapPin, Star, Tv, Users, type LucideIcon } from "lucide-react"
 import { RoundButton, SkelBar } from "@/components/gtv"
@@ -16,7 +17,7 @@ const sk = "skel !bg-surface-3"
 
 function Tile({ icon: I, label, value, wide }: { icon: LucideIcon; label: string; value: ReactNode; wide?: boolean }) {
   return (
-    <div data-nav tabIndex={0} className={cn("flex items-center gap-3 rounded-2xl bg-surface-2 p-4 outline-none [--s:1.02]", wide && "sm:col-span-2")}>
+    <div data-nav tabIndex={0} className={cn("flex items-center gap-3 rounded-2xl bg-surface-2 p-4 outline-none", wide && "sm:col-span-2")}>
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-3 text-muted-foreground"><I className="size-5" /></span>
       <span className="min-w-0">
         <span className="block text-sm text-muted-foreground">{label}</span>
@@ -118,7 +119,7 @@ export default function MatchPage({ id }: { id?: string }) {
   const timeline = (evs: MatchEvent[]) => (
     <div className="flex flex-col gap-1">
       {evs.map((e, i) => (
-        <div key={i} data-nav tabIndex={0} aria-label={`${e.minute} ${t(`pages.match.ev.${e.kind}`)} ${e.players.join(", ")}`} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl px-2 py-1.5 text-sm outline-none [--s:1.01]">
+        <div key={i} data-nav tabIndex={0} aria-label={`${e.minute} ${t(`pages.match.ev.${e.kind}`)} ${e.players.join(", ")}`} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl px-2 py-1.5 text-sm outline-none">
           <span className="flex min-w-0 items-center justify-end gap-2 text-end">{e.side === "home" && <>{eventText(e)}{icon(e)}</>}</span>
           <span dir="ltr" className="min-w-12 rounded-full bg-surface-3 px-2 py-0.5 text-center text-xs font-semibold tabular-nums">{e.minute}</span>
           <span className="flex min-w-0 items-center gap-2">{e.side === "away" && <>{icon(e)}{eventText(e)}</>}</span>
@@ -133,7 +134,7 @@ export default function MatchPage({ id }: { id?: string }) {
         <div key={head as string} className="flex flex-col">
           {head && <div className="mt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{head as string}</div>}
           {(ps as Lineup["starters"]).map((p, i) => (
-            <div key={i} data-nav tabIndex={0} className="flex items-center gap-2 rounded-lg px-1 py-1 text-sm outline-none [--s:1.01]">
+            <div key={i} data-nav tabIndex={0} className="flex items-center gap-2 rounded-lg px-1 py-1 text-sm outline-none">
               <span className="w-6 shrink-0 text-end text-xs tabular-nums text-muted-foreground">{p.number}</span>
               <span dir="auto" className="min-w-0 flex-1 truncate">{p.name}</span>
               {p.subIn && <ArrowLeftRight aria-label={t("pages.match.subIn")} className="size-3.5 shrink-0 text-emerald-500" />}
@@ -151,7 +152,7 @@ export default function MatchPage({ id }: { id?: string }) {
         <span className="flex gap-1">{fs.map((f, i) => <span key={i} title={`${f.opp} ${f.score}`} className={cn("grid size-6 place-items-center rounded-md text-xs font-bold text-white", f.result === "W" ? "bg-emerald-600" : f.result === "D" ? "bg-zinc-500" : "bg-red-600")}>{t(`pages.match.res.${f.result}`)}</span>)}</span>
       </div>
       {fs.map((f, i) => (
-        <div key={i} data-nav tabIndex={0} className="flex items-center gap-2 rounded-lg px-1 py-1 text-sm outline-none [--s:1.01]">
+        <div key={i} data-nav tabIndex={0} className="flex items-center gap-2 rounded-lg px-1 py-1 text-sm outline-none">
           <span className="w-16 shrink-0 text-xs text-muted-foreground">{fmt.date(f.at, { day: "numeric", month: "short" })}</span>
           <span className="w-5 shrink-0 text-xs text-muted-foreground">{f.home ? t("pages.match.homeShort") : t("pages.match.awayShort")}</span>
           <TeamBadge team={{ name: f.opp, badge: f.oppBadge }} className="size-5" />
@@ -177,7 +178,7 @@ export default function MatchPage({ id }: { id?: string }) {
     const lead = !bar || hn === an ? "" : hn > an ? "h" : "a"
     // data-nav on the rows: TV scrolls a page only by moving focus down it
     return (
-      <div key={s.key ?? s.label} data-nav tabIndex={0} className="rounded-2xl p-2 outline-none [--s:1.01]">
+      <div key={s.key ?? s.label} data-nav tabIndex={0} className="rounded-2xl p-2 outline-none">
         <div dir="ltr" data-ltr className="grid grid-cols-[4rem_1fr_4rem] items-center gap-2 text-sm md:text-base">
           <span className={lead === "h" ? "font-semibold" : "text-muted-foreground"}>{s.home || "-"}</span>
           <span className="text-center text-muted-foreground">{s.label}</span>
@@ -194,7 +195,8 @@ export default function MatchPage({ id }: { id?: string }) {
   }
 
   return (
-    <div className="relative h-full overflow-y-auto bg-background px-[var(--gx)] pb-[max(2.5rem,var(--safe-b))] pt-[max(1.5rem,var(--safe-t))]">
+    <Shell page="sports" title={m ? `${m.home.team.name} - ${m.away.team.name}` : t("pages.match.title")} sub>
+    <div className="under-top under-bottom relative -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
       <div className="relative mx-auto w-full max-w-4xl">
         {!isTv && <RoundButton label={t("common.back")} onClick={back}><ArrowLeft className="rtl-flip" /></RoundButton>}
         {busy && <Skel label={t("pages.match.loading")} />}
@@ -277,7 +279,7 @@ export default function MatchPage({ id }: { id?: string }) {
                           {m.h2h.summary && <p dir="auto" className="text-sm text-muted-foreground">{m.h2h.summary}</p>}
                           <div className="flex flex-col gap-1 rounded-2xl bg-surface-2 p-2">
                             {m.h2h.games.map((g, i) => (
-                              <div key={i} data-nav tabIndex={0} className="grid grid-cols-[5rem_1fr_auto_1fr] items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none [--s:1.01]">
+                              <div key={i} data-nav tabIndex={0} className="grid grid-cols-[5rem_1fr_auto_1fr] items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none">
                                 <span className="text-xs text-muted-foreground">{fmt.date(g.at, { day: "numeric", month: "short", year: "numeric" })}</span>
                                 <span dir="auto" className="truncate text-end">{g.home}</span>
                                 <span dir="ltr" className="rounded-md bg-surface-3 px-2 py-0.5 font-semibold tabular-nums">{g.homeScore ?? "-"} - {g.awayScore ?? "-"}</span>
@@ -302,5 +304,6 @@ export default function MatchPage({ id }: { id?: string }) {
         )}
       </div>
     </div>
+    </Shell>
   )
 }

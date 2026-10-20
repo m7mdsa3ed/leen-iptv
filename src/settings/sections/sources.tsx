@@ -286,6 +286,9 @@ export default function SourcesSection() {
         <ToggleRow label={t("settings.sources.badges")} description={t("settings.sources.badges.desc")} checked={badges} onChange={(v) => setSettings({ sourceBadges: v })} />
         <ToggleRow label={t("settings.sources.groupMedia")} description={t("settings.sources.groupMedia.desc")} checked={groupMedia} onChange={(v) => setSettings({ groupMedia: v })} />
         <ToggleRow label={t("settings.sources.groupLive")} description={t("settings.sources.groupLive.desc")} checked={groupLive} onChange={(v) => setSettings({ groupLive: v })} />
+        <Row label={t("settings.sources.clearCache")} description={t("settings.sources.clearCache.desc")}>
+          <ConfirmButton confirmLabel={t("settings.sources.clearCacheConfirm")} onConfirm={() => { const c = useCatalog.getState(); for (const x of sources) c.forget(x.id); void c.loadAll(sources, useApp.getState().settings.proxy, true) }}>{t("settings.sources.clearCache")}</ConfirmButton>
+        </Row>
       </SectionCard>
     </div>
   )

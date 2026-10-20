@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { get, set } from "idb-keyval"
 import { fmt, useT } from "@/lib/i18n"
 import { normalizeCfg, useMeta, useSeasonMeta, useSimilar } from "@/lib/meta"
 import { enrichEpisodes } from "@/lib/meta/episodes"
@@ -32,7 +33,7 @@ export type DetailRating = { source: string; value: string; votes?: string }
  *  title (heading: the matched TMDB title after a manual match, else the catalog name), plot, chips (year/runtime strings), genres (<=4), ratings, poster (Item whose logo falls back to meta poster; the metadata poster wins when there is one), backdrop (url|undefined),
  *  cast (meta.cast), directors, castText (raw Xtream cast string), crew (tappable people with a localised role: creators, directors, writers, producers...; falls back to the director names),
  *  tagline, original (original title when it differs), status (localised), next ({air,s,e}|undefined: next episode to air), languages / countries (ISO codes), studios, stream (StreamFacts of the SELECTED source: res, video, audio, ch, box, size bytes, added epoch s, langs),
- *  episodes (the selected season's gaps filled from TMDB: generic titles, stills, plots; after a manual match TMDB replaces them), epMeta(e) (TMDB air date/rating/guests/crew of an episode of the selected season), openEpisode(e) (episode page), markItems(items, seen) (single items, server too), seasons (numbers), season (selected, null = none), setSeason, shown (episodes of the season),
+ *  episodes (the selected season's gaps filled from TMDB: generic titles, stills, plots; after a manual match TMDB replaces them), epMeta(e) (TMDB air date/rating/guests/crew of an episode of the selected season), epInfo(e) (an episode's details dialog), playEp(e, fromStart?), toggleEpWatched(e), markItems(items, seen) (single items, server too), seasons (numbers), season (selected, null = none), setSeason, shown (episodes of the season),
  *  progress(x) -> {pos,dur,t}|undefined, pct(x) -> 0..100, watched(x), epLabel(e) -> "E3  ·  45m  ·  Watched",
  *  resumeIdx, resumeLabel (localised "Resume"|"Play"), resuming (true = Resume; compare this, not the label), ratingName(source) (localises the generic "Rating" source name), canPlay, play(queue|null, index) -> opens the player, playMain() (resume/play button),
  *  trailer ({key,name}|undefined, TMDB/YouTube), trailers (all of them: trailers, teasers, featurettes), trailerLoading,
@@ -70,17 +71,33 @@ export function useDetail(id: string) {
   const [loaded, setLoaded] = useState(false) // Xtream info fetched (or not applicable): metadata providers can start
   const open = useOpen()
 
+  // the source's detail (Xtream series/VOD info, Plex/Jellyfin item + episodes), stale-while-revalidate: the copy cached on this device
+  // (`det:<item id>`) paints at once and lets the metadata lookup start (it waits for this, and its cache key needs the panel's TMDB id),
+  // then the provider is asked anyway; its answer replaces the cached one only when something changed (a new episode), so nothing redraws for nothing
   useEffect(() => {
     if (!selected) return
     setBase(undefined); setInfo({}); setEps([]); setSeason(null); setErr("")
     if (!src || src.type === "m3u" || !selected.sid) return setLoaded(true)
-    let live = true
-    const run = src.type === "plex" || src.type === "jellyfin"
-      ? (src.type === "plex" ? plexDetail : jellyfinDetail)(src, proxy, selected).then((r) => { if (live) { setInfo(r.info as Info); setBase(r.meta); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
+    let live = true, shown = ""
+    type Got = { info: Info; meta?: Partial<Meta>; episodes: Episode[] }
+    const apply = (r: Got) => {
+      const sig = JSON.stringify(r)
+      if (!live || sig === shown) return
+      shown = sig
+      setInfo(r.info); setBase(r.meta); setEps(r.episodes)
+      setSeason((s) => (s != null && r.episodes.some((e) => e.season === s) ? s : r.episodes[0]?.season ?? null)) // keep the season the user picked
+      setLoaded(true)
+    }
+    const key = `det:${selected.id}`
+    void get<{ at: number; v: Got }>(key).then((c) => { if (c && !shown) apply(c.v) }, () => {}) // never over a fresher answer
+    const run: Promise<Got> = src.type === "plex" || src.type === "jellyfin"
+      ? (src.type === "plex" ? plexDetail : jellyfinDetail)(src, proxy, selected).then((r) => ({ info: r.info as Info, meta: r.meta, episodes: r.episodes }))
       : selected.kind === "series"
-      ? seriesInfo(src, proxy, selected).then((r) => { if (live) { setInfo(r.info); setEps(r.episodes); setSeason(r.episodes[0]?.season ?? null) } })
-      : vodInfo(src, proxy, selected.sid).then((r) => live && setInfo(r))
-    run.catch((e) => live && setErr(explain(e))).finally(() => live && setLoaded(true))
+      ? seriesInfo(src, proxy, selected).then((r) => ({ info: r.info, episodes: r.episodes }))
+      : vodInfo(src, proxy, selected.sid).then((r) => ({ info: r, episodes: [] }))
+    run.then((r) => { apply(r); void set(key, { at: Date.now(), v: r }).catch(() => {}) })
+      .catch((e) => live && !shown && setErr(explain(e))) // the cached copy on screen: a failed refresh stays quiet
+      .finally(() => live && setLoaded(true))
     return () => { live = false }
   }, [selId, src, proxy]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -146,14 +163,29 @@ export function useDetail(id: string) {
     markSeen([...eps, ...(isSeries && item ? [item] : [])], false)
     if (src?.type === "plex" || src?.type === "jellyfin") for (const e of eps) if (e.sid) (src.type === "plex" ? plexUnscrobble : jellyfinMarkUnplayed)(src, e)
   }
+  const epMeta = (e: Episode): EpisodeMeta | undefined => (e.season === season ? seasonMeta?.find((x) => x.num === e.num) : undefined)
   const allWatched = isSeries ? episodes.length > 0 && episodes.every((e) => watched(e.item)) : !!selected && watched(selected)
   const p = selected && progress(selected)
   const hasProgress = isSeries ? episodes.some((e) => progress(e.item)) : !!p && p.pos > 30
 
   return {
     logo: meta?.logo, awards: meta?.awards, releaseDate, markItems,
-    epMeta: (e: Episode): EpisodeMeta | undefined => (e.season === season ? seasonMeta?.find((x) => x.num === e.num) : undefined),
-    openEpisode: (e: Episode) => go("episode", { id: `${id}~${e.item.id}` }),
+    epMeta,
+    /** one episode for its details dialog: code ("S1 · E3"), air (long date|""), runtime, rating (TMDB), plot, still, guests / directors / writers, pct, watched, resumeAt, prev / next (across seasons) */
+    epInfo: (e: Episode) => {
+      const m = epMeta(e), i = episodes.findIndex((x) => x.id === e.id)
+      return {
+        code: t("pages.episode.code", { s: e.season, e: e.num }),
+        air: m?.air ? fmt.date(new Date(`${m.air}T12:00:00`), { year: "numeric", month: "long", day: "numeric" }) : "",
+        runtime: dur(e.dur) || "", rating: m?.rating, plot: e.item.plot || m?.plot, still: e.item.logo,
+        guests: m?.guests ?? [], directors: m?.directors ?? [], writers: m?.writers ?? [],
+        pct: pct(e.item), watched: watched(e.item), resumeAt: resumeOf(e.item),
+        prev: i > 0 ? episodes[i - 1] : undefined, next: i >= 0 ? episodes[i + 1] : undefined,
+      }
+    },
+    /** play an episode (the rest of the list follows in the player queue) */
+    playEp: (e: Episode, fromStart?: boolean) => play(episodes, Math.max(0, episodes.findIndex((x) => x.id === e.id)), fromStart),
+    toggleEpWatched: (e: Episode) => markItems([e.item], !watched(e.item)),
     item, selected, title: (matched && meta?.title) || item?.name || "", alternatives, selectSource: (i: Item) => setPickId(i.id), isSeries, meta, loading, error, plot, chips, genres, ratings, poster, backdrop: meta?.backdrop || item?.logo,
     backdrops: [...new Set([meta?.backdrop || item?.logo, ...(meta?.backdrops ?? [])].filter((x): x is string => !!x))].slice(0, 6),
     cast: meta?.cast ?? [], directors: meta?.directors ?? [], castText: text("cast"), crew,

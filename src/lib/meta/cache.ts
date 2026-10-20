@@ -4,7 +4,7 @@ import { del, get, getMany, keys, set } from "idb-keyval"
     Entries: `{ at, v, e? }` (e = empty result: re-checked after a day, not a week). In-flight requests are shared, so two screens asking at once cost one API call. */
 export const DAY = 864e5
 export const META_TTL = 30 * DAY // provider data (title details, seasons, lookups) is re-fetched after this; Refresh metadata on Detail forces it sooner
-const PREFIXES = ["meta", "season:", "person:", "genres:", "tm:", "om:"] // "meta" covers every metaN: cache version
+const PREFIXES = ["meta", "season:", "person:", "genres:", "tm:", "om:", "det:"] // "meta" covers every metaN: cache version; det: = a title's source detail (use-detail)
 const MAX = 3000 // entries kept; oldest ~30% are dropped when exceeded
 type Entry<T> = { at: number; v: T; e?: 1 }
 

@@ -11,7 +11,7 @@ import { useFollows } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { GRail, useLeft } from "./parts"
 
-const TITLES: Record<string, string> = { favs: "gtv.home.watchlist", recents: "gtv.home.recents" }
+const TITLES: Record<string, string> = { favs: "gtv.home.watchlist" }
 
 export default function Home() {
   const t = useT()
@@ -45,8 +45,9 @@ export default function Home() {
                 const art = item.backdrop || item.logo
                 const m = meta(item)
                 return (
-                  <button key={item.id} data-nav data-card onClick={() => h.play(item)} className="w-[86vw] shrink-0 snap-start text-start [--s:1.03] md:w-[44vw] xl:w-[36vw]">
-                    <div data-tile className="relative aspect-[2/1] overflow-hidden rounded-3xl bg-gradient-to-br from-accent-blue-container via-surface to-surface">
+                  <button key={item.id} data-nav data-card onClick={() => h.play(item)} className="w-[86vw] shrink-0 snap-start text-start md:w-[44vw] xl:w-[36vw]">
+                    <div data-tilewrap className="relative rounded-3xl">
+                    <div data-tile className="relative aspect-[2/1] overflow-hidden rounded-[inherit] bg-gradient-to-br from-accent-blue-container via-surface to-surface">
                       {art && <img src={art} alt="" decoding="async" loading={i ? "lazy" : undefined} className="absolute inset-0 size-full object-cover" />}
                       <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
                       <span aria-hidden className="absolute end-3 top-3 grid size-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md"><Play className="size-5 fill-current" /></span>
@@ -56,22 +57,24 @@ export default function Home() {
                         {m && <span dir="auto" className="truncate text-sm text-white/80">{m}</span>}
                       </div>
                     </div>
+                    <span data-ring aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit]" />
+                    </div>
                   </button>
                 )
               })}
             </Rail>
           )}
-          {!feat.length && !h.rails.length && <Empty>{t("gtv.home.empty")}</Empty>}
-          {games.length === 0 && gamesLoading && <SkelGames />}
-          {games.length > 0 && (
-            <Rail title={t("gtv.home.nextGames")}>
-              {games.slice(0, 12).map((g) => {
-                const route = matchRoute(follows, g)
-                return <GameCard key={g.id} g={g} mineId={teamInGame(follows, g)} onOpen={() => route && go("match", route)} />
-              })}
-            </Rail>
-          )}
-          {h.rails.map((r) => (
+          {!feat.length && !h.rails.some((r) => r.items.length) && <Empty>{t("gtv.home.empty")}</Empty>}
+          {h.rails.map((r) => r.key === "games" ? (
+            games.length > 0 ? (
+              <Rail key="games" title={t("gtv.home.nextGames")}>
+                {games.slice(0, 12).map((g) => {
+                  const route = matchRoute(follows, g)
+                  return <GameCard key={g.id} g={g} mineId={teamInGame(follows, g)} onOpen={() => route && go("match", route)} />
+                })}
+              </Rail>
+            ) : gamesLoading ? <SkelGames key="games" /> : null
+          ) : (
             <GRail key={r.key} title={TITLES[r.key] ? t(TITLES[r.key]) : r.title} onSeeAll={r.seeAll}>
               {r.items.map((i) => (
                 <Card key={i.id} item={i} variant={r.card ?? r.kind} pct={r.pct?.(i)} sub={r.key === "cont" ? left(i) : r.sub?.(i)} onOpen={() => h.open(i, r.items)} />

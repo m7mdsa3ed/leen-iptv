@@ -65,7 +65,7 @@ export default function HistoryPage() {
   let budget = shown
 
   return (
-    <Shell page="library" title={t("pages.history.title")}>
+    <Shell page="settings" title={t("pages.history.title")}>
       <div className="flex h-full flex-col">
         <div className="flex flex-wrap items-center gap-3 pb-3">
           <div className="me-auto">
@@ -78,7 +78,7 @@ export default function HistoryPage() {
             <ConfirmButton confirmLabel={t("pages.history.pressAgain")} onConfirm={() => useHistory.getState().clear()}>{t("pages.history.clear")}</ConfirmButton>
           )}
         </div>
-        <div ref={list} className="min-h-0 flex-1 overflow-y-auto pb-6 [--s:1.02]">
+        <div ref={list} className="min-h-0 flex-1 overflow-y-auto pb-6">
           {!total ? <Empty>{track ? t("pages.history.empty") : t("pages.history.emptyOff")}</Empty> : days.map(([k, rows]) => {
             if (budget <= 0) return null
             const part = rows.slice(0, budget)

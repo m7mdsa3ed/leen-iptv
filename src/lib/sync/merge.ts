@@ -60,7 +60,7 @@ export type AppSlice = {
   settings: { theme?: unknown; trackHistory?: unknown; meta?: unknown; metaMatch?: Record<string, string | { id: string }>; logoMatch?: Record<string, string>; unmatched?: Record<string, string> } & Partial<Record<DisplayKey, unknown>>
 }
 /** Display preferences that follow the account. Only written once set (an untouched device never overwrites a customised one); "reset" stores an empty value, not undefined. */
-export const DISPLAY_KEYS = ["cardSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext", "noAutoShows", "skipMarks", "colorTheme", "subs", "notify", "sportsNotify", "autoMeta", "metaPosters", "sharedMeta"] as const
+export const DISPLAY_KEYS = ["cardSize", "gridSize", "cardInfo", "startPage", "homeOrder", "homeHide", "catNav", "nextBanner", "autoNext", "noAutoShows", "skipMarks", "colorTheme", "subs", "notify", "sportsNotify", "autoMeta", "metaPosters", "sharedMeta"] as const
 type DisplayKey = (typeof DISPLAY_KEYS)[number]
 export const RECENTS_MAX = 40
 
