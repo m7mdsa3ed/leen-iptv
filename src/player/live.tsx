@@ -1,44 +1,43 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react"
-import { X } from "lucide-react"
-import { RoundButton } from "@/components/gtv"
 import { groupLabel, Logo } from "@/components/tv/ui"
 import { FAV } from "@/components/tv/groups"
 import { useCatalog } from "@/lib/catalog"
 import { isTv } from "@/lib/device"
 import { fmt, useT } from "@/lib/i18n"
 import { usePData } from "@/lib/store"
-import { cn } from "@/lib/utils"
 import type { Item } from "@/lib/types"
 import { useProgramme } from "./programme"
+import { Row, Sheet, Tag } from "./ui"
 
 const CAP = 200 // channel rows mounted around the playing one (a category can hold thousands)
 const IDLE_MS = 12000 // the list closes by itself after this long without input
 
-/** Live channel banner (bottom start): logo, number, name, category, and what is on now / next with its progress. After a zap and while the controls are up. */
-export function LiveBanner({ item, on }: { item: Item; on: boolean }) {
+/** What is playing, live: logo, LIVE + number + category, the channel, then the programme on now (times, progress) and the next one.
+ *  The dock's head (chrome.tsx), so it shows after a zap and while the controls are up. */
+export function LiveHead({ item }: { item: Item }) {
   const t = useT()
   const { current, next, pct } = useProgramme(item)
   return (
-    <div data-on={on ? "" : undefined} className="pl-layer pl-banner pointer-events-none">
+    <div className="pl-head">
       <div className="flex items-center gap-4">
         <span className="pl-logo"><Logo item={item} className="size-full p-1.5" /></span>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="pl-live">{t("player.live")}</span>
-            {item.num ? <bdi className="pl-sub tabular-nums">{fmt.number(item.num)}</bdi> : null}
-            {item.group && <span dir="auto" className="pl-sub truncate">{groupLabel(item.group, t)}</span>}
+        <div className="min-w-0 flex-1">
+          <div className="pl-meta">
+            <Tag tone="live">{t("player.live")}</Tag>
+            {item.num ? <bdi className="pl-num">{fmt.number(item.num)}</bdi> : null}
+            {item.group && <span dir="auto" className="pl-trunc">{groupLabel(item.group, t)}</span>}
           </div>
-          <div dir="auto" className="pl-title truncate">{item.name}</div>
+          <div dir="auto" className="pl-title pl-trunc mt-1">{item.name}</div>
         </div>
       </div>
       {current && (
-        <div className="mt-3 max-w-xl">
+        <div className="mt-2">
           <div className="flex items-baseline gap-3">
-            <span dir="auto" className="min-w-0 flex-1 truncate text-lg font-medium">{current.title}</span>
-            <span dir="ltr" className="pl-sub shrink-0 tabular-nums">{fmt.time(current.start)} - {fmt.time(current.end)}</span>
+            <span dir="auto" className="pl-trunc min-w-0 flex-1 text-[length:var(--pl-fs-l)] font-medium">{current.title}</span>
+            <span dir="ltr" className="pl-time shrink-0 text-end">{fmt.time(current.start)} - {fmt.time(current.end)}</span>
           </div>
-          <div dir="ltr" className="pl-prog mt-2"><span style={{ width: `${pct}%` }} /></div>
-          {next && <div className="pl-sub mt-2 truncate" dir="auto"><span className="opacity-70">{t("player.more.nextProgramme")}: </span>{next.title} <bdi dir="ltr" className="tabular-nums">{fmt.time(next.start)}</bdi></div>}
+          <span dir="ltr" className="pl-track mt-2"><span className="pl-fill" style={{ transform: `scaleX(${pct / 100})` }} /></span>
+          {next && <div dir="auto" className="pl-meta mt-2"><span className="shrink-0 opacity-70">{t("player.more.nextProgramme")}:</span><span className="pl-trunc">{next.title}</span><bdi dir="ltr" className="pl-num shrink-0">{fmt.time(next.start)}</bdi></div>}
         </div>
       )}
     </div>
@@ -84,40 +83,26 @@ export const Channels = memo(function Channels({ item, onTune, onClose }: { item
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <>
-      <div aria-hidden className="absolute inset-0 z-[11] bg-black/40 m-fade" onClick={onClose} />
-      <section ref={ref} data-modal role="dialog" aria-label={t("player.channels")} className="pl-side m-fade absolute inset-y-0 start-0 z-[12] flex flex-col"
-        onKeyDown={bump} onPointerMove={bump} onWheel={bump}>
-        <header className="flex items-center gap-3 px-5 pb-3 pt-[max(1.25rem,var(--safe-t))]">
-          <h2 className="pl-title flex-1">{t("player.channels")}</h2>
-          {!isTv && <RoundButton label={t("player.close")} onClick={onClose} className="pl-rb"><X /></RoundButton>}
-        </header>
-        <div className="flex min-h-0 flex-1">
-          <div data-nav-group="memory" className="pl-col no-scrollbar w-[38%] max-w-[15rem] shrink-0 overflow-y-auto p-2">
-            {groups.map((x) => (
-              <button key={x} data-nav aria-current={x === g ? "true" : undefined} onClick={() => setG(x)} onFocus={() => isTv && setG(x)}
-                className={cn("pl-row-btn w-full text-start", x === g && "pl-row-on")}>
-                <bdi dir="auto" className="truncate">{groupLabel(x, t)}</bdi>
-              </button>
-            ))}
-          </div>
-          <div key={g} data-nav-group className="no-scrollbar min-w-0 flex-1 overflow-y-auto p-2">
-            {shown.map((c) => {
-              const cur = c.id === item.id
-              return (
-                <button key={c.id} data-nav data-ch data-cur={cur ? "" : undefined} aria-current={cur ? "true" : undefined} onClick={() => (cur ? onClose() : onTune(c, list))}
-                  className={cn("pl-row-btn flex w-full items-center gap-3 text-start", cur && "pl-row-on")}>
-                  <span className="pl-logo pl-logo-sm"><Logo item={c} className="size-full p-1" /></span>
-                  {c.num ? <bdi className="w-10 shrink-0 tabular-nums opacity-60">{fmt.number(c.num)}</bdi> : null}
-                  <span dir="auto" className="min-w-0 flex-1 truncate">{c.name}</span>
-                  {cur && <span className="pl-live shrink-0">{t("player.more.playing")}</span>}
-                </button>
-              )
-            })}
-            {!shown.length && <p className="p-4 text-white/60">{t("player.noChannels")}</p>}
-          </div>
+    <Sheet side="start" label={t("player.channels")} head={<h2 className="pl-title pl-trunc min-w-0 flex-1">{t("player.channels")}</h2>} onClose={onClose}
+      sref={ref} onKeyDown={bump} onPointerMove={bump} onWheel={bump}>
+      <div className="flex min-h-0 flex-1">
+        <div data-nav-group="memory" className="pl-col pl-list no-scrollbar w-[38%] max-w-[15rem] shrink-0">
+          {groups.map((x) => (
+            <Row key={x} on={x === g} aria-current={x === g ? "true" : undefined} onClick={() => setG(x)} onFocus={() => isTv && setG(x)} label={groupLabel(x, t)} trail={null} />
+          ))}
         </div>
-      </section>
-    </>
+        <div key={g} data-nav-group className="pl-col pl-list no-scrollbar min-w-0 flex-1">
+          {shown.map((c) => {
+            const cur = c.id === item.id
+            return (
+              <Row key={c.id} data-ch="" data-cur={cur ? "" : undefined} aria-current={cur ? "true" : undefined} on={cur} onClick={() => (cur ? onClose() : onTune(c, list))}
+                lead={<><span className="pl-logo" data-size="sm"><Logo item={c} className="size-full p-1" /></span>{c.num ? <bdi className="pl-num w-10 shrink-0 opacity-60">{fmt.number(c.num)}</bdi> : null}</>}
+                label={c.name} trail={cur ? <Tag>{t("player.more.playing")}</Tag> : null} />
+            )
+          })}
+          {!shown.length && <p className="pl-note p-4">{t("player.noChannels")}</p>}
+        </div>
+      </div>
+    </Sheet>
   )
 })

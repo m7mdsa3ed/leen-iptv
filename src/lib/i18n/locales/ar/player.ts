@@ -160,7 +160,5 @@ const d: Dict = {
   "player.sub.subRtlFix": "صلّح علامات الترقيم العربي",
   "player.sub.subRtlFix.false": "لأ",
   "player.sub.subRtlFix.true": "أيوه",
-  "player.mini.expand": "افتح المشغّل",
-  "player.mini.close": "اقفل المشغّل",
 }
 export default d

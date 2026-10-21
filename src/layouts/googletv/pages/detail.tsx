@@ -214,16 +214,16 @@ function EpisodeRow({ e, D, onInfo }: { e: Episode; D: D; onInfo: () => void }) 
   const meta = D.epMeta(e)
   const seen = D.watched(e.item)
   const pct = D.pct(e.item)
-  const current = D.episodes[D.resumeIdx]?.id === e.id
+  const current = !e.missing && D.episodes[D.resumeIdx]?.id === e.id
   const plot = e.item.plot || meta?.plot
-  const sub = [D.epDur(e.dur), meta?.air && fmt.date(new Date(`${meta.air}T12:00:00`), DAY)].filter(Boolean).join(" · ")
+  const sub = [D.epDur(e.dur), e.missing ? D.missingLabel(e) : meta?.air && fmt.date(new Date(`${meta.air}T12:00:00`), DAY)].filter(Boolean).join(" · ")
   return (
     <div className="flex items-center gap-2">
-      <button data-nav onClick={() => D.playEp(e)} aria-current={current ? "true" : undefined} aria-label={`${t("pages.episode.play")} ${t("pages.episode.code", { s: e.season, e: e.num })} ${e.title}`}
-        className="gtv-ep group flex min-w-0 flex-1 items-center gap-4 rounded-2xl p-2 text-start md:gap-5">
+      <button data-nav onClick={() => D.playEp(e)} aria-current={current ? "true" : undefined} aria-label={`${e.missing ? "" : t("pages.episode.play")} ${t("pages.episode.code", { s: e.season, e: e.num })} ${e.title}`} aria-disabled={e.missing || undefined}
+        className={cn("gtv-ep group flex min-w-0 flex-1 items-center gap-4 rounded-2xl p-2 text-start md:gap-5", e.missing && "opacity-60")}>
         <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-xl bg-surface-2 sm:w-44 md:w-56">
           {e.item.logo ? <img src={e.item.logo} alt="" loading="lazy" decoding="async" className="size-full object-cover" /> : <div className="grid size-full place-items-center text-3xl font-semibold text-muted-foreground">{fmt.number(e.num)}</div>}
-          <span aria-hidden className="absolute inset-0 m-auto grid size-11 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100"><Play className="size-5 fill-current" /></span>
+          {!e.missing && <span aria-hidden className="absolute inset-0 m-auto grid size-11 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100"><Play className="size-5 fill-current" /></span>}
           {seen && <span className="absolute end-2 top-2 grid size-7 place-items-center rounded-full bg-black/70 text-white"><Check className="size-4" /></span>}
           {pct > 0 && !seen && <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-white/30"><div className="h-full bg-[var(--plex)]" style={{ width: `${pct}%` }} /></div>}
         </div>
@@ -283,13 +283,15 @@ function EpisodeDialog({ D, e, onPick, onClose }: { D: D; e: Episode; onPick: (e
         </div>
 
         <div data-nav-group className="flex items-center gap-2 border-t border-foreground/10 px-6 py-4">
-          {E.resumeAt > 0 ? (
-            <ActionsMenu
-              items={[{ label: t("gtv.detail.resumeFrom", { time: mmss(E.resumeAt) }), run: () => play() }, { label: t("gtv.detail.fromStart"), run: () => play(true) }]}
-              trigger={(o) => <Pill variant="primary" data-autofocus="" aria-haspopup="menu" aria-expanded={o.open} onClick={o.toggle}><Play className="fill-current" />{t("pages.episode.resume")}</Pill>}
-            />
-          ) : <Pill variant="primary" data-autofocus="" onClick={() => play()}><Play className="fill-current" />{t("pages.episode.play")}</Pill>}
-          <RoundButton label={t(E.watched ? "hooks.detail.markUnwatched" : "hooks.detail.markWatched")} aria-pressed={E.watched} onClick={() => D.toggleEpWatched(e)} className={E.watched ? "bg-[var(--plex)] text-[var(--plex-fg)]" : undefined}><Check /></RoundButton>
+          {e.missing ? <span className="text-base text-muted-foreground">{D.missingLabel(e)}</span> : <>
+            {E.resumeAt > 0 ? (
+              <ActionsMenu
+                items={[{ label: t("gtv.detail.resumeFrom", { time: mmss(E.resumeAt) }), run: () => play() }, { label: t("gtv.detail.fromStart"), run: () => play(true) }]}
+                trigger={(o) => <Pill variant="primary" data-autofocus="" aria-haspopup="menu" aria-expanded={o.open} onClick={o.toggle}><Play className="fill-current" />{t("pages.episode.resume")}</Pill>}
+              />
+            ) : <Pill variant="primary" data-autofocus="" onClick={() => play()}><Play className="fill-current" />{t("pages.episode.play")}</Pill>}
+            <RoundButton label={t(E.watched ? "hooks.detail.markUnwatched" : "hooks.detail.markWatched")} aria-pressed={E.watched} onClick={() => D.toggleEpWatched(e)} className={E.watched ? "bg-[var(--plex)] text-[var(--plex-fg)]" : undefined}><Check /></RoundButton>
+          </>}
           <div className="ms-auto flex gap-2">
             <RoundButton label={t("pages.episode.prev")} disabled={!E.prev} className={!E.prev ? "opacity-40" : undefined} onClick={() => E.prev && onPick(E.prev)}><ChevronLeft className="rtl-flip" /></RoundButton>
             <RoundButton label={t("pages.episode.next")} disabled={!E.next} className={!E.next ? "opacity-40" : undefined} onClick={() => E.next && onPick(E.next)}><ChevronRight className="rtl-flip" /></RoundButton>

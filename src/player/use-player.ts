@@ -50,8 +50,8 @@ export function useGuard() {
  *  - layer: the panel (tabs: episodes / audio & subtitles / playback / info) or the live channel list
  *  - banner: the title / channel banner after a change of item, for BANNER_MS
  */
-export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; mini: boolean; vref: RefObject<HTMLVideoElement | null> }) {
-  const { vref, mini } = o
+export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vref: RefObject<HTMLVideoElement | null> }) {
+  const { vref } = o
   const t = useT()
   const back = useRoute((s) => s.back)
   const guard = useGuard()
@@ -121,12 +121,12 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; mi
 
   /** Open the panel on a tab (default: the last one, else the most useful one for this kind). */
   const openPanel = (to?: Tab) => {
-    if (E.err || mini) return
+    if (E.err) return
     clearTimeout(hideT.current)
     setTab(to ?? (tab === "episodes" && !episode ? "av" : tab))
     setLayer("panel"); setChrome(false)
   }
-  const openChannels = () => { if (!live || E.err || mini) return; clearTimeout(hideT.current); setLayer("channels"); setChrome(false) }
+  const openChannels = () => { if (!live || E.err) return; clearTimeout(hideT.current); setLayer("channels"); setChrome(false) }
   /** Close the layer; the chrome comes back on the control that opened it (TV) or simply comes back (pointer). */
   const closeLayer = () => { if (layerRef.current === "none") return; setLayer("none"); poke() }
   useEffect(() => { if (E.err) setLayer("none") }, [E.err])
@@ -282,12 +282,12 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; mi
     }
   }
   const multi = () => { useMulti.getState().add(item.id); useRoute.getState().go("multi") }
-  // leaving for another page keeps playback in the mini player (player/host.tsx)
+  // leaving for another page stops playback (player/host.tsx)
   const details = (id: string) => useRoute.getState().replace("detail", { id })
   const person = (c: { id?: string; name: string }) => useRoute.getState().replace("person", { id: c.id, name: c.name })
 
   /* ---------- session: stop, sleep, wake lock, host, new episodes ---------- */
-  const stop = () => { if (!mini) back(); closePlayer() } // for good: no mini player
+  const stop = () => { back(); closePlayer() }
   const stopRef = useRef(stop)
   stopRef.current = stop
   useEffect(() => {
@@ -303,12 +303,6 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; mi
     return () => { document.removeEventListener("visibilitychange", get); void l?.release() }
   }, [E.paused, E.err])
   useEffect(() => { usePlayerHost.setState({ cur: { queue, index: idx } }) }, [queue, idx])
-  useEffect(() => { usePlayerHost.setState({ canMini: E.started && !E.err }) }, [E.started, E.err])
-  useEffect(() => { usePlayerHost.setState({ pip }) }, [pip]) // the browser's PiP window is open: the mini box hides
-  useEffect(() => { if (mini && E.err) closePlayer() }, [mini, E.err]) // a dead stream does not linger in the corner
-  useEffect(() => {
-    if (mini) { setLayer("none"); hide(); if (fsEl()) exitFs() } else poke()
-  }, [mini]) // eslint-disable-line react-hooks/exhaustive-deps
   // a new episode of the playing show (lib/new-episodes.ts) joins the queue, so the Next card picks it up
   useEffect(() => {
     const f = (e: Event) => {

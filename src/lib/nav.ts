@@ -475,6 +475,7 @@ export function installNav(onBack: () => void) {
   // (lastEl still there) is left alone. Also pulls focus into a [data-modal] that opened while focus stayed behind it.
   const stray = () => {
     const ae = document.activeElement
+    if (ae && ae !== document.body && ae !== document.documentElement && !document.querySelector("[data-modal]")) return false // the common case, without topModal's layout read after every commit
     const m = topModal()
     return !ae || ae === document.body || ae === document.documentElement || (m != null && !m.contains(ae))
   }

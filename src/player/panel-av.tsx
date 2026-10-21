@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { ChevronDown, Minus, Plus } from "lucide-react"
-import { Pill } from "@/components/gtv"
 import { useCatalog } from "@/lib/catalog"
 import { useLang, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
@@ -9,9 +8,9 @@ import { DEFAULT_SUB_LANGS, SUB_LANGS, type SubHit, type SubProvider, type SubQu
 import { cn } from "@/lib/utils"
 import type { Item } from "@/lib/types"
 import type { Track } from "./engine"
-import { Group, Row } from "./panel"
 import { SUB_SIZES, SUB_STYLE, setPrefs, usePrefs, type SubStyleKey } from "./prefs"
 import { langName } from "./use-tracks"
+import { Group, IconBtn, Row } from "./ui"
 import type { P } from "./use-player"
 
 const PROVIDER: Record<SubProvider, string> = { subdl: "SubDL", opensubtitles: "OpenSubtitles" }
@@ -23,11 +22,11 @@ export const subValue = (k: SubStyleKey, v: string | number | boolean, t: (k: st
 /** - value + stepper (one D-pad line). */
 function Step({ label, value, onStep }: { label: string; value: ReactNode; onStep: (d: number) => void }) {
   return (
-    <div data-nav-group className="flex items-center gap-2">
-      <span className="me-auto min-w-0 truncate">{label}</span>
-      <Pill aria-label={`${label} -`} className="pl-pill !px-3" onClick={() => onStep(-1)}><Minus /></Pill>
-      <span dir="auto" className="min-w-20 truncate text-center tabular-nums">{value}</span>
-      <Pill aria-label={`${label} +`} className="pl-pill !px-3" onClick={() => onStep(1)}><Plus /></Pill>
+    <div data-nav-group className="flex min-h-[var(--pl-h)] items-center gap-2 ps-[.875rem]">
+      <span className="pl-trunc me-auto min-w-0">{label}</span>
+      <IconBtn size="sm" label={`${label} -`} onClick={() => onStep(-1)}><Minus /></IconBtn>
+      <span dir="auto" className="pl-trunc pl-num min-w-20 text-center">{value}</span>
+      <IconBtn size="sm" label={`${label} +`} onClick={() => onStep(1)}><Plus /></IconBtn>
     </div>
   )
 }
@@ -35,11 +34,8 @@ function Step({ label, value, onStep }: { label: string; value: ReactNode; onSte
 /** A row that opens a section in place below it (no second sheet). */
 function Fold({ label, value, open, onToggle }: { label: string; value?: string; open: boolean; onToggle: () => void }) {
   return (
-    <button data-nav aria-expanded={open} onClick={onToggle} className="pl-row-btn flex w-full items-center gap-3 text-start">
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {value && <span className="shrink-0 text-sm opacity-60">{value}</span>}
-      <ChevronDown className={cn("size-5 shrink-0 transition-transform", open && "rotate-180")} />
-    </button>
+    <Row aria-expanded={open} onClick={onToggle} label={label}
+      trail={<>{value && <span className="pl-row-detail shrink-0">{value}</span>}<ChevronDown className={cn("transition-transform", open && "rotate-180")} /></>} />
   )
 }
 
@@ -58,20 +54,20 @@ export function AvTab({ p }: { p: P }) {
     setPrefs({ subSize: SUB_SIZES[Math.min(SUB_SIZES.length - 1, Math.max(0, i + d))] })
   }
   return (
-    <div className="grid gap-x-10 gap-y-6 md:grid-cols-2">
+    <div className="pl-grid">
       <Group title={t("player.audio")}>
         {T.audio.length
-          ? <div data-nav-group className="flex flex-col gap-1">{T.audio.map((x) => <Row key={x.id} on={x.id === T.audioSel} onClick={() => T.pickAudio(x.id)} label={x.label} detail={trackDetail(x, t)} />)}</div>
-          : <p className="opacity-60">{t("player.noAudioTracks")}</p>}
+          ? <div data-nav-group className="pl-list">{T.audio.map((x) => <Row key={x.id} on={x.id === T.audioSel} onClick={() => T.pickAudio(x.id)} label={x.label} detail={trackDetail(x, t)} />)}</div>
+          : <p className="pl-note">{t("player.noAudioTracks")}</p>}
       </Group>
       <Group title={t("player.subtitles")}>
-        <div data-nav-group className="flex flex-col gap-1">
+        <div data-nav-group className="pl-list">
           <Row on={T.subSel === -1} onClick={() => T.pickSub(-1)} label={t("player.off")} />
           {T.subs.map((x) => <Row key={x.id} on={x.id === T.subSel} onClick={() => T.pickSub(x.id)} label={x.label} detail={trackDetail(x, t)} />)}
           {T.ext && <Row on onClick={() => toggle("search")} label={T.ext.label} detail={t("player.subOnline")} />}
         </div>
-        {!T.subs.length && !T.ext && <p className="mt-2 text-sm opacity-60">{t("player.noSubtitleTracks")}</p>}
-        <div className="mt-4 flex flex-col gap-3">
+        {!T.subs.length && !T.ext && <p className="pl-note mt-2 ps-[.875rem]">{t("player.noSubtitleTracks")}</p>}
+        <div className="pl-list mt-4">
           <Step label={t("player.subSize")} value={`${prefs.subSize}%`} onStep={size} />
           {T.offset !== null && <Step label={t("player.subOffset")} value={`${T.offset > 0 ? "+" : ""}${T.offset}s`} onStep={T.stepOffset} />}
           {!p.live && <Fold label={t("player.subSearch")} open={open === "search"} onToggle={() => toggle("search")} />}
@@ -92,7 +88,7 @@ function SubStyle() {
     const list = SUB_STYLE[k] as readonly unknown[]
     setPrefs({ [k]: list[(list.indexOf(p[k]) + d + list.length) % list.length] })
   }
-  return <div className="flex flex-col gap-3 ps-2">{(Object.keys(SUB_STYLE) as SubStyleKey[]).map((k) => <Step key={k} label={t(`player.sub.${k}`)} value={subValue(k, p[k], t)} onStep={step(k)} />)}</div>
+  return <div className="pl-list ps-3">{(Object.keys(SUB_STYLE) as SubStyleKey[]).map((k) => <Step key={k} label={t(`player.sub.${k}`)} value={subValue(k, p[k], t)} onStep={step(k)} />)}</div>
 }
 
 /** Online search: a language stepper (the Settings languages first), then SubDL + OpenSubtitles results; a pick downloads it and turns it on. */
@@ -120,13 +116,13 @@ function SubSearch({ item, onPick }: { item: Item; onPick: (vtt: string, label: 
     setBusy(h.ref); setErr("")
     downloadSub(h, q).then((vtt) => onPick(vtt, `${langName(h.lang || lang, ui)} · ${h.name}`), (e: unknown) => setErr(t("player.subFailed", { msg: e instanceof Error ? e.message : String(e) }))).finally(() => setBusy(""))
   }
-  const note = (s: ReactNode, bad?: boolean) => <p className={cn("text-sm", bad ? "text-red-300" : "opacity-60")}>{s}</p>
+  const note = (s: ReactNode, bad?: boolean) => <p className="pl-note ps-[.875rem]" data-bad={bad ? "" : undefined}>{s}</p>
   return (
-    <div className="flex flex-col gap-2 ps-2">
+    <div className="pl-list ps-3">
       <Step label={t("player.subLang")} value={langName(lang, ui)} onStep={(d) => setLi((i) => (i + d + langs.length) % langs.length)} />
       {!res ? note(t("player.subSearching")) : res.keyless ? note(t("player.subNoKey")) : !res.hits.length && !res.errors.length ? note(t("player.subNone")) : null}
       {res?.errors.map((e) => <div key={e.provider}>{note(`${PROVIDER[e.provider]}: ${e.msg}`, true)}</div>)}
-      <div data-nav-group className="flex flex-col gap-1">
+      <div data-nav-group className="pl-list">
         {res?.hits.map((h) => (
           <Row key={h.provider + h.ref} on={false} onClick={() => pick(h)} label={h.name}
             detail={[PROVIDER[h.provider], h.hi ? t("player.subHi") : "", busy === h.ref ? t("player.subLoading") : ""].filter(Boolean).join(" · ")} />

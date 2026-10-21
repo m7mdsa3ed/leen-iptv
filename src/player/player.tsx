@@ -1,13 +1,12 @@
 import { useEffect, useRef } from "react"
 import { isTv, useTouch } from "@/lib/device"
-import { navState, useRoute } from "@/lib/nav"
+import { navState } from "@/lib/nav"
 import type { Item } from "@/lib/types"
 import { useT } from "@/lib/i18n"
-import { ErrorView, Mini, NextCard, SkipChip } from "./cards"
+import { ErrorView, NextCard, SkipChip } from "./cards"
 import { Chrome } from "./chrome"
-import { closePlayer } from "./host"
 import { Flash, NumberEntry, Spinner } from "./indicators"
-import { Channels, LiveBanner } from "./live"
+import { Channels } from "./live"
 import { Panel } from "./panel"
 import { FITS } from "./prefs"
 import { Subtitles } from "./subtitles"
@@ -16,29 +15,31 @@ import { usePlayer } from "./use-player"
 import "./player.css"
 
 /**
- * The player screen. Everything it does lives in usePlayer (use-player.ts); keys in use-keys.ts. On screen, at most one of:
- * clean video · the chrome (title, scrubber, tab chips) · the panel (Episodes / Audio & subtitles / Playback / Info) · the live
- * channel list · the error. Plus what floats: the live banner, Skip intro, the Next episode card, the flash, the spinner.
- * `mini` = shrunk to the corner while another page is on top (host.tsx): video only, tap to expand. `start` = from the beginning.
+ * The player screen. Everything it does lives in usePlayer (use-player.ts); keys in use-keys.ts; the look in player.css + ui.tsx.
+ * On screen, at most one of: clean video · the chrome (top bar + the dock: what is playing, scrubber, control row; chrome.tsx) ·
+ * the panel (Episodes / Audio & subtitles / Playback / Info) · the live channel list · the error. Plus what floats: the dock's
+ * head alone after a change of item, Skip intro and the Next episode card (stacked above the dock), the flash, the spinner.
+ * `start` = from the beginning.
  */
-export default function Player({ queue, index, start, mini = false }: { queue: Item[]; index: number; start?: boolean; mini?: boolean }) {
+export default function Player({ queue, index, start }: { queue: Item[]; index: number; start?: boolean }) {
   const t = useT()
   const vref = useRef<HTMLVideoElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const touch = useTouch() && !isTv
-  const p = usePlayer({ queue, index, start, mini, vref })
+  const p = usePlayer({ queue, index, start, vref })
   const getRoot = () => root.current
-  useKeys({ ...p, off: mini, root: getRoot })
+  const dock = p.layer === "none" && !p.E.err && (p.chrome || p.banner) // the dock: what is playing, + the controls while they are up
+  useKeys({ ...p, root: getRoot })
 
   /* the app's D-pad nav stays out while nothing focusable is on screen (the keys are the player's then) */
-  navState.lock = !mini && !p.chrome && p.layer === "none" && !p.E.err && !p.nextOn
+  navState.lock = !p.chrome && p.layer === "none" && !p.E.err && !p.nextOn
   useEffect(() => () => { navState.lock = false }, [])
 
   /* TV focus: the controls come up on the scrubber (live: the first chip), or back on the chip whose layer just closed; the error on Retry */
   const back = useRef("")
   useEffect(() => { if (p.layer === "panel") back.current = p.tab; else if (p.layer === "channels") back.current = "channels" }, [p.layer]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (mini || !isTv || !p.chrome || p.layer !== "none" || p.E.err || p.nextOn) return
+    if (!isTv || !p.chrome || p.layer !== "none" || p.E.err || p.nextOn) return
     const id = requestAnimationFrame(() => {
       const r = root.current
       const a = document.activeElement as HTMLElement | null
@@ -48,8 +49,8 @@ export default function Player({ queue, index, start, mini = false }: { queue: I
       el?.focus()
     })
     return () => cancelAnimationFrame(id)
-  }, [p.chrome, p.layer, p.E.err, p.nextOn, mini])
-  useEffect(() => { if (p.E.err && !mini) requestAnimationFrame(() => root.current?.querySelector<HTMLElement>("[role=alertdialog] [data-autofocus]")?.focus()) }, [p.E.err, mini])
+  }, [p.chrome, p.layer, p.E.err, p.nextOn])
+  useEffect(() => { if (p.E.err) requestAnimationFrame(() => root.current?.querySelector<HTMLElement>("[role=alertdialog] [data-autofocus]")?.focus()) }, [p.E.err])
 
   /* pointer: mouse click = play / pause, double click = fullscreen; touch tap = controls, double tap on a side = -10 / +10 s, swipe up = panel */
   const ptr = useRef("mouse")
@@ -69,14 +70,14 @@ export default function Player({ queue, index, start, mini = false }: { queue: I
   return (
     <div
       ref={root}
-      data-chrome={p.chrome && p.layer === "none" ? "" : undefined}
-      className={`dark pl-root ${mini ? "absolute" : "fixed"} inset-0 overflow-hidden bg-black text-white${!mini && !p.chrome && p.layer === "none" && !isTv ? " cursor-none" : ""}`}
-      onMouseMove={() => { if (!mini && ptr.current === "mouse") p.poke() }}
+      data-dock={dock ? "" : undefined}
+      className={`dark pl-root fixed inset-0 overflow-hidden bg-black text-white${!p.chrome && p.layer === "none" && !isTv ? " cursor-none" : ""}`}
+      onMouseMove={() => { if (ptr.current === "mouse") p.poke() }}
       onTouchStart={(e) => { swipe.current = (e.target as HTMLElement).closest("[data-seek],[data-modal]") ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
       onTouchEnd={(e) => {
         const s = swipe.current
         swipe.current = null
-        if (!s || mini || p.layer !== "none" || p.E.err) return
+        if (!s || p.layer !== "none" || p.E.err) return
         const dy = e.changedTouches[0].clientY - s.y, dx = e.changedTouches[0].clientX - s.x
         if (dy < -70 && Math.abs(dx) < Math.abs(dy) * 0.6) p.openPanel()
       }}
@@ -91,23 +92,20 @@ export default function Player({ queue, index, start, mini = false }: { queue: I
         onDoubleClick={() => !isTv && ptr.current === "mouse" && p.toggleFs(root.current)}
         {...p.video}
       />
-      {mini ? (
-        <Mini name={p.item.name} paused={p.E.paused} buf={p.E.buf} canPip={p.canPip} onExpand={() => useRoute.getState().go("player", { queue: p.queue, index: p.idx })} onToggle={p.toggle} onPip={p.togglePip} onClose={closePlayer} />
-      ) : (
-        <>
-          <Subtitles vref={vref} lift={p.chrome && p.layer === "none"} />
-          {p.E.buf && !p.E.err && <Spinner title={p.item.name} started={p.E.started} label={t("player.loading")} />}
-          <Flash f={p.flash} />
-          {p.num && <NumberEntry n={p.num} />}
-          {p.live && <LiveBanner item={p.item} on={(p.chrome || p.banner) && p.layer === "none" && !p.E.err} />}
-          <Chrome p={p} vref={vref} tv={isTv} touch={touch} root={getRoot} />
-          {p.seg && p.layer === "none" && <SkipChip seg={p.seg} onSkip={p.skip} />}
-          {p.nextOn && p.nextItem && p.layer === "none" && <NextCard item={p.nextItem} secs={p.nu.secs} auto={p.autoNext} tv={isTv} onPlay={p.nu.skip} onCancel={p.nu.cancel} />}
-          {p.layer === "panel" && <Panel p={p} />}
-          {p.layer === "channels" && <Channels item={p.item} onTune={(c, list) => { p.closeLayer(); p.playItem(c, list) }} onClose={p.closeLayer} />}
-          {p.E.err && <ErrorView name={p.item.name} msg={p.E.err} canNext={p.queue.length > 1} onRetry={p.E.retry} onNext={() => p.zap(1)} onBack={p.leave} />}
-        </>
+      <Subtitles vref={vref} lift={dock} />
+      {p.E.buf && !p.E.err && <Spinner title={p.item.name} started={p.E.started} label={t("player.loading")} />}
+      <Flash f={p.flash} />
+      {p.num && <NumberEntry n={p.num} />}
+      <Chrome p={p} vref={vref} tv={isTv} touch={touch} dock={dock} root={getRoot} />
+      {p.layer === "none" && (p.seg || (p.nextOn && p.nextItem)) && (
+        <div className="pl-float">
+          {p.seg && <SkipChip seg={p.seg} onSkip={p.skip} />}
+          {p.nextOn && p.nextItem && <NextCard item={p.nextItem} secs={p.nu.secs} auto={p.autoNext} tv={isTv} onPlay={p.nu.skip} onCancel={p.nu.cancel} />}
+        </div>
       )}
+      {p.layer === "panel" && <Panel p={p} />}
+      {p.layer === "channels" && <Channels item={p.item} onTune={(c, list) => { p.closeLayer(); p.playItem(c, list) }} onClose={p.closeLayer} />}
+      {p.E.err && <ErrorView name={p.item.name} msg={p.E.err} canNext={p.queue.length > 1} onRetry={p.E.retry} onNext={() => p.zap(1)} onBack={p.leave} />}
     </div>
   )
 }

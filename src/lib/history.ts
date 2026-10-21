@@ -23,7 +23,9 @@ const save = () => {
   const { profileId, sessions, days } = useHistory.getState()
   if (profileId) void idbSet(`hist:${profileId}`, { sessions, days })
 }
-const schedule = () => { clearTimeout(timer); timer = window.setTimeout(save, 2000) }
+// playback ticks every 5 s and each save clones every session into IndexedDB: save at most every 30 s (and when the app is hidden or closed, below)
+const flushNow = () => { if (timer) { clearTimeout(timer); timer = 0; save() } }
+const schedule = () => { timer ||= window.setTimeout(() => { timer = 0; save() }, 30000) }
 
 export const useHistory = create<H>((set, get) => ({
   profileId: null,
@@ -31,6 +33,7 @@ export const useHistory = create<H>((set, get) => ({
   days: {},
   async load(pid) {
     if (get().profileId === pid) return
+    flushNow() // the previous profile's unsaved ticks
     set({ profileId: pid, sessions: [], days: {} })
     const d = await idbGet<{ sessions: Session[]; days: Record<string, Day> }>(`hist:${pid}`)
     if (get().profileId === pid && d) set({ sessions: d.sessions, days: d.days }) // a different profile may have loaded meanwhile

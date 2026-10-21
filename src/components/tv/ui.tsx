@@ -125,11 +125,14 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLi
   return cat ? <div ref={ref} data-nav-aside={side ? "" : undefined} className="cat-side">{row}</div> : row
 }
 
+/** TMDB posters at tile size: panels often link the `original` (about 2000x3000) and metadata uses w500; a TV decodes every one of them on its slow CPU. */
+const tileSize = (u?: string) => u?.replace(/\/t\/p\/(original|w500)\//, "/t/p/w342/")
+
 /** Channel logo / poster: `logo`, then `logoAlt` when that link is dead, then a name tile. */
 export function Logo({ item, className }: { item: Item; className?: string }) {
   const [n, setN] = useState(0)
   useEffect(() => setN(0), [item.logo, item.logoAlt])
-  const src = [item.logo, item.logoAlt].filter(Boolean)[n]
+  const src = [tileSize(item.logo), item.logo, item.logoAlt].filter((u, i, a) => u && a.indexOf(u) === i)[n] // the full-size link stays as the fallback
   return src ? (
     <img key={src} src={src} alt="" loading="lazy" decoding="async" onError={() => setN(n + 1)} className={cn("object-contain", className)} />
   ) : <NameTile item={item} className={className} />
@@ -229,7 +232,7 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
     ro.observe(el)
     return () => ro.disconnect()
   }, [!!head]) // eslint-disable-line react-hooks/exhaustive-deps
-  const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3, scrollMargin: hh, observeElementRect: keepSize })
+  const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3, scrollMargin: hh, observeElementRect: keepSize, useFlushSync: false })
   useEffect(() => v.measure(), [rowH, v])
   return (
     <div ref={ref} data-vscroll className={cn("under-bottom -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4", className)}>
@@ -259,7 +262,7 @@ export function VList<T>({ items, rowH: baseH, render, head, className }: { item
     ro.observe(el)
     return () => ro.disconnect()
   }, [!!head]) // eslint-disable-line react-hooks/exhaustive-deps
-  const v = useVirtualizer({ count: items.length, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 8, scrollMargin: hh, observeElementRect: keepSize })
+  const v = useVirtualizer({ count: items.length, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 8, scrollMargin: hh, observeElementRect: keepSize, useFlushSync: false })
   useEffect(() => v.measure(), [rowH, v])
   return (
     <div ref={ref} data-vscroll className={cn("under-bottom h-full overflow-y-auto", className)}>

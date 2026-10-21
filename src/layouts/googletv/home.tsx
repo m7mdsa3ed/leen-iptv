@@ -1,6 +1,6 @@
 import { Play } from "lucide-react"
 import { Shell, TvButton, Empty } from "@/components/tv/ui"
-import { Card, Rail, SkelRail } from "@/components/gtv"
+import { Card, Rail, SkelRail, small } from "@/components/gtv"
 import { GameCard, SkelGames } from "@/components/tv/sports"
 import type { Item } from "@/lib/types"
 import { fmt, useT } from "@/lib/i18n"
@@ -42,7 +42,7 @@ export default function Home() {
           {feat.length > 0 && (
             <Rail className="mb-4 [&>.rail]:snap-x [&>.rail]:snap-mandatory">
               {feat.map(({ item, kicker }, i) => {
-                const art = item.backdrop || item.logo
+                const art = small(item.backdrop) || item.logo
                 const m = meta(item)
                 return (
                   <button key={item.id} data-nav data-card onClick={() => h.play(item)} className="w-[86vw] shrink-0 snap-start text-start md:w-[44vw] xl:w-[36vw]">

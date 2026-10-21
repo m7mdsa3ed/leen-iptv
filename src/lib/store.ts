@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import type { ColorThemeId } from "@/lib/themes"
-import { persist } from "zustand/middleware"
+import { persist, type PersistStorage } from "zustand/middleware"
 import { LAYOUT_IDS } from "./layouts"
 import type { ProviderCfg } from "./meta/types"
 import { isTv } from "./device"
@@ -15,7 +15,7 @@ import type { More } from "./browse-pure"
 /** A user-made group of live channels (name is its key within a profile). */
 export type LiveList = { name: string; items: string[] }
 type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }>; lists?: LiveList[]; follows?: Follow[] }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; colorTheme?: ColorThemeId; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; cardSize?: "small" | "normal" | "large" | "xl"; gridSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; miniPlayer?: boolean; autoNext?: boolean; noAutoShows?: string[]; skipMarks?: Record<string, { is?: number; ie?: number; ce?: number }>; meta?: ProviderCfg[]; metaMatch?: Record<string, MetaMatch>; logoMatch?: Record<string, string>; sharedMeta?: boolean; metaPosters?: boolean; autoMeta?: boolean; unmatched?: Record<string, string>; groupMedia?: boolean; groupLive?: boolean; sportsNotify?: { enabled: boolean; lead: number }; notifyOff?: boolean; notify?: { digest?: boolean; live?: boolean; final?: boolean; episodes?: boolean }; subs?: SubsCfg }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; colorTheme?: ColorThemeId; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; cardSize?: "small" | "normal" | "large" | "xl"; gridSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; autoNext?: boolean; noAutoShows?: string[]; skipMarks?: Record<string, { is?: number; ie?: number; ce?: number }>; meta?: ProviderCfg[]; metaMatch?: Record<string, MetaMatch>; logoMatch?: Record<string, string>; sharedMeta?: boolean; metaPosters?: boolean; autoMeta?: boolean; unmatched?: Record<string, string>; groupMedia?: boolean; groupLive?: boolean; sportsNotify?: { enabled: boolean; lead: number }; notifyOff?: boolean; notify?: { digest?: boolean; live?: boolean; final?: boolean; episodes?: boolean }; subs?: SubsCfg }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
 const empty = (): PData => ({ favs: [], recents: [], progress: {}, lists: [], follows: [] })
@@ -59,6 +59,29 @@ interface S {
 const upd = (s: S, f: (d: PData) => PData) => {
   const p = s.profileId
   return p ? { data: { ...s.data, [p]: f(s.data[p] ?? empty()) } } : {}
+}
+
+/** localStorage for zustand persist, written lazily: persist rewrites the WHOLE state (every profile's progress, matches, sources) on each
+    set(), and playback saves progress every 10 s, the metadata queue a title at a time. The JSON is built and written after a 1 s lull,
+    at once when the app is hidden or closed. */
+export function lazyStorage<T>(): PersistStorage<T> {
+  const pend = new Map<string, unknown>()
+  let timer = 0
+  const flush = () => {
+    clearTimeout(timer)
+    timer = 0
+    for (const [k, v] of pend) try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* full / private mode */ }
+    pend.clear()
+  }
+  if (typeof document !== "undefined") {
+    addEventListener("pagehide", flush)
+    document.addEventListener("visibilitychange", () => { if (document.hidden) flush() })
+  }
+  return {
+    getItem: (k) => (pend.has(k) ? pend.get(k) : JSON.parse(localStorage.getItem(k) ?? "null")) as ReturnType<PersistStorage<T>["getItem"]>,
+    setItem: (k, v) => { pend.set(k, v); timer ||= window.setTimeout(flush, 1000) }, // within 1 s of the first change, however busy
+    removeItem: (k) => { pend.delete(k); localStorage.removeItem(k) },
+  }
 }
 
 export const useApp = create<S>()(
@@ -145,6 +168,7 @@ export const useApp = create<S>()(
     {
       name: "iptv-app",
       version: 1,
+      storage: lazyStorage(),
       partialize: (s) => ({ ...s, profileId: undefined, sourceFilter: undefined, catFilter: undefined, moreFilter: undefined }), // always re-pick profile on launch
       // the picked profile survives a refresh (sessionStorage) but a fresh launch asks again
       merge: (saved, cur) => {

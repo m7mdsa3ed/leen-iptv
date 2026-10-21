@@ -1,5 +1,5 @@
 // Pure (no alias imports) so `node scripts/meta.check.ts` can test it.
-import type { Episode } from "../types"
+import type { Episode, Item } from "../types"
 import type { EpisodeMeta } from "./types"
 
 /** Panel episode names that say nothing: "Episode 3", "E03", "S01E03", "الحلقة 3", "<series name> - S1 E3", "". */
@@ -30,4 +30,24 @@ export function enrichEpisodes(eps: Episode[], season: number | null, metas: Epi
     return { ...e, title, dur, item: { ...e.item, logo, plot } }
   })
   return changed ? out : eps
+}
+
+/**
+ * The season's episodes the provider lists after the panel's last one (not aired yet, or not on the panel yet), as `missing` rows with the
+ * provider's title / still / plot: listed with their air date, never played. A season the panel does not have at all gets every provider episode.
+ * ponytail: only episodes numbered after the panel's last, so a panel that numbers a season differently (absolute numbers) never gets phantom gaps; mid-season holes stay hidden.
+ */
+export function withMissing(eps: Episode[], season: number | null, metas: EpisodeMeta[] | null, series: Item | undefined): Episode[] {
+  if (!metas?.length || season === null || !series) return eps
+  const last = Math.max(0, ...eps.filter((e) => e.season === season).map((e) => e.num))
+  const add = metas.filter((m) => m.num > last).map((m): Episode => ({
+    id: `missing:${season}:${m.num}`,
+    season,
+    num: m.num,
+    title: m.title || `Episode ${m.num}`,
+    dur: m.runtime,
+    missing: true,
+    item: { id: `${series.id}~s${season}e${m.num}`, kind: "movie", name: `${series.name} S${season}E${m.num}`, group: series.name, series: series.id, logo: m.still, plot: m.plot },
+  }))
+  return add.length ? [...eps, ...add].sort((a, b) => a.season - b.season || a.num - b.num) : eps
 }

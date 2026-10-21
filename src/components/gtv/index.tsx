@@ -102,8 +102,8 @@ export const Avatar = ({ name, color, photo, className }: { name: string; color:
 /** The two artwork shapes of the app, used by every card, skeleton and detail poster: poster = 2:3 (VOD), wide = 16:9 (live, continue watching, episodes). */
 export type ArtVariant = "poster" | "wide"
 export const RATIO: Record<ArtVariant, string> = { poster: "aspect-[2/3]", wide: "aspect-video" }
-/** TMDB backdrops come as w1280: a card never needs more than w780. */
-const small = (u?: string) => u?.replace("/t/p/w1280/", "/t/p/w780/")
+/** TMDB backdrops come as w1280 (panels: original): a card never needs more than w780. */
+export const small = (u?: string) => u?.replace(/\/t\/p\/(w1280|original)\//, "/t/p/w780/")
 
 /** One artwork frame. poster: the poster, cropped to 2:3. wide: a channel logo centred on a gradient (live), else the backdrop (16:9, cropped), else the poster whole.
     Children (badges, progress bars) are laid over it; extra props (data-tile ...) go to the frame. */
@@ -126,7 +126,6 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
   const locked = useLocked(item)
   const onMenu = useRemoveMenu(item)
   const live = item.kind === "live"
-  const [loaded, setLoaded] = useState(false)
   useEffect(() => wantMeta(item), [item]) // shown = looked up in the background (lib/meta/queue.ts)
   const chip = "absolute top-2 grid size-7 place-items-center rounded-full bg-black/60"
   return (
@@ -143,7 +142,7 @@ export function Card({ item, variant = "poster", pct, onOpen, onFocus, sub, flui
       className={cn("block shrink-0 text-start", fluid ? "w-full" : variant === "wide" ? "w-64" : "w-[9.5rem]", className)}
     >
       <div data-tilewrap className="relative rounded-2xl">
-      <Art item={item} variant={variant} data-tile data-fade data-loaded={loaded ? "" : undefined} onLoadCapture={(e: SyntheticEvent) => { if ((e.target as HTMLImageElement).loading === "lazy") setLoaded(true) }} className="rounded-[inherit]">
+      <Art item={item} variant={variant} data-tile data-fade onLoadCapture={(e: SyntheticEvent<HTMLElement>) => { if ((e.target as HTMLImageElement).loading === "lazy") e.currentTarget.setAttribute("data-loaded", "") }} className="rounded-[inherit]">
         {fav && <span className={cn(chip, "end-2")}><Star className="size-4 fill-yellow-400 text-yellow-400" /></span>}
         {locked && <span className={cn(chip, "start-2")}><Lock className="size-4 text-white" /></span>}
         <SourceBadge item={item} className={cn("absolute start-2", pct ? "bottom-3" : "bottom-2")} />

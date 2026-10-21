@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { get, set } from "idb-keyval"
 import { fmt, useT } from "@/lib/i18n"
 import { normalizeCfg, useMeta, useSeasonMeta, useSimilar } from "@/lib/meta"
-import { enrichEpisodes } from "@/lib/meta/episodes"
+import { enrichEpisodes, withMissing } from "@/lib/meta/episodes"
 import { streamInfo } from "@/lib/meta/facts-pure"
 import { cleanTitle } from "@/lib/meta/title"
 import { explain } from "@/lib/net"
@@ -65,7 +65,7 @@ export function useDetail(id: string) {
   const back = useRoute((s) => s.back)
   const [info, setInfo] = useState<Info>({})
   const [rawEps, setEps] = useState<Episode[]>([])
-  const [season, setSeason] = useState<number | null>(null)
+  const [seasonPick, setSeason] = useState<number | null>(null)
   const [base, setBase] = useState<Partial<Meta> | undefined>() // Plex/Jellyfin: server data merged first
   const [error, setErr] = useState("")
   const [loaded, setLoaded] = useState(false) // Xtream info fetched (or not applicable): metadata providers can start
@@ -104,11 +104,15 @@ export function useDetail(id: string) {
   const metaIdentity = primary ? `${primary.kind}:${srcOfId(primary.id)}:${primary.id}` : id
   const { meta, loading, matched, online, refresh: refreshMeta, rev } = useMeta(selected, info, loaded, base, metaIdentity)
   const similar = useSimilar(item, meta)
+  const lastSeason = Math.max(-1, ...rawEps.map((e) => e.season))
+  const newSeasons = useMemo(() => (meta?.seasons ?? []).filter((n) => n > lastSeason), [meta, lastSeason]) // the provider's seasons after the panel's last (a panel numbering seasons its own way gets none)
+  const season = seasonPick ?? (rawEps.length ? null : newSeasons[0] ?? null) // a show the panel has no episodes of yet: the provider's first season
   const seasonMeta = useSeasonMeta(item?.kind === "series" ? meta?.ids.tmdb : undefined, season, rev)
   const seriesName = useMemo(() => (item ? cleanTitle(item.srcName ?? item.name).title : ""), [item]) // panel episode names repeat the panel's series name
   const episodes = useMemo(() => enrichEpisodes(rawEps, season, seasonMeta, seriesName, item?.logo, !!matched) // matched by hand: TMDB episode names/stills/plots win
     .map((e) => (e.item.epTitle === e.title ? e : { ...e, item: { ...e.item, epTitle: e.title } })), [rawEps, season, seasonMeta, seriesName, item?.logo, matched]) // the player shows the episode title
-  const seasons = useMemo(() => [...new Set(episodes.map((e) => e.season))], [episodes])
+  const listed = useMemo(() => withMissing(episodes, season, seasonMeta, item), [episodes, season, seasonMeta, item]) // + the season's episodes not on the source yet (shown, not playable)
+  const seasons = useMemo(() => [...new Set([...episodes.map((e) => e.season), ...newSeasons])], [episodes, newSeasons])
   const isSeries = item?.kind === "series"
   const progress = (x: { id: string }) => d.progress[x.id]
   const pct = (x: { id: string }) => { const q = progress(x); return q ? Math.round((q.pos / q.dur) * 100) : 0 }
@@ -163,6 +167,9 @@ export function useDetail(id: string) {
     markSeen([...eps, ...(isSeries && item ? [item] : [])], false)
     if (src?.type === "plex" || src?.type === "jellyfin") for (const e of eps) if (e.sid) (src.type === "plex" ? plexUnscrobble : jellyfinMarkUnplayed)(src, e)
   }
+  const today = new Date().toISOString().slice(0, 10)
+  /** a `missing` episode's state: "Airs 30 Oct 2026" / "Not aired yet" (no date) / "Not available yet" (aired, the source lacks it) */
+  const missingLabel = (e: Episode) => { const air = epMeta(e)?.air; return !air ? t("hooks.detail.notAired") : air > today ? t("hooks.detail.airs", { date: fmt.date(new Date(`${air}T12:00:00`), { year: "numeric", month: "short", day: "numeric" }) }) : t("hooks.detail.notYet") }
   const epMeta = (e: Episode): EpisodeMeta | undefined => (e.season === season ? seasonMeta?.find((x) => x.num === e.num) : undefined)
   const allWatched = isSeries ? episodes.length > 0 && episodes.every((e) => watched(e.item)) : !!selected && watched(selected)
   const p = selected && progress(selected)
@@ -173,28 +180,28 @@ export function useDetail(id: string) {
     epMeta,
     /** one episode for its details dialog: code ("S1 · E3"), air (long date|""), runtime, rating (TMDB), plot, still, guests / directors / writers, pct, watched, resumeAt, prev / next (across seasons) */
     epInfo: (e: Episode) => {
-      const m = epMeta(e), i = episodes.findIndex((x) => x.id === e.id)
+      const m = epMeta(e), i = listed.findIndex((x) => x.id === e.id)
       return {
         code: t("pages.episode.code", { s: e.season, e: e.num }),
         air: m?.air ? fmt.date(new Date(`${m.air}T12:00:00`), { year: "numeric", month: "long", day: "numeric" }) : "",
         runtime: dur(e.dur) || "", rating: m?.rating, plot: e.item.plot || m?.plot, still: e.item.logo,
         guests: m?.guests ?? [], directors: m?.directors ?? [], writers: m?.writers ?? [],
         pct: pct(e.item), watched: watched(e.item), resumeAt: resumeOf(e.item),
-        prev: i > 0 ? episodes[i - 1] : undefined, next: i >= 0 ? episodes[i + 1] : undefined,
+        prev: i > 0 ? listed[i - 1] : undefined, next: i >= 0 ? listed[i + 1] : undefined,
       }
     },
     /** play an episode (the rest of the list follows in the player queue) */
-    playEp: (e: Episode, fromStart?: boolean) => play(episodes, Math.max(0, episodes.findIndex((x) => x.id === e.id)), fromStart),
-    toggleEpWatched: (e: Episode) => markItems([e.item], !watched(e.item)),
+    playEp: (e: Episode, fromStart?: boolean) => !e.missing && play(episodes, Math.max(0, episodes.findIndex((x) => x.id === e.id)), fromStart),
+    toggleEpWatched: (e: Episode) => !e.missing && markItems([e.item], !watched(e.item)),
     item, selected, title: (matched && meta?.title) || item?.name || "", alternatives, selectSource: (i: Item) => setPickId(i.id), isSeries, meta, loading, error, plot, chips, genres, ratings, poster, backdrop: meta?.backdrop || item?.logo,
     backdrops: [...new Set([meta?.backdrop || item?.logo, ...(meta?.backdrops ?? [])].filter((x): x is string => !!x))].slice(0, 6),
     cast: meta?.cast ?? [], directors: meta?.directors ?? [], castText: text("cast"), crew,
     tagline: meta?.tagline, original: meta?.original, status: meta?.status ? named("status", meta.status) : undefined, next: meta?.next, languages: meta?.languages ?? [], countries: meta?.countries ?? [], studios: meta?.studios ?? [],
     stream: streamInfo(info),
-    episodes, seasons, season, setSeason, shown: episodes.filter((e) => e.season === season),
+    episodes, seasons, season, setSeason, shown: listed.filter((e) => e.season === season), missingLabel,
     progress, pct, watched,
     epDur: dur,
-    epLabel: (e: Episode) => [t("hooks.detail.ep", { n: e.num }), dur(e.dur), watched(e.item) ? t("hooks.detail.watched") : ""].filter(Boolean).join("  ·  "),
+    epLabel: (e: Episode) => [t("hooks.detail.ep", { n: e.num }), dur(e.dur), e.missing ? missingLabel(e) : watched(e.item) ? t("hooks.detail.watched") : ""].filter(Boolean).join("  ·  "),
     resumeIdx, resumeLabel: t(hasProgress ? "hooks.detail.resume" : "hooks.detail.play"), resuming: hasProgress, ratingName: (s: string) => (s === "Rating" ? t("hooks.detail.rating") : s), canPlay: !isSeries || episodes.length > 0, play,
     playMain: (fromStart?: boolean) => (isSeries ? episodes.length && play(episodes, resumeIdx, fromStart) : play(null, 0, fromStart)),
     /** where the main button resumes (seconds; 0 = nothing to resume): the Detail page then offers Resume / Play from beginning */

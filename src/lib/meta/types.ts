@@ -30,6 +30,7 @@ export interface Meta {
   countries?: string[] // ISO 3166-1 codes
   studios?: string[] // production companies (movies) / networks (series)
   next?: { air: string; s: number; e: number } // series: next episode to air
+  seasons?: number[] // series: season numbers the provider has episodes for (specials left out)
   crew?: Person[] // creators, directors, writers, producers, composer, cinematographer (role = job)
 }
 

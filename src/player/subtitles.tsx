@@ -61,7 +61,7 @@ export function Subtitles({ vref, lift }: { vref: RefObject<HTMLVideoElement | n
     <div
       aria-live="off"
       className={`pointer-events-none absolute z-[1] mx-auto flex flex-col gap-[.15em] ${p.subAlign === "start" ? "items-start" : "items-center"}`}
-      style={{ ...look.text, insetInline: `${(100 - p.subWidth) / 2}%`, bottom: `${lift ? Math.max(p.subPos, 22) : p.subPos}%`, transition: "bottom var(--dur, .2s)" }} // above the controls while they are up
+      style={{ ...look.text, insetInline: `${(100 - p.subWidth) / 2}%`, bottom: lift ? `max(${p.subPos}%, calc(var(--pl-dock, 0px) + 1rem))` : `${p.subPos}%`, transition: "bottom var(--dur, .2s)" }} // above the dock while it is up
     >
       {lines.map((h, i) => (
         <div key={i} dir="auto" className="whitespace-pre-line">

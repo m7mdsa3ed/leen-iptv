@@ -33,7 +33,7 @@ export function MetaQueueButton() {
       {(n > 0 || bad > 0) && (
         <button data-nav data-pill aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}
           className={cn("flex shrink-0 items-center gap-1.5 rounded-full bg-surface-2 font-medium tabular-nums text-muted-foreground", tv ? "min-h-11 px-4 text-base" : "min-h-8 px-2.5 text-xs")}>
-          {!n ? <SearchX className={tv ? "size-4" : "size-3.5"} /> : paused ? <Pause className={tv ? "size-4" : "size-3.5"} /> : <RefreshCw className={cn("animate-spin", tv ? "size-4" : "size-3.5")} />}{fmt.number(n || bad)}
+          {!n ? <SearchX className={tv ? "size-4" : "size-3.5"} /> : paused ? <Pause className={tv ? "size-4" : "size-3.5"} /> : <RefreshCw className={cn(!tv && "animate-spin", tv ? "size-4" : "size-3.5")} />}{fmt.number(n || bad)}
         </button>
       )}
       {open && <Panel close={() => setOpen(false)} />}

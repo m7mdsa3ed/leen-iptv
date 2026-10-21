@@ -1,7 +1,7 @@
 // node scripts/meta.check.ts
 import assert from "node:assert/strict"
 import { cleanTitle, norm, tmdbId } from "../src/lib/meta/title.ts"
-import { enrichEpisodes, isGenericEpTitle } from "../src/lib/meta/episodes.ts"
+import { enrichEpisodes, isGenericEpTitle, withMissing } from "../src/lib/meta/episodes.ts"
 import { mapDiscover } from "../src/lib/meta/plex-discover-pure.ts"
 import { omdbKey, resolveKey, shareable, sharedKey, shareBody, validShared } from "../src/lib/meta/shared-pure.ts"
 
@@ -43,6 +43,14 @@ for (const r of ["The Reunion", "Pilot", "عودة الغائب", "Ozymandias (S
   assert.deepEqual([forced[1].title, forced[1].item.logo, forced[1].item.plot], ["The Real Name", "still2.jpg", "tmdb plot 2"])
   assert.equal(enrichEpisodes(eps, 1, metas, "Show", "SERIES", true)[1].title, "TMDB Name")
   assert.equal(forced[2], eps[2])
+  // provider episodes after the panel's last one are listed (not playable); earlier numbers never become phantom rows
+  const show = item("show")
+  const more = [...metas, { num: 3, title: "Soon", air: "2099-01-01", guests: [], directors: [], writers: [] }]
+  const all = withMissing(eps, 1, more, show)
+  assert.deepEqual(all.map((e) => [e.season, e.num, !!e.missing]), [[1, 1, false], [1, 2, false], [1, 3, true], [2, 1, false]])
+  assert.deepEqual([all[2].title, all[2].item.series], ["Soon", "show"])
+  assert.equal(withMissing(eps, 1, metas, show), eps) // nothing after the panel's last = same array
+  assert.equal(withMissing(eps, 3, more, show).filter((e) => e.missing).length, 3) // a season the panel lacks: every provider episode
 }
 // shared (Supabase) cache: what is shared, the key shape the SQL CHECK expects, and distrust of rows read back
 for (const p of ["/movie/550", "/tv/1399", "/tv/1399/season/2"]) assert.ok(shareable(p), p)

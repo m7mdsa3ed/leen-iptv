@@ -27,9 +27,9 @@ export function Flash({ f }: { f: FlashState }) {
   const side = f.kind === "back" ? "left-[16%]" : f.kind === "fwd" ? "right-[16%]" : "left-1/2 -translate-x-1/2"
   return (
     <div key={f.k} aria-hidden className={`pointer-events-none absolute top-1/2 z-[5] -mt-12 ${side}`}>
-      <div dir="ltr" data-ltr className="pl-flash flex min-w-24 flex-col items-center gap-1 rounded-[var(--pl-r)] bg-black/60 px-5 py-4 text-center">
+      <div dir="ltr" data-ltr className="pl-flash pl-osd flex min-w-24 flex-col items-center gap-1 px-5 py-4 text-center">
         <Icon className={`size-9 ${f.kind === "play" || f.kind === "pause" ? "fill-current" : ""}`} />
-        {f.text ? <span className="text-xl font-medium">{f.text}</span> : null}
+        {f.text ? <span className="text-[length:var(--pl-fs-l)] font-medium">{f.text}</span> : null}
       </div>
     </div>
   )
@@ -39,7 +39,7 @@ export function Flash({ f }: { f: FlashState }) {
 export function Spinner({ title, started, label }: { title: string; started: boolean; label: string }) {
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center" role="status" aria-label={label}>
-      <div className="size-16 animate-spin rounded-full border-4 border-white/30 border-t-white" />
+      <div className="pl-spin animate-spin" />
       {!started && <div dir="auto" className="pl-sub max-w-xl truncate">{title}</div>}
     </div>
   )
@@ -47,5 +47,5 @@ export function Spinner({ title, started, label }: { title: string; started: boo
 
 /** Channel number being typed with the remote / keyboard. */
 export const NumberEntry = ({ n }: { n: string }) => (
-  <div dir="ltr" data-ltr className="absolute end-[var(--gx)] top-[max(1rem,var(--safe-t))] z-[6] rounded-[var(--pl-r)] bg-black/60 px-6 py-3 text-3xl sm:text-5xl">{n}</div>
+  <div dir="ltr" data-ltr className="pl-osd pl-num absolute end-[var(--gx)] top-[max(1rem,var(--safe-t))] z-[6] px-6 py-3 text-3xl font-semibold sm:text-5xl">{n}</div>
 )

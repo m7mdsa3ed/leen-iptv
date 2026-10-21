@@ -15,21 +15,15 @@ const active = () => document.activeElement as HTMLElement | null
  *    live  Up/Down or CH+/CH-: zap · Left/Right: channel list · OK or Info: controls · 0-9: channel number
  *  controls up      the D-pad moves between them (scrubber: Left/Right seek); Down from the tab chips opens the panel there; Back hides them
  *  panel / channels the D-pad moves inside; Up from the panel's tabs closes it; Back closes it
- *  always           Back = one layer back (panel, controls, then leave: playback goes on in the mini player) · Play/Pause/Stop/FF/RW · Red favorite · Green / Blue audio & subtitles · Yellow picture size
+ *  always           Back = one layer back (panel, controls, then leave: playback stops) · Play/Pause/Stop/FF/RW · Red favorite · Green / Blue audio & subtitles · Yellow picture size
  *  desktop          Space/K play · arrows seek / volume (live: zap) · F fullscreen · M mute · P picture in picture · C channels · S subtitles · ? shortcuts · Esc
  */
-export function useKeys(p: P & { off: boolean; root: () => HTMLElement | null }) {
+export function useKeys(p: P & { root: () => HTMLElement | null }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (dialogOutside(".pl-root")) return // a PIN prompt, keyboard, trailer... over the player owns the keys
       const k = e.keyCode
       const take = () => { e.preventDefault(); e.stopPropagation() }
-      if (p.off) { // mini player: only the media keys still drive it
-        if (k === KEY.play) return take(), p.play()
-        if (k === KEY.pause) return take(), p.pause()
-        if (k === KEY.stop) return take(), p.stop()
-        return
-      }
 
       /* Back: peel one layer */
       if (k === KEY.back || k === KEY.esc || (k === KEY.bksp && isTv && !typing(e))) {
@@ -39,7 +33,7 @@ export function useKeys(p: P & { off: boolean; root: () => HTMLElement | null })
         else if (p.E.err) p.leave()
         else if (p.nextOn) p.nu.cancel()
         else if (p.chrome && (isTv || k !== KEY.esc)) p.hide()
-        else p.leave() // the page closes; playback goes on in the mini player (host.tsx) unless that is off
+        else p.leave() // the page closes and playback stops (host.tsx)
         return
       }
 

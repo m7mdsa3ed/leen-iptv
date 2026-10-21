@@ -2,7 +2,8 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { Stamp } from "./merge"
+import { lazyStorage } from "@/lib/store"
 
 export const useSyncMeta = create<{ e: Record<string, Stamp>; init: boolean; lastSyncAt: number; uid: string | null }>()(
-  persist(() => ({ e: {} as Record<string, Stamp>, init: false as boolean, lastSyncAt: 0, uid: null as string | null }), { name: "leen-sync-meta", version: 1 }),
+  persist(() => ({ e: {} as Record<string, Stamp>, init: false as boolean, lastSyncAt: 0, uid: null as string | null }), { name: "leen-sync-meta", version: 1, storage: lazyStorage() }),
 )

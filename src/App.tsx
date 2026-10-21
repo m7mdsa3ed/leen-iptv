@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ComponentType } from "react"
+import { memo, Suspense, useEffect, useRef, type ComponentType, type ReactNode } from "react"
 import { Empty, PinModal, usePinAsk, focusFirstSoon } from "@/components/tv/ui"
 import { Boundary } from "@/components/tv/boundary"
 import { useCatalog } from "@/lib/catalog"
@@ -68,7 +68,7 @@ const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-li
   profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, league: LeaguePage, detail: Detail, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage, multi: MultiviewPage,
 }
 
-function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
+const Page = memo(function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
   const over = useLayoutDef().pages
   const p = r.p ?? {}
   switch (r.name) {
@@ -80,6 +80,14 @@ function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {
   if (!C) return null
   // props are the same for default and override
   return <C {...(r.name === "movies" ? { kind: "movie" } : r.name === "series" ? { kind: "series" } : p)} />
+})
+
+/* A stacked page under the top one is frozen: Gate suspends it, so React keeps its DOM, state and effects but renders none of its
+   updates (progress saves, catalog merges, metadata landings) until it is on top again. A page that starts hidden (a refresh on #/detail) first renders when revealed. */
+const never = new Promise<never>(() => {})
+function Gate({ frozen, children }: { frozen: boolean; children: ReactNode }) {
+  if (frozen) throw never
+  return children
 }
 
 export default function App() {
@@ -158,7 +166,7 @@ export default function App() {
     <>
       {stack.map((r, i) => (
         <div key={`${i}:${r.name}`} className={`${SHELL_PAGES.has(r.name) ? "page-enter" : "m-rise"} absolute inset-0`} style={{ display: i === top ? "block" : "none" }} onAnimationEnd={endAnim}>
-          <Boundary><Page r={r} /></Boundary>
+          <Suspense fallback={null}><Gate frozen={i !== top}><Boundary><Page r={r} /></Boundary></Gate></Suspense>
         </div>
       ))}
       <PlayerHost />

@@ -29,7 +29,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
   const [paused, setPaused] = useState(false)
   const [audio, setAudio] = useState<Track[]>([])
   const [subs, setSubs] = useState<Track[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
+  const statsRef = useRef<Stats | null>(null) // a ref, not state: a 2 s re-render of the whole player for numbers only the Info tab shows (it reads them itself)
   const [retryN, setRetryN] = useState(0)
   const [viaHls, setViaHls] = useState("") // URL whose native playback failed: retried through hls.js
   const stream = useRef<Stream | null>(null)
@@ -41,8 +41,6 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
   const stalls = useRef<number[]>([]) // rebuffer times in the last minute
   const aud = useRef<{ codec?: string; ch?: number }>({})
   const meas = useRef({ stallTotal: 0, errTotal: 0, attachAt: 0, startupMs: undefined as number | undefined }) // read by the watch history
-  const statsRef = useRef(stats)
-  statsRef.current = stats
   const cb = useRef(o) // latest callbacks for the engine events
   cb.current = o
 
@@ -64,7 +62,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
     if (!eng) return
     const v = vref.current!
     const g = ++gen.current
-    setErr(""); setBuf(true); setStarted(false); setStats(null)
+    setErr(""); setBuf(true); setStarted(false); statsRef.current = null
     aud.current = {}; stalls.current = []; played.current = false
     meas.current.attachAt = Date.now(); meas.current.startupMs = undefined
     const live_ = () => g === gen.current
@@ -125,7 +123,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
       const bw = bw0 && isFinite(bw0) ? bw0 : undefined
       const pq = v.getVideoPlaybackQuality?.()
       const dropped = pq && pq.totalVideoFrames > 60 ? (pq.droppedVideoFrames / pq.totalVideoFrames) * 100 : 0
-      setStats({ q: rate({ bufAhead: ahead, stalls: stalls.current.length, bw, bitrate: lv?.bitrate }), bw, bitrate: lv?.bitrate, height: lv?.height || v.videoHeight || undefined, buf: ahead, dropped, stalls: stalls.current.length, audio: audioLabel(aud.current) })
+      statsRef.current = ({ q: rate({ bufAhead: ahead, stalls: stalls.current.length, bw, bitrate: lv?.bitrate }), bw, bitrate: lv?.bitrate, height: lv?.height || v.videoHeight || undefined, buf: ahead, dropped, stalls: stalls.current.length, audio: audioLabel(aud.current) })
     }, 2000)
     return () => clearInterval(id)
   }, [vref])
@@ -143,5 +141,5 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
     },
   }
 
-  return { hls, err, buf, started, paused, audio, subs, stats, statsRef, meas, handlers, retry: () => { auto.current = 0; setRetryN((n) => n + 1) } }
+  return { hls, err, buf, started, paused, audio, subs, statsRef, meas, handlers, retry: () => { auto.current = 0; setRetryN((n) => n + 1) } }
 }

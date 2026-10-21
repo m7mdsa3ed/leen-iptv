@@ -337,8 +337,6 @@ const d: Dict = {
   "settings.homeRows.down": "Move down",
   "settings.homeRows.reset": "Reset to default",
   "settings.playback.title": "Playback",
-  "settings.playback.miniPlayer": "Mini player",
-  "settings.playback.miniPlayer.desc": "Keep playing in a small corner window when you leave the player. Off: leaving stops playback.",
   "settings.playback.nextBanner": "Next episode banner",
   "settings.playback.nextBanner.desc": "Show a banner with the next episode, and a countdown, near the end of an episode.",
   "settings.playback.autoNext": "Play next episode automatically",

@@ -4,9 +4,10 @@ import { useApp } from "@/lib/store"
 import { useCatalog } from "@/lib/catalog"
 import type { Item } from "@/lib/types"
 import { DEFAULT_CFG, forceTmdb, PROVIDERS, tmdbSearch } from "./providers"
-import { cleanTitle, matchId, matchKeyOf, norm } from "./title"
+import { cleanTitle, matchId, norm } from "./title"
 import { cached, forget, META_TTL, scheduleCachePrune } from "./cache"
 import type { EpisodeMeta, Ids, Meta, PersonInfo, PersonRef, Provider, ProviderCfg, Query, SimilarRef } from "./types"
+import { matchKeyCached } from "@/lib/merge-pure"
 
 
 /** Saved config merged with the registry: unknown ids dropped, new providers appended (disabled). */
@@ -33,7 +34,7 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[], onFail?: () => voi
     if (!m.backdrops?.length && r.backdrops?.length) m.backdrops = r.backdrops
     if (!m.trailers?.length && r.trailers?.length) m.trailers = r.trailers
     for (const k of ["tagline", "original", "status", "next"] as const) (m as unknown as Record<string, unknown>)[k] ||= r[k]
-    for (const k of ["languages", "countries", "studios", "crew"] as const) if (!m[k]?.length && r[k]?.length) (m[k] as unknown[]) = r[k]!
+    for (const k of ["languages", "countries", "studios", "crew", "seasons"] as const) if (!m[k]?.length && r[k]?.length) (m[k] as unknown[]) = r[k]!
     for (const k of ["genres", "directors", "similar"] as const) if (!m[k].length && r[k]?.length) (m[k] as unknown[]) = r[k]!
     // cast: names-only lists (Xtream, OMDb) give way to a list that has photos
     if (r.cast?.length && (!m.cast.length || (!m.cast.some((c) => c.photo) && r.cast.some((c) => c.photo)))) m.cast = r.cast
@@ -85,7 +86,7 @@ function withBase(m: Meta, b?: Partial<Meta>): Meta {
 }
 
 /** Key of a manual TMDB match (Settings `metaMatch`): what the title IS, so every copy of it shares the match. Uses the source's name, not a matched rename. */
-export const matchKey = (item: Item) => matchKeyOf(item.kind, item.srcName ?? item.name)
+export const matchKey = (item: Item) => matchKeyCached(item.kind, item.srcName ?? item.name) // cached: every Card asks on each render
 
 /**
  * Matches that only hold a TMDB id (made by an older version, imported, or synced from an older device) have no title / poster / backdrop to show,
@@ -134,6 +135,7 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
   const meta = metaState?.key === metaKey ? metaState.value : null
   const online = cfgs.some((c) => c.enabled && c.id !== "xtream" && (c.key || !PROVIDERS.find((p) => p.id === c.id)?.needsKey))
   const sig = sigOf(cfgs)
+  const itemSig = item ? `${item.id}\n${item.srcName ?? item.name}` : "" // a catalog re-merge (posters found in the background) hands out new Item objects for the same title: not a reason to look it up again
 
   useEffect(() => {
     if (!item || !ready || item.kind === "live") return
@@ -160,7 +162,7 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
       if (matched && m.title && typeof cur?.[k] === "string") useApp.getState().setSettings({ metaMatch: { ...cur, [k]: { id: matched, title: m.title, year: m.year, poster: m.poster, backdrop: m.backdrop } } })
     })().finally(() => live && setLoading(false))
     return () => { live = false }
-  }, [item, xtream, ready, sig, base, matched, rev, identity]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [itemSig, xtream, ready, sig, base, matched, rev, identity]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Forget this title's cached provider data (details + its seasons) and load it fresh. A wrong title is fixed with Match metadata, not here. */
   const refresh = async () => {
@@ -183,7 +185,9 @@ export function useSeasonMeta(tmdb: string | undefined, season: number | null, r
     if (!tmdb || season === null || !cfg) return
     let live = true
     const p = PROVIDERS.find((x) => x.id === cfg.id)!
-    cached(`season:${cfg.id}:${tmdb}:${season}:${cfg.lang ?? ""}`, META_TTL, async () => (await p.season!(tmdb, season, cfg)) ?? [], (x) => !x.length)
+    const today = new Date().toISOString().slice(0, 10)
+    // a season still airing (an episode with no date or a future one) is re-checked daily like an empty answer, so new episodes and dates show up
+    cached(`season:${cfg.id}:${tmdb}:${season}:${cfg.lang ?? ""}`, META_TTL, async () => (await p.season!(tmdb, season, cfg)) ?? [], (x) => !x.length || x.some((e) => !e.air || e.air > today))
       .then((r) => live && setEps(r))
       .catch(() => {}) // a season the provider does not have (numbering differs) just leaves the panel's episodes as they are
     return () => { live = false }
@@ -193,11 +197,16 @@ export function useSeasonMeta(tmdb: string | undefined, season: number | null, r
 
 /* ---------- "More like this", only titles that exist in the user's catalog ---------- */
 const idx = new WeakMap<Item[], Map<string, Item[]>>()
+const normed = new Map<string, string>() // ponytail: name -> norm(name), never trimmed (one string per catalog title); a re-merge reuses the names, so rebuilding the index skips cleanTitle
 const index = (items: Item[]) => {
   let m = idx.get(items)
   if (!m) {
     m = new Map()
-    for (const i of items) { const k = norm(i.name); const l = m.get(k); l ? l.push(i) : m.set(k, [i]) }
+    for (const i of items) {
+      let k = normed.get(i.name)
+      if (k === undefined) normed.set(i.name, (k = norm(i.name)))
+      const l = m.get(k); l ? l.push(i) : m.set(k, [i])
+    }
     idx.set(items, m)
   }
   return m

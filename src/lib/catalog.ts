@@ -76,7 +76,7 @@ function scheduleMerge() {
   mergeTimer = window.setTimeout(() => { mergeTimer = undefined; remerge() }, 50)
 }
 // a match picked, reset or synced in: re-apply over the loaded catalog
-useApp.subscribe((s, p) => { if ((s.settings.metaMatch !== p.settings.metaMatch || s.settings.logoMatch !== p.settings.logoMatch || s.settings.metaPosters !== p.settings.metaPosters || s.settings.groupMedia !== p.settings.groupMedia || s.settings.groupLive !== p.settings.groupLive) && raw.size) remerge() })
+useApp.subscribe((s, p) => { if ((s.settings.metaMatch !== p.settings.metaMatch || s.settings.logoMatch !== p.settings.logoMatch || s.settings.metaPosters !== p.settings.metaPosters || s.settings.groupMedia !== p.settings.groupMedia || s.settings.groupLive !== p.settings.groupLive) && raw.size) scheduleMerge() }) // coalesced: a sync or the backfill can set several in a row
 
 /** What the metadata lookups found per title (match key -> poster, title, year, backdrop, genres, plot, rating), kept on this device (IndexedDB) and applied over the source's own data in every list and page.
     Settings > Metadata > Use metadata turns it off. Older saved data is a bare poster url per key. */
@@ -84,10 +84,16 @@ let posters: Record<string, Found | string> = {}
 const POSTERS = "leen-posters"
 void get<Record<string, Found | string>>(POSTERS).then((v) => { if (v) { posters = { ...v, ...posters }; if (raw.size) remerge() } }).catch(() => {})
 export const hasPoster = (key: string) => typeof posters[key] === "object" // a bare poster url (older data) is looked up again for the rest
+/* The queue flushes after every few titles while you browse: a re-merge rebuilds the whole catalog and re-renders every list, and the
+   IndexedDB write clones the whole map. Both wait for a 2 s lull. ponytail: one timer for both, split them if the save ever needs to be sooner */
+let posterTimer: number | undefined
 export function addPosters(add: Record<string, Found>) {
   posters = { ...posters, ...add }
-  void set(POSTERS, posters).catch(() => {})
-  if (raw.size && useApp.getState().settings.metaPosters !== false) remerge()
+  posterTimer ??= window.setTimeout(() => {
+    posterTimer = undefined
+    void set(POSTERS, posters).catch(() => {})
+    if (raw.size && useApp.getState().settings.metaPosters !== false) remerge()
+  }, 2000)
 }
 export const clearPosters = () => { posters = {}; void del(POSTERS).catch(() => {}); if (raw.size) remerge() }
 

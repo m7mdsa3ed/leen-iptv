@@ -327,8 +327,6 @@ const d: Dict = {
   "settings.homeRows.down": "تحت",
   "settings.homeRows.reset": "رجّع الافتراضي",
   "settings.playback.title": "التشغيل",
-  "settings.playback.miniPlayer": "المشغل المصغر",
-  "settings.playback.miniPlayer.desc": "كمّل التشغيل في شباك صغير في الركن لما تخرج من المشغل. لو مقفول: الخروج يوقف التشغيل.",
   "settings.playback.nextBanner": "بانر الحلقة الجاية",
   "settings.playback.nextBanner.desc": "اعرض بانر بالحلقة الجاية وعدّاد قرب نهاية الحلقة.",
   "settings.playback.autoNext": "شغّل الحلقة الجاية تلقائي",

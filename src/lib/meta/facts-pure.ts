@@ -28,6 +28,7 @@ export function tmdbExtras(d: J, tv: boolean, img: string): Partial<Meta> {
     studios: names(tv ? d.networks : d.production_companies, 3),
     next: n?.air_date ? { air: String(n.air_date), s: Number(n.season_number) || 1, e: Number(n.episode_number) || 1 } : undefined,
     crew: [...crew.values()].slice(0, 12),
+    seasons: tv ? ((d.seasons ?? []) as J[]).filter((x) => x.season_number > 0 && x.episode_count > 0).map((x) => Number(x.season_number)) : undefined,
   }
 }
 

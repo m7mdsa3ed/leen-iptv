@@ -123,7 +123,7 @@ export function onlySource(items: Item[], srcIds: string[]): Item[] {
 }
 
 const mkCache = new Map<string, string>() // kind + name -> match key: survives re-merges
-const matchKeyCached = (kind: string, name: string) => {
+export const matchKeyCached = (kind: string, name: string) => {
   const c = kind + "\u0000" + name
   let k = mkCache.get(c)
   if (k === undefined) { if (mkCache.size > 200000) mkCache.clear(); mkCache.set(c, (k = matchKeyOf(kind, name))) }

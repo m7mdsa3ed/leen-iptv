@@ -160,7 +160,5 @@ const d: Dict = {
   "player.sub.subRtlFix": "Fix Arabic punctuation",
   "player.sub.subRtlFix.false": "Off",
   "player.sub.subRtlFix.true": "On",
-  "player.mini.expand": "Open player",
-  "player.mini.close": "Close player",
 }
 export default d

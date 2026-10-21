@@ -79,4 +79,5 @@ export interface Episode {
   title: string
   item: Item
   dur?: string | number // number = seconds (formatted at render); string = raw provider text
+  missing?: boolean // listed by the metadata provider, not on the source yet (not aired, or the panel lacks it): shown with its air date, not playable
 }
