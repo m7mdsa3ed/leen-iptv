@@ -4,6 +4,7 @@ import { ArrowBigUp, ChevronLeft, Clock, ChevronRight, CornerDownLeft, Delete, G
 import { isTv } from "@/lib/device"
 import { useCatalogView } from "@/layouts/hooks/use-source-filter"
 import { fold, useLang, useT } from "@/lib/i18n"
+import { foldedName } from "@/lib/browse-pure"
 import { navHooks } from "@/lib/nav"
 import { useSearchHistory } from "@/lib/search-history"
 import { useApp } from "@/lib/store"
@@ -75,7 +76,7 @@ export function OnScreenKeyboard() {
     if (q.length < 2) return history.slice(0, 6)
     const starts = new Set<string>(), has = new Set<string>()
     for (const i of items) {
-      const n = fold(i.name)
+      const n = foldedName(i)
       if (n.startsWith(q)) { starts.add(i.name); if (starts.size >= 6) break } else if (has.size < 6 && n.includes(q)) has.add(i.name)
     }
     return [...starts, ...has].slice(0, 6)

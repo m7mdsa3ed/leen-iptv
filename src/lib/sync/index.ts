@@ -101,34 +101,42 @@ export function usePlaybackPresence() {
   return presenceStore()
 }
 
-function startPresencePolling() {
-  if (presencePoller) return
-  void pollPresence()
-  presencePoller = window.setInterval(() => void pollPresence(), 15000)
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) void pollPresence() })
+function onPresenceVisible() { if (!document.hidden) void pollPresence() }
+
+function writePresence() {
+  if (!activePresence) return
+  const { item, profileName, status } = activePresence
+  const v = document.querySelector("video")
+  const { cfg, session } = useS.getState()
+  if (!cfgOk(cfg) || !session) return
+  const presence: PlaybackPresence = {
+    device_id: presenceId(), device_name: presenceDeviceName(),
+    profile_name: profileName, item_id: item.id, item_name: item.name,
+    item_kind: item.kind === "series" ? "episode" : item.kind, status,
+    position: v?.currentTime ?? 0, duration: Number.isFinite(v?.duration) ? v!.duration : 0, updated_at: new Date().toISOString(),
+  }
+  presenceWrite = presenceWrite.then(async () => {
+    try {
+      const auth = await sharedAuth()
+      if (auth) await api.presencePut(auth.cfg, auth.session, presence)
+    } catch (e) { presenceStore.setState({ error: explain(e) }) }
+  })
 }
 
-if (typeof window !== "undefined") {
-  window.setInterval(() => {
-    if (activePresence) {
-      const { item, profileName, status } = activePresence
-      const v = document.querySelector("video")
-      const { cfg, session } = useS.getState()
-      if (!cfgOk(cfg) || !session) return
-      const presence: PlaybackPresence = {
-        device_id: presenceId(), device_name: presenceDeviceName(),
-        profile_name: profileName, item_id: item.id, item_name: item.name,
-        item_kind: item.kind === "series" ? "episode" : item.kind, status,
-        position: v?.currentTime ?? 0, duration: Number.isFinite(v?.duration) ? v!.duration : 0, updated_at: new Date().toISOString(),
-      }
-      presenceWrite = presenceWrite.then(async () => {
-        try {
-          const auth = await sharedAuth()
-          if (auth) await api.presencePut(auth.cfg, auth.session, presence)
-        } catch (e) { presenceStore.setState({ error: explain(e) }) }
-      })
-    }
-  }, 20000)
+/** Presence poll (15 s) + playing-position write (20 s): only while sync is configured and signed in. */
+let presenceWriter = 0
+function startPresence() {
+  const { cfg, session } = useS.getState()
+  if (presencePoller || !cfgOk(cfg) || !session) return
+  void pollPresence()
+  presencePoller = window.setInterval(() => void pollPresence(), 15000)
+  presenceWriter = window.setInterval(writePresence, 20000)
+  document.addEventListener("visibilitychange", onPresenceVisible)
+}
+function stopPresence() {
+  clearInterval(presencePoller); clearInterval(presenceWriter)
+  presencePoller = presenceWriter = 0
+  document.removeEventListener("visibilitychange", onPresenceVisible)
 }
 
 const cfgOk = (c: Config) => !!(c.url && c.anonKey)
@@ -141,6 +149,7 @@ function idle() {
   setStatus({ state: !cfgOk(cfg) ? "off" : !session ? "signed-out" : "idle" })
 }
 function dropAccount() {
+  stopPresence()
   key = null; try { localStorage.removeItem(KEYS) } catch { /* ignore */ }
   useS.setState({ hasPass: false })
   useSyncMeta.setState({ e: {}, init: false, lastSyncAt: 0 })
@@ -153,6 +162,7 @@ function setSession(s: Session | null) {
     if (uid) dropAccount() // different account on this device: never carry the old passphrase or stamps over
     useSyncMeta.setState({ uid: s.id, lastSyncAt: 0 })
   }
+  if (s) { startTracking(); startPresence() } else stopPresence()
   idle()
 }
 const slice = (): AppSlice => { const s = useApp.getState(); return { profiles: s.profiles, sources: s.sources, data: s.data, settings: s.settings } }
@@ -319,7 +329,16 @@ export function initSync() {
     if (k && canEncrypt()) void importKey(k).then((x) => { key = x; useS.setState({ hasPass: true }) }).catch(() => localStorage.removeItem(KEYS))
   } catch { /* ignore */ }
   idle()
-  startPresencePolling()
+  if (!cfgOk(useS.getState().cfg)) return // sync off: no stamping, no store subscription, no timers (a later session starts them in setSession)
+  startTracking()
+  startPresence()
+}
+
+/** Stamp local edits and auto-sync on change. Runs once, as soon as sync is configured (signed in or not, as before). */
+let tracking = false
+function startTracking() {
+  if (tracking || !cfgOk(useS.getState().cfg)) return
+  tracking = true
   stampNow()
   useApp.subscribe((st, prev) => {
     if (st.profiles === prev.profiles && st.sources === prev.sources && st.data === prev.data && st.settings === prev.settings) return
@@ -334,7 +353,7 @@ export function initSync() {
 
 // ---- actions ----
 const needCfg = () => { const c = useS.getState().cfg; if (!cfgOk(c)) throw new Error(t("sync.err.noConfig")); return c }
-const signedIn = async (s: Session | null) => { if (!s) throw new Error(t("sync.err.noSession")); setSession(s); void syncNow(); void pollPresence() }
+const signedIn = async (s: Session | null) => { if (!s) throw new Error(t("sync.err.noSession")); setSession(s); void syncNow() } // setSession starts presence (polls at once)
 
 const actions = {
   async signInOtpSend(email: string) { await api.otpSend(needCfg(), email.trim()) },

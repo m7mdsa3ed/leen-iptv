@@ -1,6 +1,7 @@
 // node scripts/browse.check.ts - the extra browse filters
 import assert from "node:assert/strict"
-import { byAdded, byRelease, day, decadesOf, matchMore, watchOf } from "../src/lib/browse-pure.ts"
+import { byAdded, byName, byRelease, day, decadesOf, foldedName, matchMore, sortList, watchOf } from "../src/lib/browse-pure.ts"
+import { fold } from "../src/lib/i18n/pure.ts"
 import type { Item } from "../src/lib/types.ts"
 
 // filters
@@ -29,4 +30,16 @@ assert.deepEqual([m("Dune 2021"), m("EN - Oppenheimer - 2023 4K"), m("Heat 1995"
   assert.deepEqual([a("old", 100), a("none"), a("new", 300)].sort(byAdded).map((i) => i.name), ["new", "old", "none"])
 }
 assert.deepEqual(decadesOf([m("2001: A Space Odyssey"), m("1917"), m("Blade Runner 2049")]), [], "no year in these")
+// cached name fold / sorter, and sort-then-filter = filter-then-sort (the browse hooks rely on it)
+{
+  const l = ["Éclair", "zeta", "Alpha 10", "alpha 2", "Beta", "الأخبار", "beta"].map((n, k) => ({ ...m(n, String(2000 + (k % 3)), String(k % 4)), added: k % 2 ? k : undefined }) as Item)
+  for (const i of l) assert.equal(foldedName(i), fold(i.name))
+  assert.equal(byName("en"), byName("en"), "one sorter per language")
+  assert.equal(sortList(l, "default", "en"), l)
+  for (const sort of ["az", "rating", "year", "added"] as const) for (const q of ["", "a", "eta", "e"]) {
+    const f = fold(q)
+    assert.deepEqual(sortList(l, sort, "en").filter((i) => foldedName(i).includes(f)).map((i) => i.id), sortList(l.filter((i) => foldedName(i).includes(f)), sort, "en").map((i) => i.id), `${sort} ${q}`)
+  }
+  assert.deepEqual(sortList(l, "az", "en").slice(0, 3).map((i) => i.name), ["Alpha 2", "Alpha 10", "Beta"].map((n) => l.find((i) => i.name.toLowerCase() === n.toLowerCase())!.name))
+}
 console.log("browse ok")

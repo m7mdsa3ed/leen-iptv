@@ -2,7 +2,7 @@
 // server has it, detail, HLS URL, progress reporting. The token rides as api_key in the query so GETs stay CORS-simple.
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Source, Watch } from "./types"
-import { HttpError, fetchT, mixed, plexFetch, px, scanLan } from "./net"
+import { HttpError, fetchT, mixed, paged, plexFetch, px, scanLan } from "./net"
 import { t } from "./i18n"
 import { useApp } from "./store"
 import { clientId } from "./plex"
@@ -118,18 +118,16 @@ export async function loadJellyfin(s: Source, px_: string, step: (m: string) => 
   const seen = new Set<string>()
   for (const v of views) {
     step(t("errors.source.loadingItem", { name: v.Name }))
-    for (let start = 0, total = 1; start < total; ) {
+    const o = { sourceId: s.id, group: String(v.Name), img }
+    // each page is mapped as it arrives (between network waits), so its raw JSON can be dropped at once
+    const list = await paged(500, async (start) => {
       const c = await get<{ Items?: J[]; TotalRecordCount?: number }>(s, px_, `/Users/${uid}/Items`, {
         ParentId: v.Id, Recursive: "true", IncludeItemTypes: "Movie,Series", Fields: FIELDS, EnableUserData: "true",
         SortBy: "SortName", StartIndex: start, Limit: 500,
       })
-      const list = c.Items ?? []
-      for (const m of list) if (!seen.has(m.Id)) { seen.add(m.Id); out.push(mapItem(m, { sourceId: s.id, group: String(v.Name), img })) }
-      total = c.TotalRecordCount ?? list.length
-      start += 500
-      if (!list.length) break
-      step(t("errors.source.loadingProgress", { name: v.Name, done: Math.min(start, total), total }))
-    }
+      return { list: (c.Items ?? []).map((m) => mapItem(m, o)), total: c.TotalRecordCount }
+    }, (done, total) => step(t("errors.source.loadingProgress", { name: v.Name, done, total })))
+    for (const i of list) if (!seen.has(i.sid!)) { seen.add(i.sid!); out.push(i) } // a title in two libraries: the first one keeps it (mapItem always sets sid)
   }
   try {
     step(t("errors.source.loadingChannels"))

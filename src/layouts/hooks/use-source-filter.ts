@@ -49,10 +49,13 @@ export function useCatalogView() {
   const byKind = useCatalog((s) => s.byKind)
   const groups = useCatalog((s) => s.groups)
   const filter = useActiveFilter()
-  return useMemo(() => {
-    if (!filter.length) return { items, byKind, groups }
+  // no filter: the store's own arrays (same references, so memos keyed on them hold); a filter only depends on byKind + groups
+  const filtered = useMemo(() => {
+    if (!filter.length) return undefined
     const k = { live: onlySource(byKind.live, filter), movie: onlySource(byKind.movie, filter), series: onlySource(byKind.series, filter) }
     const g = (kind: Kind) => { const s = new Set(k[kind].flatMap(catsOf)); return groups[kind].filter((x) => s.has(x)) }
     return { items: [...k.live, ...k.movie, ...k.series], byKind: k, groups: { live: g("live"), movie: g("movie"), series: g("series") } }
-  }, [filter, items, byKind, groups])
+  }, [filter, byKind, groups])
+  const plain = useMemo(() => ({ items, byKind, groups }), [items, byKind, groups])
+  return filtered ?? plain
 }

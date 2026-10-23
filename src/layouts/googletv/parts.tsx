@@ -1,11 +1,14 @@
 import type { ReactNode } from "react"
 import { ChevronRight } from "lucide-react"
 import { usePData } from "@/lib/store"
+import { useStaged } from "@/components/gtv"
 import { fmt, useT } from "@/lib/i18n"
 import type { Item } from "@/lib/types"
 
 /** Google TV rail: calm 1.4rem title (not the shared 2xl one), optional "see all" chevron. Same .rail scroller as the shared one so focus is never clipped. */
-export const GRail = ({ title, children, onSeeAll }: { title?: ReactNode; children: ReactNode; onSeeAll?: () => void }) => (
+export function GRail({ title, children, onSeeAll }: { title?: ReactNode; children: ReactNode; onSeeAll?: () => void }) {
+  const staged = useStaged(children) // TV: first cards now, the rest a moment later (same as the shared Rail)
+  return (
   <section className="-mx-[var(--gx)] mb-3">
     {title && (
       <div className="px-[var(--gx)]">
@@ -14,9 +17,10 @@ export const GRail = ({ title, children, onSeeAll }: { title?: ReactNode; childr
         ) : <h2 className="text-[1.4rem] font-normal text-foreground">{title}</h2>}
       </div>
     )}
-    <div data-nav-group className="rail rail-in !mx-0">{children}</div>
+    <div data-nav-group className="rail rail-in !mx-0">{staged}</div>
   </section>
-)
+  )
+}
 
 /** "N min left" for unfinished items (Continue watching caption). */
 export function useLeft() {

@@ -46,7 +46,7 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[], onFail?: () => voi
   return m
 }
 
-const sigOf = (cfgs: ProviderCfg[]) => cfgs.filter((c) => c.enabled).map((c) => `${c.id}:${c.key ? 1 : 0}:${c.lang ?? ""}`).join(",")
+const sigOf = (cfgs: ProviderCfg[]) => cfgs.filter((c) => c.enabled).map((c) => `${c.id}:${c.key ? 1 : 0}:${c.lang ?? ""}${c.region ? `:${c.region}` : ""}`).join(",")
 /** Cache key of a title lookup: what the title IS (kind + cleaned name + year), not the item id, so the same movie from another source / profile reuses the entry. A panel-provided id (`xid`) tells remakes apart. */
 const lookupKey = (kind: string, ct: { title: string; year?: string }, xid: string, matched: string | undefined, sig: string) => `meta5:${kind}:${norm(ct.title)}:${ct.year ?? ""}:${xid}:${matched ?? ""}:${sig}`
 /** no provider knew the title (a lookup that found it has a plot or a cast) */

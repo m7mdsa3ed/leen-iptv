@@ -2,6 +2,7 @@ import { useDeferredValue, useMemo } from "react"
 import { create } from "zustand"
 import { useOpen } from "@/components/tv/ui"
 import { fold } from "@/lib/i18n"
+import { foldedName } from "@/lib/browse-pure"
 import { useSearchHistory } from "@/lib/search-history"
 import type { Item } from "@/lib/types"
 import { useCatalogView } from "./use-source-filter"
@@ -21,7 +22,7 @@ export function useSearch() {
   const open = useOpen()
   const q = useQ((s) => s.q)
   const query = fold(useDeferredValue(q).trim())
-  const results = useMemo(() => (query.length < 2 ? [] : items.filter((i) => fold(i.name).includes(query) || (!!i.srcName && fold(i.srcName).includes(query))).slice(0, 300)), [query, items])
+  const results = useMemo(() => (query.length < 2 ? [] : items.filter((i) => foldedName(i).includes(query) || (!!i.srcName && fold(i.srcName).includes(query))).slice(0, 300)), [query, items])
   const live = useMemo(() => results.filter((i) => i.kind === "live"), [results])
   const movies = useMemo(() => results.filter((i) => i.kind === "movie"), [results])
   const series = useMemo(() => results.filter((i) => i.kind === "series"), [results])

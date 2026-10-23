@@ -6,16 +6,28 @@ import App from './App.tsx'
 import { probeProxy } from './lib/net'
 import { initSync } from './lib/sync'
 import { registerPwa } from './lib/pwa'
+import { isTv } from './lib/device'
 
-// Animated boot splash (markup + CSS live in index.html). Cold start plays the intro for ~2.6s; a refresh in the same session skips it.
+declare global {
+  /** the persisted `iptv-app` store, parsed once by the pre-paint script in index.html (null when absent or unreadable) */
+  interface Window { __leenBoot?: { state?: { settings?: { motion?: string } } } | null }
+}
+
+// Animated boot splash (markup + CSS live in index.html). Cold start plays the intro for ~2.6s (0.9s with reduced motion, the TV default); a refresh in the same session skips it.
 const splash = document.getElementById('splash')
 const t0 = performance.now()
-let motionOff = false
-try { motionOff = JSON.parse(localStorage.getItem('iptv-app') || '{}').state?.settings?.motion === 'off' } catch { /* default */ }
+let motion: string | undefined
+try {
+  const boot = window.__leenBoot !== undefined ? window.__leenBoot : JSON.parse(localStorage.getItem('iptv-app') || '{}')
+  motion = boot?.state?.settings?.motion
+} catch { /* default */ }
+motion ??= isTv ? 'reduced' : 'full' // the store default (src/lib/store.ts)
+const motionOff = motion === 'off'
+const reduced = motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches
 const seen = sessionStorage.getItem('leen-splash') === '1'
 if (motionOff) splash?.classList.add('static')
 sessionStorage.setItem('leen-splash', '1')
-const hold = seen ? 0 : motionOff ? 400 : 2600
+const hold = seen ? 0 : motionOff ? 400 : reduced ? 900 : 2600
 
 // know whether a same-origin /p proxy exists before the first fetch
 void probeProxy().finally(() => {

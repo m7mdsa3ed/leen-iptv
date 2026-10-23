@@ -21,7 +21,9 @@ const movie = mapMeta(
   { ratingKey: "42", type: "movie", title: "Heat", year: 1995, originallyAvailableAt: "1995-12-15", addedAt: 1700000000, summary: "s", rating: 8.25, thumb: "/t", art: "/a", viewOffset: 61000, duration: 7200000, Genre: [{ tag: "Crime" }], Media: [{ Part: [{ container: "mkv" }] }] },
   { sourceId: "s1", group: "Movies", img },
 )
-assert.deepEqual(movie, { id: "s1|movie|42", kind: "movie", sid: "42", name: "Heat", group: "Movies", logo: "IMG300x450/t", backdrop: "IMG1280x720/a", plot: "s", rating: "8.3", year: "1995", released: "1995-12-15", added: 1700000000, genres: ["Crime"], resume: 61, dur: 7200, ext: "mkv", part: undefined, codecs: undefined })
+assert.deepEqual(movie, { id: "s1|movie|42", kind: "movie", sid: "42", name: "Heat", group: "Movies", logo: "IMG300x450/t", backdrop: "IMG1280x720/a", plot: "s", rating: "8.3", year: "1995", released: "1995-12-15", added: 1700000000, genres: ["Crime"], resume: 61, dur: 7200, ext: "mkv" })
+// a sparse title carries no undefined keys (memory + merge time on big libraries)
+assert.deepEqual(Object.keys(mapMeta({ ratingKey: "12", type: "movie", title: "Bare" }, { sourceId: "s1", group: "Movies", img })).sort(), ["genres", "group", "id", "kind", "name", "sid"])
 assert.equal(mapMeta({ ratingKey: "7", type: "show", title: "X" }, { sourceId: "s1", group: "TV", img }).kind, "series")
 assert.equal(mapMeta({ ratingKey: "8", type: "movie", title: "Dune", editionTitle: "IMAX" }, { sourceId: "s1", group: "Movies", img }).imax, true)
 assert.equal(mapMeta({ ratingKey: "9", type: "movie", title: "Dune", Label: [{ tag: "IMAX Enhanced" }] }, { sourceId: "s1", group: "Movies", img }).imax, true)

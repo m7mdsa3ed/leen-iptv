@@ -237,6 +237,7 @@ const d: Dict = {
 
   "diag.svc.tmdb": "مفتاح TMDB",
   "diag.svc.omdb": "مفتاح OMDb",
+  "diag.svc.watchmode": "مفتاح Watchmode",
   "diag.svc.sbReach": "الوصول لسيرفر المزامنة",
   "diag.svc.sbSession": "جلسة سيرفر المزامنة",
   "diag.svc.sbLast": "آخر مزامنة",

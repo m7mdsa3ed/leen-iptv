@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual"
 import { create } from "zustand"
 import { History, List, ListPlus, Lock, Star } from "lucide-react"
@@ -15,6 +15,7 @@ import { useCatalog } from "@/lib/catalog"
 import { fmt, useT, type TFn } from "@/lib/i18n"
 import type { Item } from "@/lib/types"
 import { tileName } from "@/lib/logos-pure"
+import { useBadges } from "@/lib/sources"
 
 /* ---------- PIN gate ---------- */
 export const usePinAsk = create<{ ask: null | { pin: string; resolve: (ok: boolean) => void } }>(() => ({ ask: null }))
@@ -87,10 +88,10 @@ export function useCatSide() {
 /** Title count at the end of a category pill; CSS shows it only in the sidebar (.cat-count). */
 export const CatCount = ({ n }: { n?: number }) => (n == null ? null : <span className="cat-count ms-auto shrink-0 ps-2 text-sm tabular-nums text-muted-foreground">{fmt.number(n)}</span>)
 
-export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLists, count }: { count?: (g: string) => number | undefined; cat?: boolean; items: string[]; active: string; onPick: (g: string) => void; locked?: (g: string) => boolean; onKey?: (e: React.KeyboardEvent, g: string) => void; onCtx?: (e: React.MouseEvent, g: string) => void; liveLists?: boolean }) {
+export const Chips = memo(function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLists, count }: { count?: (g: string) => number | undefined; cat?: boolean; items: string[]; active: string; onPick: (g: string) => void; locked?: (g: string) => boolean; onKey?: (e: React.KeyboardEvent, g: string) => void; onCtx?: (e: React.MouseEvent, g: string) => void; liveLists?: boolean }) {
   const t = useT()
   const lists = useLists()
-  const isList = (g: string) => lists.some((l) => l.name === g)
+  const listNames = useMemo(() => new Set(lists.map((l) => l.name)), [lists])
   const ref = useCatSide()
   const mode = useMode()
   const side = useApp((s) => s.settings.catNav === "sidebar") && mode !== "mobile" // the category list as a fixed sidebar (Settings > Display): beside the page, not a row in it
@@ -109,7 +110,7 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLi
         >
           {g === "Continue watching" && <History className="size-4" />}
           {g === "Favorites" && <Star className="size-4" />}
-          {isList(g) && <List className="size-4" />}
+          {listNames.has(g) && <List className="size-4" />}
           {locked?.(g) && <Lock className="size-4" />}
           <bdi>{groupLabel(g, t)}</bdi>
           {count && <CatCount n={count(g)} />}
@@ -123,7 +124,7 @@ export function Chips({ items, active, onPick, locked, onKey, onCtx, cat, liveLi
     </div>
   )
   return cat ? <div ref={ref} data-nav-aside={side ? "" : undefined} className="cat-side">{row}</div> : row
-}
+})
 
 /** TMDB posters at tile size: panels often link the `original` (about 2000x3000) and metadata uses w500; a TV decodes every one of them on its slow CPU. */
 const tileSize = (u?: string) => u?.replace(/\/t\/p\/(original|w500)\//, "/t/p/w342/")
@@ -168,9 +169,21 @@ function NameTile({ item, className }: { item: Item; className?: string }) {
   )
 }
 
-export const Poster = ({ item, pct, onOpen, onFocus }: { item: Item; pct?: number; onOpen: () => void; onFocus?: () => void }) => (
+export const Poster = ({ item, pct, onOpen, onFocus }: { item: Item; pct?: number; onOpen: (i: Item) => void; onFocus?: () => void }) => (
   <Card fluid item={item} pct={pct} onOpen={onOpen} onFocus={onFocus} />
 )
+
+/** Card flags computed once per page (one Set each) and passed to every Card, so tiles skip their own store selectors. */
+export function useCardFlags() {
+  const favs = useApp((s) => (s.profileId && s.data[s.profileId]?.favs) || NO_IDS)
+  const p = useProfile()
+  const badge = useBadges()
+  return useMemo(() => {
+    const f = new Set(favs), l = new Set(p?.pin ? p.locked : NO_IDS)
+    return { badge, fav: (i: Item) => f.has(i.id), locked: (i: Item) => l.has(`${i.kind}|${i.group}`) }
+  }, [favs, p, badge])
+}
+const NO_IDS: string[] = []
 
 export function useLocked(item: Item) {
   const p = useProfile()
@@ -232,7 +245,7 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
     ro.observe(el)
     return () => ro.disconnect()
   }, [!!head]) // eslint-disable-line react-hooks/exhaustive-deps
-  const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3, scrollMargin: hh, observeElementRect: keepSize, useFlushSync: false })
+  const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: isTv ? 1 : 3, scrollMargin: hh, observeElementRect: keepSize, useFlushSync: false })
   useEffect(() => v.measure(), [rowH, v])
   return (
     <div ref={ref} data-vscroll className={cn("under-bottom -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4", className)}>
@@ -301,7 +314,8 @@ export const focusFirstSoon = () => { requestAnimationFrame(() => requestAnimati
 
 /** Catalog not ready: show progress, or the reason it failed with a retry. */
 export function Pending({ shape = "rails" }: { shape?: "rails" | "grid" }) {
-  const { status, msg } = useCatalog()
+  const status = useCatalog((s) => s.status)
+  const msg = useCatalog((s) => s.msg)
   const t = useT()
   if (status !== "error")
     return (

@@ -22,10 +22,16 @@ export const sourceOf = (item: { id: string }): Source | undefined => {
   const id = srcOfId(item.id)
   return useApp.getState().sources.find((s) => s.id === id)
 }
+/** id -> SourceMeta, rebuilt once per `sources` array (not per tile): every badge reads the same object. */
+let metaOf: Source[] | null = null
+let metaMap = new Map<string, SourceMeta>()
+const metaMapFor = (sources: Source[]) => {
+  if (sources !== metaOf) { metaOf = sources; metaMap = new Map(sources.map((s) => [s.id, withMeta(s)])) }
+  return metaMap
+}
 export const useSourceOf = (item?: { id: string }): SourceMeta | undefined => {
-  const sources = useApp((s) => s.sources)
   const id = item && srcOfId(item.id)
-  return useMemo(() => { const s = sources.find((x) => x.id === id); return s && withMeta(s) }, [sources, id])
+  return useApp((s) => (id === undefined ? undefined : metaMapFor(s.sources).get(id)))
 }
 
 /** Enabled sources (priority order) with resolved color/label. */
@@ -38,8 +44,11 @@ export function useSources(): SourceMeta[] {
 export const onColor = (hex: string) => { const n = parseInt(hex.slice(1, 7), 16) || 0; return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150 ? "#111111" : "#ffffff" }
 
 /** Badges show with more than one connected source (enabled, loading or loaded; one that failed to load does not count) and settings.sourceBadges on. Two primitive selectors, cheap per tile. */
-export const useBadges = () => {
-  const on = useApp((s) => s.settings.sourceBadges !== false)
-  const connected = useCatalog((c) => Object.values(c.sources).filter((x) => x.status !== "error").length) // catalog.sources only holds enabled sources (loadAll drops the rest)
-  return on && connected > 1
+export const useBadges = () => useBadgesOr()
+
+/** useBadges, unless the page already computed it (`given`): then no per-tile work at all. */
+export const useBadgesOr = (given?: boolean) => {
+  const on = useApp((s) => given === undefined && s.settings.sourceBadges !== false)
+  const many = useCatalog((c) => { if (given !== undefined) return false; let n = 0; for (const id in c.sources) if (c.sources[id].status !== "error" && ++n > 1) return true; return false }) // catalog.sources only holds enabled sources (loadAll drops the rest)
+  return given ?? (on && many)
 }

@@ -68,9 +68,10 @@ export function wantMeta(item: Item) {
   const src = st.sources.find((s) => s.id === (item.srcId ?? item.id.split("|")[0]))
   if (src?.type === "plex" || src?.type === "jellyfin") return
   todo.set(k, item)
-  bump()
+  if (!bumpQueued) { bumpQueued = true; queueMicrotask(() => { bumpQueued = false; bump() }) } // 300 cards mounting = one store update
   void run()
 }
+let bumpQueued = false
 
 async function run() {
   if (running) return
@@ -87,15 +88,17 @@ async function run() {
       now = batch.map(([, i]) => i)
       bump()
       let failed = 0
+      const empty: Record<string, string> = {}
       await Promise.all(batch.map(async ([k, item]) => {
         try {
           const m = await titleMeta(item, cfgs)
-          if (isEmptyMeta(m)) { setUnmatched({ ...unmatched(), [k]: item.id }); return } // nothing found: kept for a manual match, not retried
+          if (isEmptyMeta(m)) { empty[k] = item.id; return } // nothing found: kept for a manual match, not retried
           if (m.poster || m.backdrop || m.title) found[k] = foundOf(m)
           recent = [{ item, poster: m.poster }, ...recent].slice(0, 30)
         }
         catch { failed++; todo.set(k, item) } // rate limited / offline: back in line (titleMeta does not cache a failure)
       }))
+      if (Object.keys(empty).length) setUnmatched({ ...unmatched(), ...empty }) // one settings write per batch
       now = []
       bump()
       if (Object.keys(found).length >= 15) flush()

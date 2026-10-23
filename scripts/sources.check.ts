@@ -1,7 +1,8 @@
 // node scripts/sources.check.ts
 import assert from "node:assert/strict"
-import { applyMatches, catsOf, dedupeKey, groupKey, liveKey, mergeSources, versionTags, onlySource, srcOfId } from "../src/lib/merge-pure.ts"
-import { matchKeyOf } from "../src/lib/meta/title.ts"
+import { applyMatches, buildMatchIndex, catsOf, dedupeKey, groupKey, liveKey, mergeSources, mergeSourcesAsync, versionTags, onlySource, srcOfId, type GroupOpts, type Merged } from "../src/lib/merge-pure.ts"
+import { cleanTitle, matchKeyOf } from "../src/lib/meta/title.ts"
+import type { Kind } from "../src/lib/types.ts"
 import { byAdded } from "../src/lib/browse-pure.ts"
 import type { Item } from "../src/lib/types.ts"
 
@@ -113,4 +114,103 @@ assert.deepEqual(versionTags(it("a", "movie", "1", "|AR| Dune (2021) 4K HEVC Dub
 assert.deepEqual(versionTags(it("a", "movie", "1", "EN - Dune 1080p HDR", "g")), ["EN", "1080p", "HDR"])
 assert.deepEqual(versionTags(it("a", "movie", "1", "The Dune", "g")), [], "a title word is not a language prefix")
 assert.deepEqual(versionTags({ ...it("a", "movie", "1", "Dune", "g"), codecs: "hevc,eac3" }), ["HEVC"], "Plex codecs")
+
+// the indexed candidate lookup = the old linear scan (kept here as the reference): same items, alts, cats, byId, primaryOf
+function oldMerge(parts: { id: string; items: Item[]; self?: boolean }[], opts: GroupOpts = {}): Merged {
+  const yearOfItem = (i: Item) => i.year?.match(/\d{4}/)?.[0] ?? cleanTitle(i.name).year
+  const media = opts.media !== false
+  const items: Item[] = [], byId = new Map<string, Item>(), primaryOf = new Map<string, Item>()
+  const names: Record<Kind, Map<string, string>> = { live: new Map(), movie: new Map(), series: new Map() }
+  const seen = new Map<string, number[]>(), years = new Map<number, Set<string>>()
+  const yearsAt = (n: number) => { let y = years.get(n); if (!y) { y = new Set(); const v = yearOfItem(items[n]); if (v) y.add(v); years.set(n, y) } return y }
+  for (const part of parts) for (const raw of part.items) {
+    const gk = groupKey(raw.group)
+    const g = names[raw.kind].get(gk) ?? (names[raw.kind].set(gk, raw.group), raw.group)
+    const it = g === raw.group ? raw : { ...raw, group: g, origGroup: raw.group }
+    byId.set(it.id, it)
+    const k = raw.kind === "live" ? (opts.live ? liveKey(raw) : null) : media ? dedupeKey(raw) : null
+    const candidates = k === null ? undefined : seen.get(k)
+    const at = candidates?.find((index) => {
+      if (it.kind === "live") return true
+      if (srcOfId(items[index].id) === part.id && !part.self) return false
+      const known = yearsAt(index), year = yearOfItem(raw)
+      return !year || !known.size || known.has(year)
+    })
+    const p = at === undefined ? undefined : items[at]
+    if (p) {
+      const np = p.alts ? p : { ...p, alts: [] as Item[] }
+      np.alts!.push(it)
+      if (it.kind !== "live") { const y = yearOfItem(raw); if (y) yearsAt(at!).add(y) }
+      if (it.kind !== "live" && srcOfId(np.id) === part.id && !catsOf(np).includes(it.group)) np.cats = [...catsOf(np), it.group]
+      if (np !== p) { items[at!] = np; byId.set(np.id, np) }
+      primaryOf.set(it.id, np)
+      continue
+    }
+    if (k !== null) { if (candidates) candidates.push(items.length); else seen.set(k, [items.length]) }
+    items.push(it)
+  }
+  const byKind: Record<Kind, Item[]> = { live: [], movie: [], series: [] }
+  const gs: Record<Kind, Set<string>> = { live: new Set(), movie: new Set(), series: new Set() }
+  for (const i of items) { byKind[i.kind].push(i); for (const c of catsOf(i)) gs[i.kind].add(c) }
+  return { items, byId, primaryOf, byKind, groups: { live: [...gs.live], movie: [...gs.movie], series: [...gs.series] } }
+}
+const shape = (m: Merged) => ({
+  items: m.items.map((i) => [i.id, i.group, (i.alts ?? []).map((a) => a.id), i.cats ?? null]),
+  byId: [...m.byId].map(([k, v]) => [k, v.id, (v.alts ?? []).map((a) => a.id), v.cats ?? null]),
+  primaryOf: [...m.primaryOf].map(([k, v]) => [k, v.id]),
+  byKind: (["live", "movie", "series"] as const).map((k) => m.byKind[k].map((i) => i.id)),
+  groups: m.groups,
+})
+{
+  let seed = 1
+  const rnd = (n: number) => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) % n)
+  for (let round = 0; round < 300; round++) {
+    const srcs = ["a", "b", "c"].slice(0, 1 + rnd(3))
+    const parts = srcs.map((id) => ({ id, self: !!rnd(2), items: Array.from({ length: 5 + rnd(40) }, (_, n): Item => {
+      const kind = (["movie", "series", "live", "movie"] as const)[rnd(4)]
+      const y = ["", "", " (2001)", " (2002)", " (2003)"][rnd(5)]
+      const name = kind === "live" ? ["BBC One HD", "BBC One FHD", "UK| BBC One", "CNN", "CNN (Backup)"][rnd(5)] : ["Dune", "The Dune", "Heat", "AR - Heat"][rnd(4)] + y
+      return { id: `${id}|${kind}|${n}`, kind, name, group: ["Action", "action", "Drama", "4K"][rnd(4)], year: rnd(4) ? undefined : ["2001", "2002", "2003"][rnd(3)] }
+    }) }))
+    const opts = { media: !!rnd(6), live: !!rnd(2) }
+    assert.deepEqual(shape(mergeSources(parts, opts)), shape(oldMerge(parts, opts)), `random merge ${round}`)
+    if (round % 30 === 0) assert.deepEqual(shape(await mergeSourcesAsync(parts, opts, 7)), shape(oldMerge(parts, opts)), `sliced merge ${round}`)
+  }
+  // abandoned slices: an aborted merge rejects instead of finishing
+  const abort = { aborted: true }
+  await assert.rejects(mergeSourcesAsync([{ id: "a", items: A }], {}, 1, abort), { name: "AbortError" })
+}
+// re-apply only changed keys: same result as the full apply, untouched kinds keep their arrays, nothing changed = same object
+{
+  const parts = [
+    { id: "a", self: true, items: [it("a", "movie", "1", "Dune (2021)", "g"), it("a", "movie", "2", "Heat (1995)", "g"), it("a", "series", "3", "Lost (2004)", "s"), it("a", "live", "4", "CNN", "n")] },
+    { id: "b", items: [it("b", "movie", "9", "AR - Dune (2021) 4K", "x")] },
+  ]
+  const base = mergeSources(parts)
+  const pristine = base.items.slice()
+  const ix = buildMatchIndex(base)
+  const kd = matchKeyOf("movie", "Dune (2021)"), kh = matchKeyOf("movie", "Heat (1995)")
+  assert.deepEqual(ix.get(kd), [0])
+  assert.deepEqual(ix.get(matchKeyOf("movie", "AR - Dune (2021) 4K")), [0], "an alt's key points at its primary")
+  const f1 = { [kd]: { poster: "https://p/d.jpg" } }
+  const full1 = applyMatches(base, undefined, f1)
+  const part1 = applyMatches(base, undefined, f1, { changed: [kd], index: ix })
+  assert.deepEqual(shape(part1), shape(full1))
+  assert.equal(part1.byId.get("b|movie|9")!.logo, "https://p/d.jpg")
+  assert.equal(part1.byKind.series, base.byKind.series, "no changed series: same array")
+  assert.equal(part1.byKind.live, base.byKind.live)
+  assert.equal(base.items[0], pristine[0], "not owned: base untouched")
+  const f2 = { ...f1, [kh]: { title: "Heat!" } }
+  const part2 = applyMatches(part1, undefined, f2, { changed: [kh], index: ix, from: pristine })
+  assert.deepEqual(part2.items.map((i) => [i.name, i.logo]), applyMatches(base, undefined, f2).items.map((i) => [i.name, i.logo]))
+  assert.equal(applyMatches(part2, undefined, f2, { changed: ["movie:nothing:"], index: ix, from: pristine }), part2, "nothing changed: same object")
+  // a removed match restores the source's own item
+  const part3 = applyMatches(part2, undefined, f1, { changed: [kh], index: ix, from: pristine })
+  assert.equal(part3.byId.get("a|movie|2"), pristine[1])
+  // owned: written in place, same result as the copying apply
+  const own = mergeSources(parts)
+  const r = applyMatches(own, undefined, f2, { owned: true })
+  assert.equal(r.items, own.items)
+  assert.deepEqual(shape(r), shape(applyMatches(base, undefined, f2)))
+}
 console.log("sources.check ok")

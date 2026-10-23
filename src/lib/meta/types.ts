@@ -3,6 +3,9 @@ export interface Rating { source: string; value: string; votes?: string }
 export interface SimilarRef { title: string; year?: string; alt?: string } // alt = original-language title
 export interface Trailer { key: string; name: string; site: "YouTube"; official?: boolean; type: string }
 export interface Ids { tmdb?: string; imdb?: string }
+/** Where a title can be watched (Watchmode). Region-specific and short-lived, so it never rides inside `Meta` (cached 30 days): see meta/watchmode.ts. */
+export type AvailKind = "sub" | "free" | "purchase" | "tve"
+export interface Avail { source: string; kind: AvailKind; price?: string; web?: string }
 
 /** Normalized info about a movie/series, whatever provider it came from. */
 export interface Meta {
@@ -64,7 +67,7 @@ export interface PersonInfo {
 }
 
 /** One entry of Settings > Metadata, in priority order. */
-export interface ProviderCfg { id: string; enabled: boolean; key?: string; lang?: string }
+export interface ProviderCfg { id: string; enabled: boolean; key?: string; lang?: string; region?: string }
 
 /** A metadata source. Return only the fields you know; earlier providers win per field. */
 export interface Provider {
@@ -72,6 +75,7 @@ export interface Provider {
   name: string
   needsKey: boolean
   hasLang?: boolean
+  hasRegion?: boolean // Settings > Metadata shows a country field (ISO 3166-1 alpha-2) for this provider
   fetch(q: Query, cfg: ProviderCfg): Promise<Partial<Meta> | null>
   /** Optional: genre names for "movie" / "series" (powers the genre pills). */
   genres?(kind: "movie" | "series", cfg: ProviderCfg): Promise<string[] | null>

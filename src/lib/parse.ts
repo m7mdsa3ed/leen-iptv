@@ -16,12 +16,10 @@ export function parseM3U(text: string, sid: string): Item[] {
     if (l.startsWith("#EXTINF")) {
       const q = l.lastIndexOf('"')
       const name = l.slice(l.indexOf(",", q > 0 ? q : 0) + 1).trim()
-      cur = {
-        name: name || l.match(A_NAME)?.[1] || "Unnamed",
-        logo: l.match(A_LOGO)?.[1] || undefined,
-        group: l.match(A_GROUP)?.[1] || "Uncategorized",
-        epgId: l.match(A_ID)?.[1] || undefined,
-      }
+      cur = { name: name || l.match(A_NAME)?.[1] || "Unnamed", group: l.match(A_GROUP)?.[1] || "Uncategorized" }
+      const logo = l.match(A_LOGO)?.[1], epgId = l.match(A_ID)?.[1]
+      if (logo) cur.logo = logo // only fields the line has: no undefined keys on every item
+      if (epgId) cur.epgId = epgId
     } else if (cur && !l.startsWith("#")) {
       const kind = /\/movie\//i.test(l) || VOD_EXT.test(l) ? "movie" : "live"
       out.push({ ...cur, id: `${sid}|${kind}|${n++}`, kind, url: l, num: n } as Item)

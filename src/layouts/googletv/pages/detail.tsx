@@ -15,6 +15,7 @@ import { useDetail, type DetailRating } from "@/layouts/hooks/use-detail"
 import type { Episode } from "@/lib/types"
 import type { Person, Trailer } from "@/lib/meta/types"
 import { Awards, TitleArt } from "@/components/tv/title-art"
+import { WhereToWatch } from "@/components/tv/where-to-watch"
 import { SourceBadge, SourceChooser } from "../source-ui"
 
 type D = ReturnType<typeof useDetail>
@@ -187,7 +188,10 @@ export default function Detail({ id }: { id: string }) {
                   <Awards text={D.awards} className="mt-4" />
                   {D.next && <p className="mt-4 text-base text-foreground/80">{t("gtv.detail.next", { code: t("pages.episode.code", { s: D.next.s, e: D.next.e }), date: fmt.date(new Date(`${D.next.air}T12:00:00`), DAY) })}</p>}
                 </div>
-                <Rows rows={rows} className="content-start rounded-3xl bg-surface/70 p-5" />
+                <div className="min-w-0 content-start">
+                  <Rows rows={rows} className="rounded-3xl bg-surface/70 p-5" />
+                  <WhereToWatch avail={D.avail} className="mt-6" />
+                </div>
               </div>
             )}
 

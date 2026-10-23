@@ -1,6 +1,6 @@
 // node scripts/engine.check.ts - player engine decisions (src/player/engine-pure.ts)
 import assert from "node:assert/strict"
-import { hlsAction, isHlsUrl, mpegtsAction, nativeAction, pickEngine } from "../src/player/engine-pure.ts"
+import { engineToLoad, hlsAction, isHlsUrl, mpegtsAction, nativeAction, pickEngine } from "../src/player/engine-pure.ts"
 
 // engine choice: playlists -> hls.js, live TS -> mpegts.js, files -> native; a failed native URL retried through hls.js
 assert.equal(isHlsUrl("http://x/live/a/b/1.m3u8"), true)
@@ -12,6 +12,25 @@ assert.equal(pickEngine({ raw: "http://x/1.ts", live: true, viaHls: false, ...ha
 assert.equal(pickEngine({ raw: "http://x/1.mp4", live: false, viaHls: false, ...has }), "native")
 assert.equal(pickEngine({ raw: "http://x/1.mp4", live: false, viaHls: true, ...has }), "hls")
 assert.equal(pickEngine({ raw: "http://x/1.m3u8", live: false, viaHls: false, hls: false, mpegts: true }), "native") // Safari-like: native HLS
+
+// only the script the pick needs is loaded; the choice is the same as with both loaded
+const hlsLive = { raw: "http://x/1.m3u8", live: true, viaHls: false }, tsLive = { raw: "http://x/1.ts", live: true, viaHls: false }, mp4 = { raw: "http://x/1.mp4", live: false, viaHls: false }
+assert.equal(engineToLoad(hlsLive, {}), "hls")
+assert.equal(engineToLoad(tsLive, {}), "mpegts")
+assert.equal(engineToLoad(mp4, {}), null) // native VOD loads nothing
+assert.equal(engineToLoad({ ...mp4, viaHls: true }, {}), "hls") // native failed: hls.js loaded lazily
+assert.equal(engineToLoad(hlsLive, { hls: true }), null)
+assert.equal(engineToLoad(hlsLive, { hls: false }), "mpegts") // hls.js unsupported: live falls to mpegts.js, as before
+assert.equal(engineToLoad(hlsLive, { hls: false, mpegts: true }), null)
+assert.equal(engineToLoad(tsLive, { hls: true }), "mpegts")
+assert.equal(engineToLoad(tsLive, { mpegts: false }), null) // -> native
+for (const o of [hlsLive, tsLive, mp4, { ...mp4, viaHls: true }]) for (const h of [true, false]) for (const m of [true, false]) {
+  const both = pickEngine({ ...o, hls: h, mpegts: m })
+  // load step by step, then pick with what is loaded (a missing script = unsupported, as engine.ts does)
+  const has: { hls?: boolean; mpegts?: boolean } = {}
+  for (let k = engineToLoad(o, has); k; k = engineToLoad(o, has)) has[k] = k === "hls" ? h : m
+  assert.equal(pickEngine({ ...o, hls: !!has.hls, mpegts: !!has.mpegts }), both)
+}
 
 // hls.js: direct manifest unreachable -> proxy once; network/media errors recover 3 times; 4xx fails at once
 const net = { type: "network" as const }

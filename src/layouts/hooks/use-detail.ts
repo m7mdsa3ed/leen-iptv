@@ -4,6 +4,7 @@ import { fmt, useT } from "@/lib/i18n"
 import { normalizeCfg, useMeta, useSeasonMeta, useSimilar } from "@/lib/meta"
 import { enrichEpisodes, withMissing } from "@/lib/meta/episodes"
 import { streamInfo } from "@/lib/meta/facts-pure"
+import { watchmodeAvail } from "@/lib/meta/watchmode"
 import { cleanTitle } from "@/lib/meta/title"
 import { explain } from "@/lib/net"
 import { useCatalog } from "@/lib/catalog"
@@ -13,7 +14,7 @@ import { withMeta, type SourceMeta } from "@/lib/sources"
 import { srcOfId } from "@/lib/merge-pure"
 import { useOpen } from "@/components/tv/ui"
 import { openMatch } from "@/components/tv/match"
-import type { EpisodeMeta, Meta } from "@/lib/meta/types"
+import type { Avail, EpisodeMeta, Meta } from "@/lib/meta/types"
 import type { Episode, Item } from "@/lib/types"
 import { plexDetail, plexScrobble, plexUnscrobble } from "@/lib/plex"
 import { jellyfinDetail, jellyfinMarkPlayed, jellyfinMarkUnplayed } from "@/lib/jellyfin"
@@ -37,6 +38,7 @@ export type DetailRating = { source: string; value: string; votes?: string }
  *  progress(x) -> {pos,dur,t}|undefined, pct(x) -> 0..100, watched(x), epLabel(e) -> "E3  ·  45m  ·  Watched",
  *  resumeIdx, resumeLabel (localised "Resume"|"Play"), resuming (true = Resume; compare this, not the label), ratingName(source) (localises the generic "Rating" source name), canPlay, play(queue|null, index) -> opens the player, playMain() (resume/play button),
  *  trailer ({key,name}|undefined, TMDB/YouTube), trailers (all of them: trailers, teasers, featurettes), trailerLoading,
+ *  avail (Avail[]: where to watch in the Watchmode region, [] when the provider is off / keyless / has nothing; looked up once the metadata has its ids), availLoading,
  *  fav, toggleFav(), similar: Item[], open(item) (PIN-aware, live -> player), openCategory(), openGenre(g), openPerson(castMember), back()
  * }
  */
@@ -146,6 +148,22 @@ export function useDetail(id: string) {
   const poster = item && ({ ...item, logo: item.mposter ? item.logo : meta?.poster || item.logo } as Item) // identified or matched: the metadata poster replaces the panel's (Plex/Jellyfin: their own art is already in meta)
   const metaCfg = useApp((s) => s.settings.meta)
   const canMatch = useMemo(() => normalizeCfg(metaCfg).some((c) => c.id === "tmdb" && c.enabled && !!c.key), [metaCfg]) // manual match needs a TMDB key
+  // where to watch (Watchmode): only with the provider on and a key, once the metadata is in (it brings the IMDb / TMDB id, so no name search), cached 2 days apart from Meta
+  const wm = useMemo(() => normalizeCfg(metaCfg).find((c) => c.id === "watchmode" && c.enabled && !!c.key?.trim()), [metaCfg])
+  const [avail, setAvail] = useState<Avail[]>([])
+  const [availLoading, setAvailLoading] = useState(false)
+  const availTitle = item && item.kind !== "live" && meta ? cleanTitle(item.srcName ?? item.name) : undefined
+  const availIdent = availTitle && wm ? [item!.kind, meta!.ids.imdb, meta!.ids.tmdb, availTitle.title, meta!.year || availTitle.year, wm.key, wm.region].join("\n") : ""
+  useEffect(() => {
+    setAvail([])
+    if (!availIdent || !wm || !availTitle) return setAvailLoading(false)
+    let live = true
+    setAvailLoading(true)
+    void watchmodeAvail({ kind: item!.kind === "series" ? "series" : "movie", imdb: meta!.ids.imdb, tmdb: meta!.ids.tmdb, title: availTitle.title, year: meta!.year || availTitle.year }, wm)
+      .then((r) => live && setAvail(r))
+      .finally(() => live && setAvailLoading(false))
+    return () => { live = false }
+  }, [availIdent]) // eslint-disable-line react-hooks/exhaustive-deps
   const markSeen = useApp((s) => s.markSeen)
   const targets = isSeries ? [...episodes.map((e) => e.item), ...(item ? [item] : [])] : selected ? [selected] : []
   // Plex/Jellyfin: tell the server too. A series is one call on the series item (the server cascades to its episodes).
@@ -215,6 +233,7 @@ export function useDetail(id: string) {
     ],
     allWatched, toggleWatched: () => markAll(!allWatched), // the same action as marks[0], for a dedicated button
     fav: !!item && d.favs.includes(item.id), toggleFav: () => item && toggleFavStore(item.id),
+    avail, availLoading,
     trailers: meta?.trailers ?? [],
     trailer: meta?.trailers?.[0] ? { key: meta.trailers[0].key, name: meta.trailers[0].name } : undefined, trailerLoading: loading,
     similar, open: (i: Item) => open(i),

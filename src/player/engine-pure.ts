@@ -13,6 +13,13 @@ export function pickEngine(o: { raw: string; live: boolean; viaHls: boolean; hls
   return "native"
 }
 
+/** The engine script to load before `pickEngine` can decide, or null when it can decide now. `has` = isSupported() of a loaded script,
+    undefined = not loaded yet (assumed supported until it is). Loading only what the pick needs gives the same choice as having both. */
+export function engineToLoad(o: { raw: string; live: boolean; viaHls: boolean }, has: { hls?: boolean; mpegts?: boolean }): "hls" | "mpegts" | null {
+  const k = pickEngine({ ...o, hls: has.hls ?? true, mpegts: has.mpegts ?? true })
+  return k !== "native" && has[k] === undefined ? k : null
+}
+
 /** Why playback stopped for good; engine.ts turns it into the sentence (statusMsg / corsHint / errors.*). `account` = worth asking an Xtream server whether the account is at its connection limit. */
 export type Fail =
   | { why: "http"; code: number; account: true }

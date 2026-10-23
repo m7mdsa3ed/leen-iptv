@@ -1,6 +1,6 @@
 import { ArrowLeft } from "lucide-react"
 import { Card, Pill, RoundButton, SkelGrid } from "@/components/gtv"
-import { Empty, Pending, Shell, VGrid } from "@/components/tv/ui"
+import { Empty, Pending, Shell, VGrid, useCardFlags } from "@/components/tv/ui"
 import { useGenre } from "@/layouts/hooks/use-genre"
 import { SourceFilter } from "../source-ui"
 import { isTv } from "@/lib/device"
@@ -11,6 +11,7 @@ import { fmt, useT } from "@/lib/i18n"
 export default function GenrePage({ id }: { id: string }) {
   const t = useT()
   const { kind, genre, status, items, available, loading, unknown, hasMore, more, related, back, pct, open, openCategory, openSettings } = useGenre(id)
+  const flags = useCardFlags()
   return (
     <Shell page={kind === "movie" ? "movies" : "series"} title={genre}>
       {status !== "ready" ? <Pending /> : (
@@ -29,7 +30,7 @@ export default function GenrePage({ id }: { id: string }) {
           </>)
           // one tree for results, loading and the empty states: a different root would remount the focused "Find more" pill when its results arrive
           const empty = !(available && items.length)
-          return <VGrid items={available ? items : []} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => void open(i)} />} className="under-top" head={<>{head}{empty && (
+          return <VGrid items={available ? items : []} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={open} fav={flags.fav(i)} locked={flags.locked(i)} badge={flags.badge} />} className="under-top" head={<>{head}{empty && (
             <div className="h-[50vh] overflow-hidden">
               {!available ? (
                 <Empty>

@@ -1,6 +1,6 @@
 import { ArrowLeft } from "lucide-react"
 import { Card, Pill, RoundButton } from "@/components/gtv"
-import { Empty, Pending, Shell, VGrid } from "@/components/tv/ui"
+import { Empty, Pending, Shell, VGrid, useCardFlags } from "@/components/tv/ui"
 import { TextInput } from "@/components/tv/text-input"
 import { useCategory } from "@/layouts/hooks/use-category"
 import { SourceFilter } from "../source-ui"
@@ -11,6 +11,7 @@ import { fmt, useT } from "@/lib/i18n"
 export default function CategoryPage({ id }: { id: string }) {
   const t = useT()
   const { kind, group, status, ok, all, items, sort, setSort, sorts, q, setQ, back, pct, open } = useCategory(id)
+  const flags = useCardFlags()
   return (
     <Shell page={kind === "movie" ? "movies" : "series"} title={group}>
       {status !== "ready" ? <Pending /> : !ok ? null : (
@@ -30,7 +31,7 @@ export default function CategoryPage({ id }: { id: string }) {
           <SourceFilter />
           </>)
           // one tree whether or not anything matches: a different root would remount the filter input mid-typing
-          return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={() => open(i)} />} head={<>{head}{!items.length && <div className="h-[50vh]"><Empty>{t("gtv.category.noMatch")}</Empty></div>}</>} className="under-top" />
+          return <VGrid items={items} render={(i) => <Card key={i.id} item={i} fluid pct={pct(i)} onOpen={open} fav={flags.fav(i)} locked={flags.locked(i)} badge={flags.badge} />} head={<>{head}{!items.length && <div className="h-[50vh]"><Empty>{t("gtv.category.noMatch")}</Empty></div>}</>} className="under-top" />
         })()
       )}
     </Shell>

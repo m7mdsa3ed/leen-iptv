@@ -60,5 +60,9 @@ const d: Dict = {
   "common.update.readyNote": "حمّل الصفحة من الأول عشان تستخدمها.",
   "common.update.reload": "حمّل من الأول",
   "common.update.applying": "بنحدّث Leen TV...",
+  "common.warm.title": "بنجهّز مكتبتك",
+  "common.warm.merge": "بنرتّب المكتبة",
+  "common.warm.continue": "كمّل دلوقتي",
+  "common.warm.note": "بتتحمّل مرة واحدة كل تشغيل، وبعدها القنوات والأفلام والمسلسلات تفتح على طول.",
 }
 export default d

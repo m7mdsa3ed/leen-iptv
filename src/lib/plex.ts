@@ -3,7 +3,7 @@
 // No live TV for Plex in this version.
 import { AUDIO_CODECS, STREAM_QS, VIDEO_CODECS, type StreamQ } from "./quality"
 import type { Episode, Item, Source, Watch } from "./types"
-import { fetchT, mixed, plexFetch, px, scanLan } from "./net"
+import { fetchT, mixed, paged, plexFetch, px, scanLan } from "./net"
 import { t } from "./i18n"
 import { mkvSubtitle } from "./mkv"
 import { useApp } from "./store"
@@ -134,15 +134,13 @@ export async function loadPlex(src: Source, px_: string, step: (m: string) => vo
   const img = (p: string, w: number, h: number) => plexImg(s, p, w, h)
   for (const d of secs) {
     step(t("errors.source.loadingItem", { name: d.title }))
-    for (let start = 0, total = 1; start < total; ) {
-      const c = (await get<Container>(s, px_, `/library/sections/${d.key}/all`, { includeGuids: 1, "X-Plex-Container-Start": start, "X-Plex-Container-Size": 500 })).MediaContainer
-      const list = c?.Metadata ?? []
-      for (const m of list) out.push(mapMeta(m, { sourceId: s.id, group: String(d.title), img }))
-      total = c?.totalSize ?? list.length
-      start += 500
-      if (!list.length) break
-      step(t("errors.source.loadingProgress", { name: d.title, done: Math.min(start, total), total }))
-    }
+    const o = { sourceId: s.id, group: String(d.title), img }
+    // each page is mapped as it arrives (between network waits), so its raw JSON can be dropped at once
+    const list = await paged(500, async (start) => {
+      const c = (await get<Container>(s, px_, `/library/sections/${d.key}/all`, { "X-Plex-Container-Start": start, "X-Plex-Container-Size": 500 })).MediaContainer
+      return { list: (c?.Metadata ?? []).map((m) => mapMeta(m, o)), total: c?.totalSize }
+    }, (done, total) => step(t("errors.source.loadingProgress", { name: d.title, done, total })))
+    for (const i of list) out.push(i)
   }
   return out
 }

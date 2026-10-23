@@ -43,12 +43,16 @@
     <style>html{background:#0e0f11;color:#fff}html:not(.dark){background:#f4f5f7;color:#1f1f1f}</style>
     <script>
       // set the theme before first paint (no flash); mirrors src/lib/theme.ts
-      var t
-      try { t = JSON.parse(localStorage.getItem("iptv-app")).state.settings.theme } catch (e) {}
-      try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("iptv-app")).state.settings.colorTheme || "default" } catch (e) {}
+      // the persisted store is parsed ONCE here and handed to main.tsx as window.__leenBoot (a big store costs a TV real time per parse)
+      var st = null
+      try { st = JSON.parse(localStorage.getItem("iptv-app")) } catch (e) {}
+      window.__leenBoot = st
+      var ss = (st && st.state && st.state.settings) || {}
+      var t = ss.theme
+      document.documentElement.dataset.theme = ss.colorTheme || "default"
       var tv = /Web0S|webOS|SmartTV/i.test(navigator.userAgent)
       // language / direction before first paint; mirrors src/lib/i18n
-      var lg; try { lg = JSON.parse(localStorage.getItem("iptv-app")).state.settings.language } catch (e) {}
+      var lg = ss.language
       var ar = lg === "ar" || (lg !== "en" && /^ar/i.test(navigator.language))
       document.documentElement.lang = ar ? "ar-EG" : "en"
       document.documentElement.dir = ar ? "rtl" : "ltr"

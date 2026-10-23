@@ -149,6 +149,13 @@ export function serviceChecks(env: Env): Check[] {
       try { j = JSON.parse(r.text ?? "") } catch { /* not json */ }
       return j.Response === "True" ? res("ok", t("diag.svc.keyOk"), undefined, Math.round(r.ms)) : res("fail", j.Error ?? t("diag.svc.keyBad"), t("diag.svc.keyBad.hint"))
     }),
+    sv("watchmode", async () => {
+      const k = meta("watchmode")?.key?.trim()
+      if (!k) return res("skip", t("diag.svc.nokey"))
+      const r = await probe("https://api.watchmode.com/v1/status/", { text: true, read: 4096, init: { headers: { "X-API-Key": k } } })
+      if (r.kind === "ok") return res("ok", t("diag.svc.keyOk"), undefined, Math.round(r.ms))
+      return res("fail", r.status === 401 ? t("diag.svc.keyBad") : say(r), r.status === 401 ? t("diag.svc.keyBad.hint") : t("diag.svc.net.hint"))
+    }),
     sv("sbReach", async () => {
       const y = env.sync()
       if (!y.configured) return res("skip", t("diag.svc.sb.off"), t("diag.svc.sb.offHint"))

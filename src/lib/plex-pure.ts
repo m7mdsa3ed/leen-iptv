@@ -82,25 +82,26 @@ export function mapMeta(m: J, o: { sourceId: string; group: string; img: (path: 
   const kind = m.type === "show" ? "series" : "movie"
   const rating = m.rating ?? m.audienceRating
   const resume = m.viewOffset ? Math.round(m.viewOffset / 1000) : undefined
-  return {
-    id: `${o.sourceId}|${kind}|${m.ratingKey}`,
-    kind,
-    sid: String(m.ratingKey),
-    name: String(m.title ?? "?"),
-    group: o.group,
-    logo: m.thumb ? o.img(m.thumb, 300, 450) : undefined,
-    backdrop: m.art ? o.img(m.art, 1280, 720) : undefined,
-    plot: m.summary || undefined,
-    rating: rating ? Number(rating).toFixed(1) : undefined,
-    year: m.year ? String(m.year) : undefined,
-    released: day(m.originallyAvailableAt),
-    added: Number(m.addedAt) || undefined,
-    genres: tagList(m.Genre),
-    ...(isImax(m) ? { imax: true } : {}),
-    resume,
-    dur: m.duration ? Math.round(m.duration / 1000) : undefined,
-    ...fileOf(m),
-  }
+  // only the fields the title has: explicit undefined keys cost memory and clone/merge time on big libraries
+  const i: Item = { id: `${o.sourceId}|${kind}|${m.ratingKey}`, kind, sid: String(m.ratingKey), name: String(m.title ?? "?"), group: o.group }
+  if (m.thumb) i.logo = o.img(m.thumb, 300, 450)
+  if (m.art) i.backdrop = o.img(m.art, 1280, 720)
+  if (m.summary) i.plot = m.summary
+  if (rating) i.rating = Number(rating).toFixed(1)
+  if (m.year) i.year = String(m.year)
+  const released = day(m.originallyAvailableAt)
+  if (released !== undefined) i.released = released
+  const added = Number(m.addedAt)
+  if (added) i.added = added
+  i.genres = tagList(m.Genre)
+  if (isImax(m)) i.imax = true
+  if (resume !== undefined) i.resume = resume
+  if (m.duration) i.dur = Math.round(m.duration / 1000)
+  const f = fileOf(m)
+  if (f.ext !== undefined) i.ext = f.ext
+  if (f.part !== undefined) i.part = f.part
+  if (f.codecs !== undefined) i.codecs = f.codecs
+  return i
 }
 
 /** Plex movie/episode (viewOffset, viewCount, lastViewedAt) -> Watch; undefined when never played. An offset wins over viewCount (a rewatch in progress). */

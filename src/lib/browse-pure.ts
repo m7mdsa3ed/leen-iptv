@@ -1,5 +1,6 @@
 import type { Item } from "./types"
 import { yearOf } from "./meta/title.ts"
+import { LOCALE, fold, type Lang } from "./i18n/pure.ts"
 
 /** The extra filters of the browse filter panel. Pure (node scripts/browse.check.ts). */
 
@@ -40,7 +41,31 @@ export const RATINGS = [5, 6, 7, 8]
 // sort key: the release date, else the year alone ("2023" sorts after every dated 2023 title), "" = unknown (last)
 const relKey = (i: Item) => i.released ?? (yearNum(i) ? String(yearNum(i)) : "")
 /** Most recently added to the source first (a merged title counts its newest copy); titles with no date last. */
-const addedOf = (i: Item) => (i.alts ?? []).reduce((m, a) => Math.max(m, a.added ?? 0), i.added ?? 0)
+const added = new WeakMap<Item, number>() // items are immutable once merged (a rebuild makes new objects), so per-object caches stay true
+const addedOf = (i: Item) => {
+  let n = added.get(i)
+  if (n === undefined) added.set(i, (n = (i.alts ?? []).reduce((m, a) => Math.max(m, a.added ?? 0), i.added ?? 0)))
+  return n
+}
 export const byAdded = (a: Item, b: Item) => addedOf(b) - addedOf(a)
 /** Newest release first: by release date, else year; titles with neither last. */
 export const byRelease = (a: Item, b: Item) => { const x = relKey(a), y = relKey(b); return x === y ? 0 : x < y ? 1 : -1 }
+const folded = new WeakMap<Item, string>()
+/** fold(i.name), computed once per item: title filters run it over the whole catalog on every keystroke. */
+export function foldedName(i: Item) {
+  let n = folded.get(i)
+  if (n === undefined) folded.set(i, (n = fold(i.name)))
+  return n
+}
+const names = new Map<Lang, (a: Item, b: Item) => number>()
+/** A-Z title compare for the app language. One Collator per language: localeCompare with options builds a new one per call (~40x slower on big catalogs). */
+export function byName(lang: Lang) {
+  let f = names.get(lang)
+  if (!f) { const c = new Intl.Collator(LOCALE[lang], { numeric: true, sensitivity: "base" }).compare; names.set(lang, (f = (a, b) => c(a.name, b.name))) }
+  return f
+}
+export type Sort = "default" | "az" | "rating" | "year" | "added"
+const byRating = (a: Item, b: Item) => (parseFloat(b.rating ?? "") || 0) - (parseFloat(a.rating ?? "") || 0)
+/** The list in this order (a new array; "default" = the list itself). Stable, so filtering the result keeps the same order as sorting the filtered list. */
+export const sortList = (l: Item[], sort: Sort, lang: Lang) =>
+  sort === "az" ? [...l].sort(byName(lang)) : sort === "rating" ? [...l].sort(byRating) : sort === "year" ? [...l].sort(byRelease) : sort === "added" ? [...l].sort(byAdded) : l

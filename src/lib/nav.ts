@@ -143,16 +143,45 @@ export const navState = { lock: false }
 
 const DIRS: Record<number, Dir> = { 37: "left", 38: "up", 39: "right", 40: "down" }
 
+/* One key press = one measurement: while a press is open (beginPress .. endPress) every rect, visibility verdict, candidate list and
+   group box is read once and reused by pick, hintsOf, viaMemory, wrap, firstRow, pageMove and recover. Anything that scrolls or
+   moves focus (focusTo, virtualStep) closes the press first, since rects go stale after a scroll or a re-render. Outside a press
+   every read is live, as before. */
+type Press = { rects: Map<Element, DOMRect>; vis: Map<HTMLElement, boolean>; lists: Map<ParentNode, HTMLElement[]>; groups: Map<HTMLElement, Element | null>; boxes: Map<Element, Box>; modal?: HTMLElement | null }
+let press: Press | null = null
+const beginPress = () => void (press = { rects: new Map(), vis: new Map(), lists: new Map(), groups: new Map(), boxes: new Map() })
+const endPress = () => void (press = null)
+function rectOf(el: Element) {
+  if (!press) return el.getBoundingClientRect()
+  let r = press.rects.get(el)
+  if (!r) press.rects.set(el, (r = el.getBoundingClientRect()))
+  return r
+}
+/** the rect of every element, read once (the press cache when one is open) */
+function measure(els: Element[]) {
+  const m = new Map<Element, DOMRect>()
+  for (const el of els) m.set(el, rectOf(el))
+  return m
+}
+
 function visible(el: HTMLElement) {
-  const r = el.getBoundingClientRect()
-  return r.width > 0 && r.height > 0 && !(el as HTMLButtonElement).disabled && el.getAttribute("aria-disabled") !== "true" && getComputedStyle(el).visibility !== "hidden" && !el.closest("[inert]")
+  const c = press?.vis.get(el)
+  if (c !== undefined) return c
+  // cheap checks first; computed style and the [inert] walk only for the survivors
+  const r = rectOf(el)
+  const v = r.width > 0 && r.height > 0 && !(el as HTMLButtonElement).disabled && el.getAttribute("aria-disabled") !== "true" && getComputedStyle(el).visibility !== "hidden" && !el.closest("[inert]")
+  press?.vis.set(el, v)
+  return v
 }
 
 /** topmost open [data-modal] (several can stack; the last one in the DOM is on top) */
 function topModal() {
+  if (press && press.modal !== undefined) return press.modal
   const all = document.querySelectorAll<HTMLElement>("[data-modal]")
-  for (let i = all.length - 1; i >= 0; i--) if (all[i].getBoundingClientRect().width > 0) return all[i]
-  return null
+  let m: HTMLElement | null = null
+  for (let i = all.length - 1; i >= 0; i--) if (rectOf(all[i]).width > 0) { m = all[i]; break }
+  if (press) press.modal = m
+  return m
 }
 
 /** An open [data-modal] that is not inside `scope` (a CSS selector): the player yields its keys to those (PIN, card menu, trailer, keyboard...). */
@@ -165,10 +194,36 @@ export function dialogOutside(scope: string) {
 /** The player's raw-key lock (navState.lock) only holds while no dialog is open: a PIN prompt, card menu or keyboard over a locked player still needs the D-pad. */
 const locked = () => navState.lock && !topModal()
 
+/* Where to look when nothing narrower is asked: the whole document minus the stacked pages App hides with display:none (they stay
+   mounted to keep scroll and focus; visible() would reject their nodes anyway, this only avoids measuring them). The shown page
+   (its top bar, page content, asides, the mobile pill), the player and any portal are all still searched, in DOM order. */
+function navRoots(): ParentNode[] {
+  const app = document.getElementById("root")
+  if (!app || app.parentElement !== document.body) return [document]
+  const out: ParentNode[] = []
+  for (const c of Array.from(document.body.children)) {
+    if (c !== app) { out.push(c); continue }
+    for (const p of Array.from(app.children)) if ((p as HTMLElement).style.display !== "none") out.push(p)
+  }
+  return out
+}
+function navIn(roots: ParentNode[]) {
+  const out: HTMLElement[] = []
+  for (const r of roots) {
+    if (r instanceof HTMLElement && r.hasAttribute("data-nav")) out.push(r)
+    out.push(...Array.from(r.querySelectorAll<HTMLElement>("[data-nav]")))
+  }
+  return out
+}
+
 export function focusables(root: ParentNode = document) {
   // an open [data-modal] scopes navigation to itself
   const scope = topModal() ?? root
-  return Array.from(scope.querySelectorAll<HTMLElement>("[data-nav]")).filter(visible)
+  const hit = press?.lists.get(scope)
+  if (hit) return hit
+  const els = (scope === document ? navIn(navRoots()) : Array.from(scope.querySelectorAll<HTMLElement>("[data-nav]"))).filter(visible)
+  press?.lists.set(scope, els)
+  return els
 }
 
 /** divs/sections with data-nav have no tabindex and silently ignore focus(): make them focusable */
@@ -179,34 +234,50 @@ function focusEl(el: HTMLElement) {
 
 let anchorX: number | null = null // x centre kept across consecutive Up/Down moves
 /** What the boxes alone cannot say (see nearestRow): the row / grid / list each candidate belongs to, and whether it sits beside the page ([data-nav-aside]). */
+const GROUP = "[data-nav-group],[data-vscroll]"
 function hintsOf(els: HTMLElement[]): Hints {
-  const seen = new Map<Element, Box>()
+  const groups = press?.groups ?? new Map<HTMLElement, Element | null>()
+  const boxes = press?.boxes ?? new Map<Element, Box>() // per group element: shared by every candidate in it, once per press
   return {
     ext: els.map((el) => {
-      let g = el.closest("[data-nav-group],[data-vscroll]")
-      for (let up = g?.parentElement?.closest("[data-nav-group],[data-vscroll]"); up; up = up.parentElement?.closest("[data-nav-group],[data-vscroll]")) g = up // the outermost: a settings Row that holds a Segmented
+      let g = groups.get(el)
+      if (g === undefined) {
+        g = el.closest(GROUP)
+        for (let up = g?.parentElement?.closest(GROUP); up; up = up.parentElement?.closest(GROUP)) g = up // the outermost: a settings Row that holds a Segmented
+        groups.set(el, g)
+      }
       if (!g) return null
-      let b = seen.get(g)
-      if (!b) { const r = g.getBoundingClientRect(); seen.set(g, (b = { left: r.left, right: r.right, top: r.top, bottom: r.bottom })) }
+      let b = boxes.get(g)
+      if (!b) { const r = rectOf(g); boxes.set(g, (b = { left: r.left, right: r.right, top: r.top, bottom: r.bottom })) }
       return b
     }),
     aside: els.map((el) => !!el.closest("[data-nav-aside]")),
   }
 }
+/** Up/Down: candidates more than this many viewport heights away are not scored, as long as one in that direction lines up inside the band. */
+const BAND = 1.5
 function pick(from: HTMLElement, dir: Dir) {
-  const a = from.getBoundingClientRect()
+  const a = rectOf(from)
   const vert = dir === "up" || dir === "down"
   if (vert && anchorX == null) anchorX = (a.left + a.right) / 2
-  const els = focusables().filter((el) => el !== from)
-  const i = pickIndex(a, els.map((el) => el.getBoundingClientRect()), dir, vert ? anchorX : null, hintsOf(els))
+  let els = focusables().filter((el) => el !== from)
+  const m = measure(els)
+  if (vert) {
+    const band = window.innerHeight * BAND, lo = anchorX ?? a.left, hi = anchorX ?? a.right
+    const near = els.filter((el) => { const r = m.get(el)!; return r.bottom >= a.top - band && r.top <= a.bottom + band })
+    // keep the full set unless a candidate in that direction and under the column remains inside the band (far jumps still work)
+    if (near.length < els.length && near.some((el) => { const r = m.get(el)!; return Math.min(hi, r.right) - Math.max(lo, r.left) >= 0 && scoreMove(a, r, dir, anchorX) != null })) els = near
+  }
+  const i = pickIndex(a, els.map((el) => m.get(el)!), dir, vert ? anchorX : null, hintsOf(els))
   return i >= 0 ? els[i] : null
 }
 
 /** Down from the top bar goes to the first row on screen (the hero's Watch button, the category chips...), not to whatever lies under the tab. */
 function firstRow(bar: HTMLElement) {
-  const edge = (bar.closest("header.topbar") ?? bar).getBoundingClientRect().bottom
+  const edge = rectOf(bar.closest("header.topbar") ?? bar).bottom
   const els = focusables().filter((e) => e.closest("[data-page-content]") && !e.closest("[data-nav-aside]"))
-  const i = firstRowIndex(els.map((e) => e.getBoundingClientRect()), edge, window.innerHeight, document.documentElement.dir === "rtl")
+  const m = measure(els)
+  const i = firstRowIndex(els.map((e) => m.get(e)!), edge, window.innerHeight, document.documentElement.dir === "rtl")
   return i >= 0 ? els[i] : null
 }
 
@@ -228,10 +299,11 @@ function viaMemory(cur: HTMLElement, next: HTMLElement, dir: Dir) {
   // new row: its active tab (top bar) or else its first item, by position so RTL starts at the right
   const els = focusables(sc).filter((el) => scopeOf(el) === sc) // direct members only: not a side list sharing the line
   const home = els.find((el) => el.hasAttribute("data-nav-home"))
-  const nb = next.getBoundingClientRect()
+  const nb = rectOf(next)
   const cy = (nb.top + nb.bottom) / 2
-  if (home) { const h = home.getBoundingClientRect(); if (h.top <= cy && h.bottom >= cy) return (anchorX = null), home }
-  const i = lineStart(els.map((el) => el.getBoundingClientRect()), nb, document.documentElement.dir === "rtl")
+  if (home) { const h = rectOf(home); if (h.top <= cy && h.bottom >= cy) return (anchorX = null), home }
+  const rs = measure(els)
+  const i = lineStart(els.map((el) => rs.get(el)!), nb, document.documentElement.dir === "rtl")
   if (i >= 0) anchorX = null
   return i >= 0 ? els[i] : next
 }
@@ -241,7 +313,9 @@ function wrap(cur: HTMLElement, next: HTMLElement | null, dir: Dir) {
   // only at a dead end: a neighbour outside the row (the top bar's Search and profile buttons beside the tabs) is still reachable
   if (!w || (dir !== "left" && dir !== "right") || next) return next
   // by position (not DOM order) so RTL and reordered rows wrap to the visually opposite end
-  const items = Array.from(w.querySelectorAll<HTMLElement>("[data-nav]")).filter(visible).map((el) => ({ el, x: el.getBoundingClientRect().left }))
+  const els = Array.from(w.querySelectorAll<HTMLElement>("[data-nav]")).filter(visible)
+  const m = measure(els)
+  const items = els.map((el) => ({ el, x: m.get(el)!.left }))
   items.sort((p, q) => p.x - q.x)
   return (dir === "right" ? items[0] : items[items.length - 1])?.el ?? next
 }
@@ -262,20 +336,25 @@ export function focusFirst() {
   if (el) focusTo(el, true)
   if (auto) return
   // the main action ([data-autofocus], e.g. Play) may still be loading or disabled (series episodes): move to it once it is
-  // ready, unless the user has moved focus in the meantime. ponytail: 200ms poll for up to 10s, a MutationObserver if it ever costs
+  // ready, unless the user has moved focus in the meantime. ponytail: 200ms poll for 3s (up to 10s while the page is still mounting), a MutationObserver if it ever costs
   const held = el ?? document.body
   let n = 0
   autoWait = window.setInterval(() => {
     if (document.activeElement !== held && !(held === document.body && !document.activeElement) || ++n > 50) return clearInterval(autoWait)
-    const a = focusables().find((e) => e.dataset.autofocus !== undefined)
-    if (a) (clearInterval(autoWait), focusTo(a, true))
+    const all = focusables()
+    const a = all.find((e) => e.dataset.autofocus !== undefined)
+    if (a) return clearInterval(autoWait), focusTo(a, true)
+    // after 3s: stop unless the page is still mounting (no controls of its own yet) or its main action is there but not usable yet (disabled Play)
+    if (n > 15 && all.some((e) => !e.closest("header.topbar")) && !navIn(navRoots()).some((e) => e.dataset.autofocus !== undefined)) clearInterval(autoWait)
   }, 200)
 }
 
+const scrollsX = (p: HTMLElement) => { const o = getComputedStyle(p).overflowX; return (o === "auto" || o === "scroll") && p.scrollWidth > p.clientWidth }
 function scroller(el: HTMLElement) {
+  // the first horizontally scrolling ancestor; a rail (or a marked one) ends the walk, since nothing outside it scrolls the item sideways
   for (let p = el.parentElement; p; p = p.parentElement) {
-    const o = getComputedStyle(p).overflowX
-    if ((o === "auto" || o === "scroll") && p.scrollWidth > p.clientWidth) return p
+    if (p.classList.contains("rail") || p.hasAttribute("data-scroll-x")) return scrollsX(p) ? p : null
+    if (scrollsX(p)) return p
   }
   return null
 }
@@ -298,6 +377,7 @@ function scrollFocused(el: HTMLElement, fast: boolean) {
 /** focus without the browser's jump, then keep it comfortably visible (navigation controls stay centred).
  *  `keep` = a D-pad move: the x anchor of consecutive Up/Down moves survives it. Any other focus (page open, recovery, Back to the tab bar) starts a new column. */
 function focusTo(el: HTMLElement, fast: boolean, keep = false) {
+  endPress() // focus handlers may re-render and the scroll moves things: the press's rects are stale from here on
   lastKeyTarget = keep ? el : null
   focusEl(el)
   scrollFocused(el, fast)
@@ -311,7 +391,8 @@ const canScrollV = (el: HTMLElement, dir: Dir) => (dir === "down" ? el.scrollTop
 function virtualStep(vs: HTMLElement, cur: HTMLElement, dir: Dir, fast: boolean) {
   if (vsBusy) return
   vsBusy = true
-  const r = cur.getBoundingClientRect()
+  const r = rectOf(cur)
+  endPress() // scrolls now and picks frames later: live reads from here on
   const from = { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
   const before = vs.scrollTop
   vs.scrollTop += (dir === "down" ? 1 : -1) * Math.max(r.height * 1.5, vs.clientHeight * 0.4)
@@ -347,8 +428,9 @@ function recover(box: Box | null = lastBox) {
   if (lastEl && els.includes(lastEl)) return focusTo(lastEl, true)
   const cx = (box.left + box.right) / 2, cy = (box.top + box.bottom) / 2
   let best: HTMLElement | null = null, bd = Infinity
+  const m = measure(els)
   for (const el of els) {
-    const r = el.getBoundingClientRect()
+    const r = m.get(el)!
     const d = Math.hypot((r.left + r.right) / 2 - cx, (r.top + r.bottom) / 2 - cy)
     if (d < bd) (best = el), (bd = d)
   }
@@ -358,19 +440,37 @@ function recover(box: Box | null = lastBox) {
 function pageMove(cur: HTMLElement, sign: 1 | -1) {
   const dir: Dir = sign > 0 ? "down" : "up"
   const h = (scroller(cur)?.clientHeight ?? 0) || window.innerHeight
-  const y0 = cur.getBoundingClientRect().top
+  const y0 = rectOf(cur).top
   let el = cur
   for (let i = 0; i < 30; i++) {
     const n = pick(el, dir)
     if (!n) break
     el = n
-    if (Math.abs(n.getBoundingClientRect().top - y0) >= h * 0.8) break
+    if (Math.abs(rectOf(n).top - y0) >= h * 0.8) break
   }
   return el === cur ? null : el
 }
 
 /** Set by the on-screen keyboard: return true when it took over the text field (OK pressed in it). */
 export const navHooks: { text?: (el: HTMLInputElement | HTMLTextAreaElement) => boolean } = {}
+/** One D-pad / page key from `cur` (inside an open press). */
+function move(cur: HTMLElement, dir: Dir | undefined, page: 1 | -1 | 0, repeat: boolean, nowhere: boolean) {
+  if (nowhere) return recover() // focus is nowhere: the key brings it back (to the last control), it does not also move
+  if (dir === "left" || dir === "right") anchorX = null
+  let next = dir ? pick(cur, dir) : pageMove(cur, page as 1 | -1)
+  if (dir === "down" && cur.closest("header.topbar")) next = firstRow(cur) ?? next
+  if (dir) {
+    if (next) next = viaMemory(cur, next, dir)
+    next = wrap(cur, next, dir)
+  }
+  if (dir === "up" || dir === "down") {
+    const vs = cur.closest<HTMLElement>("[data-vscroll]")
+    if (vs && (!next || !vs.contains(next)) && canScrollV(vs, dir)) return virtualStep(vs, cur, dir, repeat)
+  }
+  if (next) focusTo(next, repeat, true)
+  else if (!cur.hasAttribute("data-nav") || !visible(cur)) focusFirst() // stray/disabled focus with nowhere to go
+}
+
 const NATIVE_CLICK = /^(BUTTON|A|INPUT|SELECT|TEXTAREA|SUMMARY)$/
 const hold = { t: 0, el: null as HTMLElement | null }
 export function installNav(onBack: () => void) {
@@ -399,24 +499,13 @@ export function installNav(onBack: () => void) {
         if (i.value && s0 != null && !(s0 === s1 && ((dir === "left") !== rtl ? s0 === 0 : s0 === i.value.length))) return
       } else if (t instanceof HTMLInputElement && t.type === "range" && (dir === "left" || dir === "right") && t.hasAttribute("data-seek")) return // seek bar: native step
       e.preventDefault()
-      if (!cur || cur === document.body || cur === document.documentElement) return recover() // focus is nowhere: the key brings it back (to the last control), it does not also move
       // key repeat: throttle so virtualized lists can mount rows between moves
       const now = performance.now()
-      if (e.repeat && now - lastMove < 90) return
-      lastMove = now
-      if (dir === "left" || dir === "right") anchorX = null
-      let next = dir ? pick(cur, dir) : pageMove(cur, page as 1 | -1)
-      if (dir === "down" && cur.closest("header.topbar")) next = firstRow(cur) ?? next
-      if (dir) {
-        if (next) next = viaMemory(cur, next, dir)
-        next = wrap(cur, next, dir)
-      }
-      if (dir === "up" || dir === "down") {
-        const vs = cur.closest<HTMLElement>("[data-vscroll]")
-        if (vs && (!next || !vs.contains(next)) && canScrollV(vs, dir)) return virtualStep(vs, cur, dir, e.repeat)
-      }
-      if (next) focusTo(next, e.repeat, true)
-      else if (!cur.hasAttribute("data-nav") || !visible(cur)) focusFirst() // stray/disabled focus with nowhere to go
+      const nowhere = !cur || cur === document.body || cur === document.documentElement
+      if (!nowhere && e.repeat && now - lastMove < 90) return
+      if (!nowhere) lastMove = now
+      beginPress() // every rect read once for this key (see Press)
+      try { move(cur, dir, page as 1 | -1 | 0, e.repeat, nowhere) } finally { endPress() }
     } else if ((e.keyCode === KEY.enter || e.keyCode === 32) && !typing && !(t instanceof HTMLSelectElement) && t.hasAttribute?.("data-nav") && ((e.keyCode === KEY.enter && isTv) || !NATIVE_CLICK.test(t.tagName))) {
       // TV: Enter clicks any [data-nav]; div/section/[role] with data-nav (any mode): Enter and Space click like a button
       e.preventDefault()

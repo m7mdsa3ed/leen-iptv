@@ -11,11 +11,11 @@ import { useApp } from "@/lib/store"
 import { openSection } from "@/settings/open"
 import { cn } from "@/lib/utils"
 
-const statusOf = (st?: SrcState) => st?.status === "ready" ? fmt.plural("settings.sources.items", st.count) : st?.status === "loading" ? st.msg || t("settings.sources.loading") : st?.status === "error" ? t("settings.sources.failed") : t("settings.sources.notLoaded")
+export const statusOf = (st?: SrcState) => st?.status === "ready" ? fmt.plural("settings.sources.items", st.count) : st?.status === "loading" ? st.msg || t("settings.sources.loading") : st?.status === "error" ? t("settings.sources.failed") : t("settings.sources.notLoaded")
 const RANK = { ready: 0, loading: 1, idle: 2, error: 3 } as const
 
 /** A source as a round avatar: Plex / Jellyfin = their logo, any other type = the first letter of its name on the source colour. */
-function SourceAvatar({ s, className }: { s: SourceMeta; className?: string }) {
+export function SourceAvatar({ s, className }: { s: SourceMeta; className?: string }) {
   return hasMark(s.type)
     ? <span className={cn("grid shrink-0 place-items-center rounded-full bg-surface-3", className)}><SourceMark type={s.type} color={s.color} className="size-[55%]" /></span>
     : <span style={{ background: s.color, color: onColor(s.color) }} className={cn("grid shrink-0 place-items-center rounded-full font-semibold leading-none", className)}><bdi>{s.name.trim().slice(0, 1).toUpperCase()}</bdi></span>

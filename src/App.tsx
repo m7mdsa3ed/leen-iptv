@@ -1,4 +1,4 @@
-import { memo, Suspense, useEffect, useRef, type ComponentType, type ReactNode } from "react"
+import { memo, Suspense, useEffect, useMemo, useRef, type ComponentType, type ReactNode } from "react"
 import { Empty, PinModal, usePinAsk, focusFirstSoon } from "@/components/tv/ui"
 import { Boundary } from "@/components/tv/boundary"
 import { useCatalog } from "@/lib/catalog"
@@ -10,6 +10,7 @@ import { useLanguageAttr, useT } from "@/lib/i18n"
 import { TrailerModal, closeTrailer, useTrailer } from "@/components/TrailerModal"
 import { RecoveryGate } from "@/settings/AccountSync"
 import { Toasts } from "@/components/tv/toast"
+import { WarmUp } from "@/components/tv/warmup"
 import { startReminders } from "@/lib/sports/reminders"
 import { startEpisodeWatch } from "@/lib/new-episodes"
 import { CardMenu, closeCardMenu, useCardMenu } from "@/components/tv/card-menu"
@@ -26,6 +27,7 @@ import { CARD_K } from "@/lib/cards"
 import { SearchPalette, closePalette, installPaletteKeys, usePalette } from "@/components/tv/search-palette"
 import { OnScreenKeyboard, closeKeyboard, installKeyboard, useKbd } from "@/components/tv/keyboard"
 import { useApp } from "@/lib/store"
+import type { Item } from "@/lib/types"
 import Browse from "@/pages/browse"
 import CategoryPage from "@/pages/category"
 import Detail from "@/pages/detail"
@@ -50,13 +52,17 @@ import Sports from "@/pages/sports"
 
 // after a refresh only the item id is in the URL: rebuild the zapping queue (the channel's category) once the catalog is ready
 function RestorePlayer({ id }: { id: string }) {
-  const { status, byId, byKind } = useCatalog()
+  const status = useCatalog((s) => s.status)
+  const item = useCatalog((s) => s.byId.get(id))
   const back = useRoute((s) => s.back)
   const t = useT()
-  const item = byId.get(id)
   if (status === "ready" && !item) return <Empty>{t("common.notFound")} <button data-nav className="ms-3 underline" onClick={back}>{t("common.back")}</button></Empty>
   if (!item) return <Empty>{t("common.loading")}</Empty>
-  const queue = item.kind === "live" ? byKind.live.filter((i) => i.group === item.group) : [item]
+  return <RestoreQueue item={item} />
+}
+function RestoreQueue({ item }: { item: Item }) {
+  const live = useCatalog((s) => (item.kind === "live" ? s.byKind.live : undefined)) // only a channel needs the live list (its zapping queue)
+  const queue = useMemo(() => (live ? live.filter((i) => i.group === item.group) : [item]), [live, item])
   return <PlayerRoute queue={queue} index={queue.indexOf(item)} />
 }
 
@@ -96,6 +102,7 @@ export default function App() {
   const sources = useApp((s) => s.sources)
   const last = useRef(new Map<number, HTMLElement>())
   const top = stack.length - 1
+  const warming = useCatalog((s) => s.warm !== "off") // first load of the session: pages wait behind the warm-up screen (frozen, so nothing renders a half catalog)
   useMode() // keeps html[data-mode] in sync on resize
   useTheme()
   useMotion()
@@ -155,7 +162,7 @@ export default function App() {
       if (el?.isConnected && el.getClientRects().length) el.focus()
       else focusFirstSoon()
     })
-  }, [top, stack[top]?.name])
+  }, [top, stack[top]?.name, warming])
 
   // the entrance class is dropped once played: display none->block would otherwise replay it when Back reveals a stacked page
   const endAnim = (e: React.AnimationEvent<HTMLElement>) => {
@@ -166,9 +173,10 @@ export default function App() {
     <>
       {stack.map((r, i) => (
         <div key={`${i}:${r.name}`} className={`${SHELL_PAGES.has(r.name) ? "page-enter" : "m-rise"} absolute inset-0`} style={{ display: i === top ? "block" : "none" }} onAnimationEnd={endAnim}>
-          <Suspense fallback={null}><Gate frozen={i !== top}><Boundary><Page r={r} /></Boundary></Gate></Suspense>
+          <Suspense fallback={null}><Gate frozen={i !== top || warming}><Boundary><Page r={r} /></Boundary></Gate></Suspense>
         </div>
       ))}
+      {warming && <WarmUp />}
       <PlayerHost />
       <PinModal />
       <CardMenu />

@@ -9,6 +9,7 @@ import { useT } from "@/lib/i18n"
 import { openTrailer } from "@/components/TrailerModal"
 import { useDetail } from "@/layouts/hooks/use-detail"
 import { Awards, TitleArt } from "@/components/tv/title-art"
+import { WhereToWatch } from "@/components/tv/where-to-watch"
 
 export default function Detail({ id }: { id: string }) {
   const D = useDetail(id)
@@ -46,6 +47,7 @@ export default function Detail({ id }: { id: string }) {
                 <SkelBar className="w-full" /><SkelBar className="w-11/12" /><SkelBar className="w-2/3" />
               </div>
             )}
+            <WhereToWatch avail={D.avail} className="mt-4" />
             {err && <p role="alert" className="mt-3 text-sm text-destructive">{err}</p>}
             <div className="-ms-1 mt-6 flex flex-wrap items-center gap-3 p-1">
               <Pill variant="primary" data-autofocus="" onClick={() => D.playMain()} disabled={!D.canPlay}>

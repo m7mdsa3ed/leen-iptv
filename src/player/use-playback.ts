@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
 import type Hls from "hls.js"
-import { engines, loadEngines } from "@/lib/engines"
+import { loadedEngines, loadHls, loadMpegts } from "@/lib/engines"
+import { useCatalog } from "@/lib/catalog"
 import { useApp } from "@/lib/store"
 import { connInfo } from "@/lib/xtream"
 import { corsHint, statusMsg } from "@/lib/net"
@@ -8,11 +9,19 @@ import { rate } from "@/lib/quality"
 import { t as tn } from "@/lib/i18n"
 import type { Item, Source } from "@/lib/types"
 import { attach, release, type Stream, type Track } from "./engine"
-import { MAX_AUTO, mpegtsAction, nativeAction, watchdogMs, ZAP_DELAY, type Fail } from "./engine-pure"
+import { engineToLoad, MAX_AUTO, mpegtsAction, nativeAction, watchdogMs, ZAP_DELAY, type Fail } from "./engine-pure"
 import { audioLabel, type Stats } from "./stats"
 
 export type { Track }
 const MSG: Record<string, string> = { decode: "errors.stream.decode", unavailable: "errors.stream.unavailable", offline: "errors.stream.offline", stuck: "errors.stream.stuck", format: "errors.video.format", corrupt: "errors.video.corrupt", cannot: "errors.video.cannotPlay" }
+const LOAD = { hls: loadHls, mpegts: loadMpegts }
+
+/* hls.js plays most streams: fetch it while the app is idle once the catalog is on screen, so the first play does not wait for it */
+if (typeof window !== "undefined") {
+  const warm = () => window.setTimeout(() => void loadHls().catch(() => {}), 4000) // a failure is retried by the first play that needs it
+  if (useCatalog.getState().status === "ready") warm()
+  else { const off = useCatalog.subscribe((c) => { if (c.status === "ready") { off(); warm() } }) }
+}
 const say = (f: Fail) => (f.why === "http" ? statusMsg(f.code) : f.why === "cors" ? corsHint() : f.why === "blocked" ? tn("errors.http.blocked", { host: f.host }) : tn(MSG[f.why]))
 
 /**
@@ -22,7 +31,7 @@ const say = (f: Fail) => (f.why === "http" ? statusMsg(f.code) : f.why === "cors
 export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item: Item; live: boolean; raw: string; url: string; direct: boolean; toProxy: () => void; src?: Source | null; fallback?: () => void }) {
   const { vref, item, live, raw, url, direct, src } = o
   const proxy = useApp((s) => s.settings.proxy)
-  const [eng, setEng] = useState(engines) // hls.js / mpegts.js arrive on first playback (spinner meanwhile)
+  const [eng, setEng] = useState(loadedEngines) // hls.js / mpegts.js each arrive on the first playback that needs them (spinner meanwhile)
   const [err, setErr] = useState("")
   const [buf, setBuf] = useState(true)
   const [started, setStarted] = useState(false) // first frame shown: loading screen vs rebuffering ring
@@ -46,7 +55,8 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
 
   useEffect(() => { setAudio([]); setSubs([]) }, [item.id])
   useEffect(() => { auto.current = 0 }, [url, live])
-  useEffect(() => { if (!eng) loadEngines().then(setEng, () => setErr(tn("errors.stream.unavailable"))) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const need = engineToLoad({ raw, live, viaHls: viaHls === url }, { hls: eng.Hls?.isSupported(), mpegts: eng.mpegts?.isSupported() })
+  useEffect(() => { if (need) void LOAD[need]().then(() => setEng(loadedEngines()), () => setErr(tn("errors.stream.unavailable"))) }, [need, retryN]) // Retry also re-tries a script that failed to load
   useEffect(() => { if (err) meas.current.errTotal++ }, [err])
 
   /** Final error. A refused stream on an Xtream account at its connection limit gets the real reason. */
@@ -59,7 +69,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
 
   const first = useRef(true)
   useEffect(() => {
-    if (!eng) return
+    if (need) return
     const v = vref.current!
     const g = ++gen.current
     setErr(""); setBuf(true); setStarted(false); statsRef.current = null
@@ -93,7 +103,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
       stream.current?.stop(); stream.current = null; hls.current = null
       release(v)
     }
-  }, [url, live, retryN, viaHls, eng]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [url, live, retryN, viaHls, eng, need]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* back online / app back in front: a dead or still-loading stream restarts after a pause (the provider drops the old connection meanwhile) */
   useEffect(() => {
@@ -134,10 +144,17 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
     onPlaying: () => { auto.current = 0; played.current = true; setBuf(false); setStarted(true); setPaused(false); meas.current.startupMs ??= Date.now() - meas.current.attachAt },
     onPause: () => setPaused(true),
     onError: () => {
-      const a = nativeAction({ fallback: !!cb.current.fallback, live, usedHls: !!hls.current, triedHls: viaHls === url, hlsOk: !!eng?.Hls.isSupported(), code: vref.current?.error?.code })
-      if (a.do === "fallback") cb.current.fallback!()
-      else if (a.do === "hls") setViaHls(url)
-      else fail(a.fail)
+      const g = gen.current, code = vref.current?.error?.code, usedHls = !!hls.current
+      const decide = (hlsOk: boolean) => {
+        if (g !== gen.current) return
+        const a = nativeAction({ fallback: !!cb.current.fallback, live, usedHls, triedHls: viaHls === url, hlsOk, code })
+        if (a.do === "fallback") cb.current.fallback!()
+        else if (a.do === "hls") setViaHls(url)
+        else fail(a.fail)
+      }
+      // a native VOD may never have needed hls.js: load it now to know whether the hls.js retry is possible
+      if (eng.Hls || cb.current.fallback || live || usedHls || viaHls === url) decide(!!eng.Hls?.isSupported())
+      else void loadHls().then((H) => decide(H.isSupported()), () => decide(false))
     },
   }
 

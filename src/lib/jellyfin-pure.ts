@@ -40,24 +40,24 @@ const backdrop = (m: J, img: Img) =>
 /** One Movie/Series from /Users/{uid}/Items -> catalog Item. `group` = library (view) name. */
 export function mapItem(m: J, o: { sourceId: string; group: string; img: Img }): Item {
   const kind = m.Type === "Series" ? "series" : "movie"
-  return {
-    id: `${o.sourceId}|${kind}|${m.Id}`,
-    kind,
-    sid: String(m.Id),
-    name: String(m.Name ?? "?"),
-    group: o.group,
-    logo: poster(m, o.img, 300),
-    backdrop: backdrop(m, o.img),
-    plot: m.Overview || undefined,
-    rating: m.CommunityRating ? Number(m.CommunityRating).toFixed(1) : undefined,
-    year: m.ProductionYear ? String(m.ProductionYear) : undefined,
-    released: day(m.PremiereDate),
-    added: Math.floor(Date.parse(m.DateCreated) / 1000) || undefined,
-    genres: Array.isArray(m.Genres) ? m.Genres.map(String) : [],
-    resume: fromTicks(m.UserData?.PlaybackPositionTicks),
-    dur: fromTicks(m.RunTimeTicks),
-    ext: m.Container ? String(m.Container).split(",")[0] : undefined,
-  }
+  // only the fields the title has: explicit undefined keys cost memory and clone/merge time on big libraries
+  const i: Item = { id: `${o.sourceId}|${kind}|${m.Id}`, kind, sid: String(m.Id), name: String(m.Name ?? "?"), group: o.group }
+  const logo = poster(m, o.img, 300), back = backdrop(m, o.img)
+  if (logo !== undefined) i.logo = logo
+  if (back !== undefined) i.backdrop = back
+  if (m.Overview) i.plot = m.Overview
+  if (m.CommunityRating) i.rating = Number(m.CommunityRating).toFixed(1)
+  if (m.ProductionYear) i.year = String(m.ProductionYear)
+  const released = day(m.PremiereDate)
+  if (released !== undefined) i.released = released
+  const added = Math.floor(Date.parse(m.DateCreated) / 1000)
+  if (added) i.added = added
+  i.genres = Array.isArray(m.Genres) ? m.Genres.map(String) : []
+  const resume = fromTicks(m.UserData?.PlaybackPositionTicks), dur = fromTicks(m.RunTimeTicks)
+  if (resume !== undefined) i.resume = resume
+  if (dur !== undefined) i.dur = dur
+  if (m.Container) i.ext = String(m.Container).split(",")[0]
+  return i
 }
 
 /** One Episode from /Shows/{id}/Episodes -> Episode (its item plays like a movie). */

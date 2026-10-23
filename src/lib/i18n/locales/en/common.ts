@@ -60,5 +60,9 @@ const d: Dict = {
   "common.update.readyNote": "Reload to use it.",
   "common.update.reload": "Reload",
   "common.update.applying": "Updating Leen TV...",
+  "common.warm.title": "Getting your library ready",
+  "common.warm.merge": "Preparing your library",
+  "common.warm.continue": "Continue now",
+  "common.warm.note": "Loads once per session; channels, movies and shows open instantly after.",
 }
 export default d

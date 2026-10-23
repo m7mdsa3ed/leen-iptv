@@ -24,12 +24,13 @@ const flag = (on: boolean, f: string) => (on ? f : "")
  * Plays one stream in `v` and returns how to stop it. Teardown is strict: the connection is closed (requests aborted, mpegts unloaded,
  * decoder released) before the next stream opens, because many providers allow only 1-2 connections and a leftover one makes the next channel fail.
  */
-export function attach(v: HTMLVideoElement, eng: Engines, s: Spec, on: Events): Stream {
-  const { Hls, mpegts } = eng
-  const kind = pickEngine({ raw: s.raw, live: s.live, viaHls: s.viaHls, hls: Hls.isSupported(), mpegts: mpegts.isSupported() })
+export function attach(v: HTMLVideoElement, eng: Partial<Engines>, s: Spec, on: Events): Stream {
+  const { Hls, mpegts } = eng // only the scripts this stream needs are loaded (engineToLoad); a missing one counts as unsupported
+  const kind = pickEngine({ raw: s.raw, live: s.live, viaHls: s.viaHls, hls: !!Hls?.isSupported(), mpegts: !!mpegts?.isSupported() })
 
-  if (kind === "hls") {
-    const h = new Hls({ maxBufferLength: 30, enableWorker: true })
+  if (kind === "hls" && Hls) {
+    // bounded buffers: the back buffer defaults to Infinity, which an old TV runs out of memory on during a long live session
+    const h = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: s.live ? 10 : 30, maxBufferSize: 30 * 1000 * 1000, enableWorker: true })
     let tries = 0 // per outage: a buffered fragment resets it
     h.loadSource(s.url)
     h.attachMedia(v)
@@ -57,8 +58,11 @@ export function attach(v: HTMLVideoElement, eng: Engines, s: Spec, on: Events): 
     return { kind, hls: h, mp: null, stop: () => { h.stopLoad(); h.detachMedia(); h.destroy() } }
   }
 
-  if (kind === "mpegts") {
-    const p = mpegts.createPlayer({ type: "mpegts", isLive: true, url: s.url }, { enableWorker: true, liveBufferLatencyChasing: true })
+  if (kind === "mpegts" && mpegts) {
+    const p = mpegts.createPlayer({ type: "mpegts", isLive: true, url: s.url }, {
+      enableWorker: true, liveBufferLatencyChasing: true,
+      autoCleanupSourceBuffer: true, autoCleanupMaxBackwardDuration: 30, autoCleanupMinBackwardDuration: 15, // drop played media instead of growing the SourceBuffer
+    })
     p.attachMediaElement(v)
     p.load()
     p.on(mpegts.Events.MEDIA_INFO, (mi: { audioCodec?: string; audioChannelCount?: number }) => { if (mi.audioCodec) on.codec({ codec: mi.audioCodec, ch: mi.audioChannelCount }) })

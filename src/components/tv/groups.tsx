@@ -18,34 +18,45 @@ export const FAV = "Favorites"
 export const ALL = "All"
 export const CONT = "Continue watching" // pseudo group, like FAV: live = recently watched channels, movies / shows = started and not finished (same rule as Home's Continue watching row)
 
-/** What the Continue watching group lists for a kind, newest first, narrowed by the source filter. Series progress is also saved under the series id (setProgress), so shows resolve here. */
-export function useContinue(kind: Kind): Item[] {
+/** What the Continue watching group lists for a kind, newest first, narrowed by the source filter. Series progress is also saved under the series id (setProgress), so shows resolve here.
+ *  `off` = the caller already has the list: skip the work and return []. */
+export function useContinue(kind: Kind, off = false): Item[] {
   const byId = useCatalog((s) => s.byId)
   const d = usePData()
   const filter = useActiveFilter()
+  const recents = kind === "live" ? d.recents : undefined, progress = kind === "live" ? undefined : d.progress
   return useMemo(() => {
-    const ids = kind === "live" ? d.recents : Object.entries(d.progress).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
+    if (off) return NONE
+    const ids = recents ?? Object.entries(progress ?? {}).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
     return ids.map((id) => byId.get(id)).filter((i): i is Item => !!i && i.kind === kind && inSource(i, filter))
-  }, [kind, byId, d.recents, d.progress, filter])
+  }, [off, kind, byId, recents, progress, filter])
 }
+const NONE: Item[] = []
 
-/** Titles behind each category pill, counted like the pages list them (picked sources only): All, Favorites, the user's live lists, categories. undefined = no count (genre pills). Shown in the sidebar. */
-export function useGroupCount(kind: Kind) {
+/** Titles behind each category pill, counted like the pages list them (picked sources only): All, Favorites, the user's live lists, categories. undefined = no count (genre pills). Shown in the sidebar.
+ *  `cont` = the caller's useContinue(kind) list, so it is not built twice. */
+export function useGroupCount(kind: Kind, cont?: Item[]) {
   const { byKind } = useCatalogView()
   const byId = useCatalog((s) => s.byId)
   const favs = usePData().favs
   const lists = useLists()
   const filter = useActiveFilter()
-  const cont = useContinue(kind).length
-  const m = useMemo(() => {
+  const own = useContinue(kind, !!cont)
+  const nCont = (cont ?? own).length
+  // the expensive pass over every title: only when the catalog (or the source filter) changes
+  const cats = useMemo(() => {
     const m = new Map<string, number>([[ALL, byKind[kind].length]])
     for (const i of byKind[kind]) for (const c of catsOf(i)) m.set(c, (m.get(c) ?? 0) + 1)
-    m.set(CONT, cont)
-    m.set(FAV, favs.filter((id) => { const i = byId.get(id); return i?.kind === kind && inSource(i, filter) }).length) // via byId, like the pages: favorites of merged copies count
-    if (kind === "live") { const ids = new Set(byKind.live.map((i) => i.id)); for (const l of lists) m.set(l.name, l.items.filter((id) => ids.has(id)).length) }
     return m
-  }, [byKind, kind, byId, favs, lists, filter, cont])
-  return (g: string) => m.get(g)
+  }, [byKind, kind])
+  const live = byKind.live
+  const mine = useMemo(() => {
+    const m = new Map<string, number>([[CONT, nCont]])
+    m.set(FAV, favs.filter((id) => { const i = byId.get(id); return i?.kind === kind && inSource(i, filter) }).length) // via byId, like the pages: favorites of merged copies count
+    if (kind === "live") { const ids = new Set(live.map((i) => i.id)); for (const l of lists) m.set(l.name, l.items.filter((id) => ids.has(id)).length) }
+    return m
+  }, [kind, live, byId, favs, lists, filter, nCont])
+  return (g: string) => (mine.has(g) ? mine.get(g) : cats.get(g))
 }
 
 /** Category pill row (all modes). Yellow key toggles the parental lock on the focused category. */
@@ -55,12 +66,13 @@ export function GroupList({ kind, groups, active, onPick }: { kind: Kind; groups
   const toggleLock = useApp((s) => s.toggleLock)
   const lists = useLists()
   const isList = (g: string) => lists.some((l) => l.name === g)
-  const hasCont = useContinue(kind).length > 0
+  const cont = useContinue(kind)
+  const hasCont = cont.length > 0
   const list = [...(hasCont || active === CONT ? [CONT] : []), FAV, ALL, ...groups]
   const lockKey = (g: string) => findLock(p?.locked ?? [], kind, g)
   const mode = useMode()
   const ref = useCatSide()
-  const count = useGroupCount(kind)
+  const count = useGroupCount(kind, cont)
   const toggle = async (g: string) => {
     if (g === CONT || g === FAV || g === ALL || !p?.pin) return
     const k = lockKey(g)

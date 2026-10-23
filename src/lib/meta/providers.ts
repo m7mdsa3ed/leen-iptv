@@ -9,6 +9,8 @@ import { mapDiscover } from "./plex-discover-pure"
 import { plexUrl } from "@/lib/plex"
 import { sharedGet, sharedPut } from "./shared"
 import { omdbKey, resolveKey, shareable, sharedKey } from "./shared-pure"
+import { mapWatchmodeDetails } from "./watchmode-pure"
+import { watchmodeId, wmGet } from "./watchmode"
 import type { Credit, EpisodeMeta, Person, PersonInfo, PersonRef, Provider, ProviderCfg, Rating, SimilarRef } from "./types"
 
 const list = (v: unknown) => String(v ?? "").split(/\s*,\s*/).map((x) => x.trim()).filter((x) => x && x !== "N/A")
@@ -337,6 +339,22 @@ const plexDiscover: Provider = {
   },
 }
 
+/* ---------- Watchmode (title info; where-to-watch is meta/watchmode.ts). Free plan: ~2,500 requests/month, so details are cached 7 days. ---------- */
+const watchmode: Provider = {
+  id: "watchmode",
+  name: "Watchmode",
+  needsKey: true,
+  hasRegion: true,
+  async fetch(q, cfg) {
+    const key = cfg.key?.trim()
+    if (!key) return null
+    const id = await watchmodeId({ kind: q.kind, imdb: q.ids.imdb, tmdb: q.ids.tmdb, title: q.title, year: q.year }, key) // imdb -> tmdb -> name search
+    if (!id) return null
+    const d = await cached(`wm:det:${id}`, 7 * DAY, () => wmGet(`/title/${id}/details/`, key), (j) => !(j as J)?.title)
+    return (d as J)?.title ? mapWatchmodeDetails(d) : null
+  },
+}
+
 /** Add a new source = write one Provider above and list it here; Settings > Metadata picks it up. */
-export const PROVIDERS: Provider[] = [xtream, tmdb, omdb, plexDiscover]
-export const DEFAULT_CFG = [{ id: "xtream", enabled: true }, { id: "tmdb", enabled: false }, { id: "omdb", enabled: false }]
+export const PROVIDERS: Provider[] = [xtream, tmdb, omdb, plexDiscover, watchmode]
+export const DEFAULT_CFG = [{ id: "xtream", enabled: true }, { id: "tmdb", enabled: false }, { id: "omdb", enabled: false }, { id: "watchmode", enabled: false }]

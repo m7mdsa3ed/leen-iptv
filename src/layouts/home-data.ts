@@ -1,5 +1,5 @@
 import { catsOf } from "@/lib/merge-pure"
-import { useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { fmt, t, useLang } from "@/lib/i18n"
 import { useNotify } from "@/lib/notify"
 import { accountInfo } from "@/lib/xtream"
@@ -10,6 +10,7 @@ import { useOpen } from "@/components/tv/ui"
 import type { Item, Kind, Source } from "@/lib/types"
 import { useSources } from "@/lib/sources"
 import { inSource, useActiveFilter, useCatalogView } from "./hooks/use-source-filter"
+import { useStable } from "./hooks/use-category"
 
 const CAP = 20
 
@@ -61,7 +62,7 @@ export function useHomeData() {
   const { byKind, groups } = useCatalogView()
   const filter = useActiveFilter()
   const enabled = useSources()
-  const d = usePData()
+  const { progress, favs: favIds } = usePData()
   const go = useRoute((s) => s.go)
   const openItem = useOpen()
   const toggleFav = useApp((s) => s.toggleFav)
@@ -70,55 +71,62 @@ export function useHomeData() {
   const homeOrder = useApp((s) => s.settings.homeOrder), homeHide = useApp((s) => s.settings.homeHide)
   const { lang } = useLang() // t() below is non-reactive: rebuild on language change
 
-  const data = useMemo(() => {
-    const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter((x) => x && inSource(x, filter)).slice(0, CAP) as Item[]
-    const p = Object.entries(d.progress).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
+  // genre rails: one pass over the whole catalog, so only when the catalog (or the language) changes, not on every progress save
+  const genreRails = useMemo(() => {
     const genre = (k: Kind) => {
       const first = groups[k].slice(0, 6)
       const m = new Map<string, Item[]>(first.map((g) => [g, []]))
       for (const i of byKind[k]) for (const c of catsOf(i)) { const l = m.get(c); if (l && l.length < CAP) l.push(i) }
       return first.map((g) => ({ k, g, items: m.get(g)! })).filter((r) => r.items.length)
     }
-    const cont = get(p), favs = get(d.favs), live = byKind.live.slice(0, CAP)
+    const seeAll = (k: Kind, g: string) => () => go("category", { id: `${k}|${g}` })
+    return [...genre("movie"), ...genre("series")].map((r): HomeRail => ({
+      key: r.k + r.g, title: t(r.k === "movie" ? "common.moviesIn" : "common.showsIn", { g: r.g }), kind: "poster", items: r.items, seeAll: seeAll(r.k, r.g),
+    }))
+  }, [byKind, groups, go, lang])
+
+  const data = useMemo(() => {
+    const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter((x) => x && inSource(x, filter)).slice(0, CAP) as Item[]
+    const p = Object.entries(progress).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
+    const cont = get(p), favs = get(favIds), live = byKind.live.slice(0, CAP)
     // hero: last continue-watching, else a favorite, else a day-stable VOD pick, else first channel
-    const vod = [...byKind.movie, ...byKind.series]
+    const mv = byKind.movie, nv = mv.length + byKind.series.length
+    const vod = (n: number) => (n < mv.length ? mv[n] : byKind.series[n - mv.length]) // = [...movie, ...series][n], without copying both lists
     const day = Math.floor(Date.now() / 864e5)
-    const hero = cont[0] ?? favs[0] ?? (vod.length ? vod[day % vod.length] : undefined) ?? byKind.live[0]
+    const hero = cont[0] ?? favs[0] ?? (nv ? vod(day % nv) : undefined) ?? byKind.live[0]
     const kicker = (i: Item) => (cont[0] === i ? t("common.continueWatching") : favs[0] === i ? t("common.favorite") : t("common.featured"))
     // carousel candidates (up to 5, distinct, hero first)
     const featured: HeroPick[] = []
     const add = (i: Item | undefined, k?: string) => { if (i && featured.length < 5 && !featured.some((f) => f.item === i)) featured.push({ item: i, kicker: k ?? t("common.featured") }) }
     add(hero, hero && kicker(hero))
     add(favs[0], t("common.favorite"))
-    for (let n = 0; n < vod.length && featured.length < 5; n++) add(vod[(day + n * 7) % vod.length])
+    for (let n = 0; n < nv && featured.length < 5; n++) add(vod((day + n * 7) % nv))
     if (!featured.length) add(byKind.live[0])
-    const pct = (i: Item) => { const p = d.progress[i.id]; return p ? (p.pos / p.dur) * 100 : undefined }
-    const seeAll = (k: Kind, g: string) => () => go("category", { id: `${k}|${g}` })
+    const pct = (i: Item) => { const p = progress[i.id]; return p ? (p.pos / p.dur) * 100 : undefined }
     const rails: HomeRail[] = []
     const card = (l: Item[]) => (l.some((i) => i.kind !== "live") ? "poster" : "wide") as "wide" | "poster"
     if (cont.length) rails.push({ key: "cont", title: t("common.continueWatching"), kind: "wide", card: card(cont), items: cont, pct })
     if (favs.length) rails.push({ key: "favs", title: t("common.favorites"), kind: "wide", card: card(favs), items: favs })
     rails.push({ key: "games", title: "", kind: "wide", items: [] }) // slot only: the layout fills it with sports games, so it orders/hides like any row
-    for (const r of [...genre("movie"), ...genre("series")]) {
-      const title = t(r.k === "movie" ? "common.moviesIn" : "common.showsIn", { g: r.g })
-      rails.push({ key: r.k + r.g, title, kind: "poster", items: r.items, seeAll: seeAll(r.k, r.g) })
-    }
+    rails.push(...genreRails)
     const order: readonly string[] = homeOrder?.length ? homeOrder : HOME_ROWS, hide = homeHide ?? []
     const rank = (r: HomeRail) => { const i = order.indexOf(homeRowOf(r.key)); return i < 0 ? 99 : i }
     rails.splice(0, rails.length, ...rails.filter((r) => !hide.includes(homeRowOf(r.key))).sort((a, b) => rank(a) - rank(b))) // stable: genre rails keep their order
     const hp: HeroPick | undefined = hero ? { item: hero, kicker: kicker(hero) } : undefined
-    return { hero: hp, featured, rails, live, favIds: d.favs }
-  }, [d, byId, byKind, groups, go, filter, lang, homeOrder, homeHide])
+    return { hero: hp, featured, rails, live, favIds }
+  }, [progress, favIds, byId, byKind, filter, genreRails, lang, homeOrder, homeHide])
+  const favSet = useMemo(() => new Set(favIds), [favIds])
+  const live = data.live
 
   return {
     status, msg, ...data,
     /** open an item; `from` = the rail's items (live ones become the zapping queue) */
-    open: (i: Item, from?: Item[]) => openItem(i, from?.filter((x) => x.kind === "live")),
+    open: useStable((i: Item, from?: Item[]) => openItem(i, from?.filter((x) => x.kind === "live"))),
     /** play/open from the hero: live items zap within the first channels */
-    play: (i: Item) => openItem(i, data.live),
-    info: (i: Item) => openItem(i),
-    toggleFav: (i: Item) => toggleFav(i.id),
-    isFav: (i: Item) => data.favIds.includes(i.id),
+    play: useStable((i: Item) => openItem(i, live)),
+    info: useStable((i: Item) => openItem(i)),
+    toggleFav: useCallback((i: Item) => toggleFav(i.id), [toggleFav]),
+    isFav: useCallback((i: Item) => favSet.has(i.id), [favSet]),
     retry: () => void useCatalog.getState().loadAll(useApp.getState().sources, proxy, true),
     changeSource: () => go("sources"),
     sourceName: enabled.length === 1 ? enabled[0].name : undefined, // several sources: no single name

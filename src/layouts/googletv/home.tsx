@@ -1,5 +1,6 @@
+import { startTransition, useCallback, useEffect, useState } from "react"
 import { Play } from "lucide-react"
-import { Shell, TvButton, Empty } from "@/components/tv/ui"
+import { Shell, TvButton, Empty, useCardFlags } from "@/components/tv/ui"
 import { Card, Rail, SkelRail, small } from "@/components/gtv"
 import { GameCard, SkelGames } from "@/components/tv/sports"
 import type { Item } from "@/lib/types"
@@ -12,6 +13,19 @@ import { useRoute } from "@/lib/nav"
 import { GRail, useLeft } from "./parts"
 
 const TITLES: Record<string, string> = { favs: "gtv.home.watchlist" }
+/** Rails painted on the first frame; the rest follow in a transition right after (same order, same list). */
+const FIRST_RAILS = 4
+
+type Flags = ReturnType<typeof useCardFlags>
+/** One rail: the opener is stable per rail (item + the rail as zapping queue), so memoised Cards skip re-rendering. Cards are GRail's direct children (it stages them on TV). */
+function CardRail({ title, onSeeAll, items, variant, pct, sub, open, flags }: { title: string; onSeeAll?: () => void; items: Item[]; variant: "wide" | "poster"; pct?: (i: Item) => number | undefined; sub: (i: Item) => string | undefined; open: (i: Item, from?: Item[]) => void; flags: Flags }) {
+  const onOpen = useCallback((i: Item) => open(i, items), [open, items])
+  return (
+    <GRail title={title} onSeeAll={onSeeAll}>
+      {items.map((i) => <Card key={i.id} item={i} variant={variant} pct={pct?.(i)} sub={sub(i)} onOpen={onOpen} fav={flags.fav(i)} locked={flags.locked(i)} badge={flags.badge} />)}
+    </GRail>
+  )
+}
 
 export default function Home() {
   const t = useT()
@@ -21,6 +35,15 @@ export default function Home() {
   const follows = useFollows()
   const go = useRoute((s) => s.go)
   const feat = h.featured
+  const flags = useCardFlags()
+  const ready = h.status === "ready"
+  const [allRails, setAllRails] = useState(false)
+  useEffect(() => {
+    if (!ready || allRails) return
+    const id = requestAnimationFrame(() => startTransition(() => setAllRails(true))) // after the first paint of the top rails
+    return () => cancelAnimationFrame(id)
+  }, [ready, allRails])
+  const rails = allRails ? h.rails : h.rails.slice(0, FIRST_RAILS)
   const meta = (item: Item) => [item.year && fmt.digits(item.year), item.rating ? `★ ${Number.isFinite(Number(item.rating)) ? fmt.decimal(Number(item.rating)) : item.rating}` : "", item.genres?.slice(0, 2).join(", ") || item.group, item.dur && item.dur > 60 ? fmt.duration(item.dur) : ""].filter(Boolean).join("  •  ")
 
   return (
@@ -65,7 +88,7 @@ export default function Home() {
             </Rail>
           )}
           {!feat.length && !h.rails.some((r) => r.items.length) && <Empty>{t("gtv.home.empty")}</Empty>}
-          {h.rails.map((r) => r.key === "games" ? (
+          {rails.map((r) => r.key === "games" ? (
             games.length > 0 ? (
               <Rail key="games" title={t("gtv.home.nextGames")}>
                 {games.slice(0, 12).map((g) => {
@@ -75,11 +98,7 @@ export default function Home() {
               </Rail>
             ) : gamesLoading ? <SkelGames key="games" /> : null
           ) : (
-            <GRail key={r.key} title={TITLES[r.key] ? t(TITLES[r.key]) : r.title} onSeeAll={r.seeAll}>
-              {r.items.map((i) => (
-                <Card key={i.id} item={i} variant={r.card ?? r.kind} pct={r.pct?.(i)} sub={r.key === "cont" ? left(i) : r.sub?.(i)} onOpen={() => h.open(i, r.items)} />
-              ))}
-            </GRail>
+            <CardRail key={r.key} title={TITLES[r.key] ? t(TITLES[r.key]) : r.title} onSeeAll={r.seeAll} items={r.items} variant={r.card ?? r.kind} pct={r.pct} sub={r.key === "cont" ? left : (i) => r.sub?.(i)} open={h.open} flags={flags} />
           ))}
         </div>
       )}

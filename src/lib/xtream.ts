@@ -2,7 +2,9 @@ import type { Episode, Item, Source } from "./types"
 import { fetchT, px } from "./net"
 import { t } from "./i18n"
 import { hasStreamFacts, streamInfo } from "./meta/facts-pure"
-import { day } from "./browse-pure"
+import { mapXtream } from "./xtream-map"
+import ParseWorker from "./xtream.worker?worker&inline"
+import type { Answer, Ask } from "./xtream.worker"
 
 const base = (s: Source) => s.server!.replace(/\/+$/, "")
 const api = (s: Source, action = "", extra = "") =>
@@ -32,33 +34,46 @@ export async function xtreamAuth(s: Source, proxy: string) {
   if (!auth.user_info || auth.user_info.auth === 0) throw new Error(t("errors.source.loginFailed"))
 }
 
+/* The parse worker: started on the first fetched part, reused. It answers a ping before the first part is posted, so a worker that cannot start
+   (a blocked blob worker) is known while the buffers are still ours: they are parsed here as before. Parts are then TRANSFERRED, not copied
+   (a 40 MB copy on a TV costs as much as the parse); if the worker dies mid-parse the answer is null and the caller fetches the part again. */
+let worker: Promise<Worker | null> | undefined
+let seq = 0
+const waiting = new Map<number, (a: Answer | null) => void>() // null = no answer from the worker: parse on this thread
+const startWorker = () => new Promise<Worker | null>((res) => {
+  let w: Worker
+  try { w = new ParseWorker() } catch { return res(null) }
+  const fail = () => { w.terminate(); res(null) }
+  const timer = setTimeout(fail, 5000) // never answered: treat as not started
+  w.onerror = () => { clearTimeout(timer); fail() }
+  w.onmessage = () => {
+    clearTimeout(timer)
+    w.onmessage = (e: MessageEvent<Answer>) => { waiting.get(e.data.n)?.(e.data); waiting.delete(e.data.n) }
+    w.onerror = () => { w.terminate(); worker = Promise.resolve(null); for (const f of waiting.values()) f(null); waiting.clear() }
+    res(w)
+  }
+  w.postMessage({ n: 0 }) // ping: no buffers
+})
+async function viaWorker(ask: Omit<Ask, "n">): Promise<Answer | null> {
+  const w = await (worker ??= startWorker())
+  if (!w) return null
+  const n = ++seq
+  return new Promise((res) => { waiting.set(n, res); w.postMessage({ ...ask, n }, [ask.cats, ask.list]) })
+}
+
 /** One part of the catalog (live channels, movies or series). */
 export async function loadXtreamKind(s: Source, proxy: string, kind: XtreamKind, step: (m: string) => void): Promise<Item[]> {
   const [, cats, list, msg] = XTREAM_KINDS.find((k) => k[0] === kind)!
   step(t(msg))
-  const [c, l] = await Promise.all([call<R[]>(s, proxy, cats), call<R[]>(s, proxy, list)])
-  const names = new Map(arr<R>(c).map((x) => [String(x.category_id), String(x.category_name)]))
-  const out: Item[] = []
-  for (const x of arr<R>(l)) {
-    const sid = String(kind === "series" ? x.series_id : x.stream_id)
-    out.push({
-      id: `${s.id}|${kind}|${sid}`,
-      kind,
-      sid,
-      name: String(x.name ?? "?"),
-      group: names.get(String(x.category_id)) ?? "Other",
-      logo: String((kind === "series" ? x.cover : x.stream_icon) ?? "") || undefined,
-      epgId: x.epg_channel_id ? String(x.epg_channel_id) : undefined,
-      ext: x.container_extension ? String(x.container_extension) : undefined,
-      num: x.num ? Number(x.num) : undefined,
-      rating: x.rating ? String(x.rating) : undefined,
-      year: String(x.year ?? x.releaseDate ?? x.release_date ?? "").match(/^(?:19|20)\d{2}/)?.[0], // "2023" or "2023-05-01"
-      released: day(x.releaseDate ?? x.release_date),
-      added: Number(kind === "series" ? x.last_modified : x.added) || undefined, // series: last update = newest episode
-      plot: x.plot ? String(x.plot) : undefined,
-    })
-  }
-  return out
+  const raw = (action: string) => fetchT(px(api(s, action), proxy)).then((r) => r.arrayBuffer())
+  const fetchBoth = () => Promise.all([raw(cats), raw(list)])
+  let [c, l] = await fetchBoth()
+  const a = await viaWorker({ sourceId: s.id, kind, cats: c, list: l })
+  if (a?.error) throw new SyntaxError(a.error) // not JSON: what .json() threw before
+  if (a?.items) return a.items
+  if (!a && (c.byteLength === 0 || l.byteLength === 0)) [c, l] = await fetchBoth() // transferred to a worker that died: the buffers are gone
+  const dec = new TextDecoder()
+  return mapXtream(s.id, kind, JSON.parse(dec.decode(c)), JSON.parse(dec.decode(l)))
 }
 
 /** Account status from the panel: expiry (ms, 0 = never), connections in use vs allowed (max 0 = unknown); null when unreachable. */

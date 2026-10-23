@@ -61,6 +61,23 @@ export async function fetchT(url: string, ms = 60000, init?: RequestInit): Promi
   }
 }
 
+/** A paged list (Plex / Jellyfin libraries): the first page says how many there are, the others are fetched 3 at a time
+    (a TV waits on round trips, not on the server). Items come back in page order. */
+export async function paged<T>(size: number, page: (start: number) => Promise<{ list: T[]; total?: number }>, progress: (done: number, total: number) => void): Promise<T[]> {
+  const first = await page(0)
+  const total = first.total ?? first.list.length
+  const out = first.list.slice()
+  const starts: number[] = []
+  for (let st = size; first.list.length && st < total; st += size) starts.push(st)
+  progress(Math.min(size, total), total)
+  for (let i = 0; i < starts.length; i += 3) {
+    const got = await Promise.all(starts.slice(i, i + 3).map(page))
+    for (const p of got) for (const x of p.list) out.push(x)
+    progress(Math.min(starts[Math.min(i + 3, starts.length) - 1] + size, total), total)
+  }
+  return out
+}
+
 /** Text of a URL, transparently gunzipping .xml.gz style payloads. */
 export async function fetchText(url: string): Promise<string> {
   const buf = new Uint8Array(await (await fetchT(url, 120000)).arrayBuffer())

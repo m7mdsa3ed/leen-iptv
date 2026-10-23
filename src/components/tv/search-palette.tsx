@@ -3,6 +3,7 @@ import { TextInput } from "@/components/tv/text-input"
 import { create } from "zustand"
 import { Clock, Search as SearchIcon, X } from "lucide-react"
 import { Card } from "@/components/gtv"
+import { VGrid } from "@/components/tv/ui"
 import { useSearch } from "@/layouts/hooks/use-search"
 import { fmt, useT } from "@/lib/i18n"
 import { navHooks } from "@/lib/nav"
@@ -37,6 +38,8 @@ function Panel() {
   const groups = ([["movie", t("nav.movies"), S.movies], ["series", t("nav.shows"), S.series], ["live", t("nav.live"), S.live]] as const).filter((g) => g.length && g[2].length)
   const shown = kind === "all" ? groups : groups.filter((g) => g[0] === kind)
   const first = shown[0]?.[2][0]
+  const one = !S.tooShort && kind !== "all" ? shown[0] : undefined // one kind picked: its whole list, virtualised
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 // the grid minimums stay 10rem / 6.5rem like the 'all' tab
   return (
     <div data-modal role="dialog" aria-modal="true" aria-label={t("common.search")} className="fixed inset-0 z-[55] flex justify-center bg-background/90 px-[var(--gx)] pb-[var(--safe-b)] pt-[max(4vh,var(--safe-t))] backdrop-blur-md" onClick={closePalette}>
       <div className="flex h-full w-full max-w-[72rem] flex-col text-foreground" onClick={(e) => e.stopPropagation()}>
@@ -61,6 +64,11 @@ function Panel() {
             ))}
           </div>
         )}
+        {one ? (
+          <VGrid items={one[2] as Item[]} className="no-scrollbar mx-0 min-h-0 flex-1 px-0 pt-3" minW={(one[0] === "live" ? 10 : 6.5) * rem} ratio={one[0] === "live" ? 0.5625 : 1.5} label={56}
+            head={<h2 className="mb-2 text-lg font-medium">{one[1]} <span className="text-muted-foreground">{fmt.number(one[2].length)}</span></h2>}
+            render={(i) => <Card key={i.id} item={i} variant={one[0] === "live" ? "wide" : "poster"} fluid onOpen={pick} />} />
+        ) : (
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pb-6 pt-3">
           {S.tooShort ? (
             H.list.length ? (
@@ -78,11 +86,12 @@ function Panel() {
             <section key={k} className="mb-6">
               <h2 className="mb-2 text-lg font-medium">{label} <span className="text-muted-foreground">{fmt.number(items.length)}</span></h2>
               <div data-nav-group className="grid gap-3" style={grid(k === "live" ? "10rem" : "6.5rem")}>
-                {items.slice(0, kind === "all" ? 12 : 120).map((i) => <Card key={i.id} item={i} variant={k === "live" ? "wide" : "poster"} fluid onOpen={() => pick(i)} />)}
+                {items.slice(0, 12).map((i) => <Card key={i.id} item={i} variant={k === "live" ? "wide" : "poster"} fluid onOpen={pick} />)}
               </div>
             </section>
           )) : <div className="px-4 py-12 text-center text-muted-foreground">{t("search.none")}</div>}
         </div>
+        )}
       </div>
     </div>
   )

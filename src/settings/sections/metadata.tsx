@@ -70,6 +70,7 @@ export default function MetadataSection() {
             <ToggleRow label={t("settings.meta.use", { name })} checked={c.enabled} onChange={(v) => patch(c.id, { enabled: v })} />
             {p.needsKey && <Field label={t("settings.meta.apiKey")} type="password" dir="ltr" value={c.key ?? ""} onChange={(v) => patch(c.id, { key: v.trim() })} error={c.enabled && !c.key ? t("settings.meta.keyNeeded") : undefined} />}
             {p.hasLang && <Field label={t("settings.meta.language")} dir="ltr" placeholder={t("settings.meta.languagePh")} className="max-w-[20rem]" value={c.lang ?? ""} onChange={(v) => patch(c.id, { lang: v.trim() })} />}
+            {p.hasRegion && <Field label={t("settings.meta.region")} dir="ltr" placeholder={t("settings.meta.regionPh")} className="max-w-[20rem]" value={c.region ?? ""} onChange={(v) => patch(c.id, { region: v.trim().toUpperCase() })} />}
             <div className="flex gap-2">
               <RoundButton label={t("settings.meta.moveUp")} aria-disabled={i === 0} className={i === 0 ? "opacity-50" : ""} onClick={() => move(i, -1)}><ChevronUp /></RoundButton>
               <RoundButton label={t("settings.meta.moveDown")} aria-disabled={i === cfgs.length - 1} className={i === cfgs.length - 1 ? "opacity-50" : ""} onClick={() => move(i, 1)}><ChevronDown /></RoundButton>

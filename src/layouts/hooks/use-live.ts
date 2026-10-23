@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { ALL, CONT, FAV, useContinue } from "@/components/tv/groups"
 import { useOpen } from "@/components/tv/ui"
 import { useCatalog } from "@/lib/catalog"
 import { useApp, useLists, usePData } from "@/lib/store"
 import type { Item } from "@/lib/types"
+import { useStable } from "./use-category"
 import { useCatalogView } from "./use-source-filter"
 
 export { ALL, CONT, FAV }
@@ -16,10 +17,11 @@ export { ALL, CONT, FAV }
  * }
  */
 export function useLive() {
-  const { status } = useCatalog()
+  const status = useCatalog((s) => s.status)
   const { byKind, groups: catGroups } = useCatalogView()
   const lists = useLists()
-  const d = usePData()
+  const favs = usePData().favs
+  const favSet = useMemo(() => new Set(favs), [favs])
   const toggleFav = useApp((s) => s.toggleFav)
   const open = useOpen()
   const cont = useContinue("live")
@@ -33,13 +35,15 @@ export function useLive() {
   const items = useMemo(() => {
     if (g === ALL) return byKind.live
     if (g === CONT) return cont
-    if (g === FAV) return byKind.live.filter((i) => d.favs.includes(i.id))
+    if (g === FAV) return byKind.live.filter((i) => favSet.has(i.id))
     const list = lists.find((l) => l.name === g)
-    return list ? byKind.live.filter((i) => list.items.includes(i.id)) : byKind.live.filter((i) => i.group === g)
-  }, [g, byKind, d.favs, lists, cont])
+    if (!list) return byKind.live.filter((i) => i.group === g)
+    const ids = new Set(list.items)
+    return byKind.live.filter((i) => ids.has(i.id))
+  }, [g, byKind.live, favSet, lists, cont])
   return {
     status, channels: byKind.live, groups, lists, g, setG, items, sel, setSel,
-    isFav: (i: Item) => d.favs.includes(i.id), toggleFav: (i: Item) => toggleFav(i.id),
-    open: (i: Item, queue: Item[] = items) => open(i, queue),
+    isFav: useCallback((i: Item) => favSet.has(i.id), [favSet]), toggleFav: useCallback((i: Item) => toggleFav(i.id), [toggleFav]),
+    open: useStable((i: Item, queue: Item[] = items) => open(i, queue)),
   }
 }

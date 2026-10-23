@@ -2,7 +2,7 @@ import { HttpError } from "../net"
 
 /** Provider request log for the metadata activity panel: requests in the last minute, today (kept on the device, the day rolls at local midnight),
     and the last time a provider answered 429 (rate limited). Only real network calls are counted: cached answers never reach `counted`. */
-export const DAILY: Record<string, number> = { omdb: 1000 } // free-tier daily caps; TMDB has none (about 50 requests a second)
+export const DAILY: Record<string, number> = { omdb: 1000, watchmode: 80 } // free-tier daily caps; TMDB has none (about 50 requests a second); Watchmode free plan is about 2,500 requests a month
 const KEY = "leen-api-count"
 const today = () => new Date().toDateString()
 const load = (): { day: string; n: Record<string, number> } => { try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v?.day === today()) return v } catch { /* corrupt: start over */ } return { day: today(), n: {} } }

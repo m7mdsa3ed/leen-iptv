@@ -237,6 +237,7 @@ const d: Dict = {
 
   "diag.svc.tmdb": "TMDB key",
   "diag.svc.omdb": "OMDb key",
+  "diag.svc.watchmode": "Watchmode key",
   "diag.svc.sbReach": "Sync server reachable",
   "diag.svc.sbSession": "Sync server session",
   "diag.svc.sbLast": "Last sync",
