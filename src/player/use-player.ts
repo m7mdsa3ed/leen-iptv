@@ -206,6 +206,9 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
   const setFit = (i: number) => { setFitState(i); setPrefs({ fit: i }) }
   const [speed, setSpeedState] = useState(() => prefs().speed)
   const setSpeed = (n: number) => { const v = vref.current; if (v) { v.defaultPlaybackRate = n; v.playbackRate = n } setSpeedState(n); setPrefs({ speed: n }) }
+  // the clock over the video (on by default; a device preference, like the aspect and the speed)
+  const [clock, setClockState] = useState(() => prefs().clock)
+  const setClock = (on: boolean) => { setClockState(on); setPrefs({ clock: on }) }
   const setQuality = (nq: StreamQ) => {
     if (nq.id === q.id) return
     const v = vref.current
@@ -303,6 +306,8 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
     return () => { document.removeEventListener("visibilitychange", get); void l?.release() }
   }, [E.paused, E.err])
   useEffect(() => { usePlayerHost.setState({ cur: { queue, index: idx } }) }, [queue, idx])
+  // the picture sits still (paused, no sheet over it): the screen saver may take the screen (components/tv/screensaver.tsx)
+  useEffect(() => { usePlayerHost.setState({ paused: E.paused && layer === "none" && !E.err }) }, [E.paused, layer, E.err])
   // a new episode of the playing show (lib/new-episodes.ts) joins the queue, so the Next card picks it up
   useEffect(() => {
     const f = (e: Event) => {
@@ -333,7 +338,7 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
     chrome, layer, tab, setTab, banner, num, flash, hover, scrubbing,
     poke, hide, openPanel, openChannels, closeLayer,
     play, pause, toggle, seek, seekTo, zap, next, prev, go, playItem, digit, stop, leave: back,
-    vol, muted, setVolume, toggleMute, fit, setFit, cycleFit: () => setFit((fit + 1) % FITS.length), speed, setSpeed, q, setQuality, sleepMin, sleepAt, setSleep,
+    vol, muted, setVolume, toggleMute, fit, setFit, cycleFit: () => setFit((fit + 1) % FITS.length), speed, setSpeed, clock, setClock, q, setQuality, sleepMin, sleepAt, setSleep,
     isFav, toggleFav, mark, hasMarks, autoAll, autoNext, toggleShowAuto, variants, pickVariant,
     fs, toggleFs, canPip, pip, togglePip, casting, cast, multi, details, person,
     seg: skipOn ? sg.seg : null, skip: sg.skip, nextOn, nextItem: queue[idx + 1], nu,

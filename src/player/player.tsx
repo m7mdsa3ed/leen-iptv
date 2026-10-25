@@ -4,7 +4,7 @@ import { navState } from "@/lib/nav"
 import type { Item } from "@/lib/types"
 import { useT } from "@/lib/i18n"
 import { ErrorView, NextCard, SkipChip } from "./cards"
-import { Chrome } from "./chrome"
+import { Chrome, VideoClock } from "./chrome"
 import { Flash, NumberEntry, Spinner } from "./indicators"
 import { Channels } from "./live"
 import { Panel } from "./panel"
@@ -96,6 +96,7 @@ export default function Player({ queue, index, start }: { queue: Item[]; index: 
       {p.E.buf && !p.E.err && <Spinner title={p.item.name} started={p.E.started} label={t("player.loading")} />}
       <Flash f={p.flash} />
       {p.num && <NumberEntry n={p.num} />}
+      {p.clock && p.layer === "none" && !p.E.err && <VideoClock />}
       <Chrome p={p} vref={vref} tv={isTv} touch={touch} dock={dock} root={getRoot} />
       {p.layer === "none" && (p.seg || (p.nextOn && p.nextItem)) && (
         <div className="pl-float">

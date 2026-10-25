@@ -1,10 +1,11 @@
 import { Check } from "lucide-react"
-import { Row, SectionCard, Segmented } from "../controls"
+import { Pill, Row, SectionCard, Segmented } from "../controls"
 import { useMode } from "@/lib/device"
-import { useT } from "@/lib/i18n"
+import { fmt, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
 import { swatches, THEMES } from "@/lib/themes"
 import { useIsDark } from "@/lib/theme"
+import { saverMinutes, startSaver } from "@/components/tv/screensaver"
 
 /** Colour theme picker: one D-pad focusable chip per theme with its background / surface / accent swatches. */
 function ThemeChips() {
@@ -45,6 +46,11 @@ export default function AppearanceSection() {
       </Row>
       <Row label={t("settings.display.motion")} description={t("settings.display.motion.desc")} stack>
         <Segmented label={t("settings.display.motion")} value={settings.motion} options={[{ value: "full", label: t("settings.display.motion.full") }, { value: "reduced", label: t("settings.display.motion.reduced") }, { value: "off", label: t("settings.display.motion.off") }]} onChange={(v) => setSettings({ motion: v })} />
+      </Row>
+      <Row label={t("settings.display.saver")} description={t("settings.display.saver.desc")} stack>
+        <Segmented label={t("settings.display.saver")} value={saverMinutes(settings.screensaver)} options={[0, 2, 5, 10, 30].map((n) => ({ value: n, label: n ? t("settings.display.saver.min", { n: fmt.number(n) }) : t("settings.display.saver.off") }))} onChange={(v) => setSettings({ screensaver: v })} />
+        <Segmented label={t("settings.display.saver.style")} value={settings.saverStyle ?? "art"} options={[{ value: "art", label: t("settings.display.saver.art") }, { value: "clock", label: t("settings.display.saver.clock") }]} onChange={(v) => setSettings({ saverStyle: v })} />
+        <Pill onClick={startSaver}>{t("settings.display.saver.preview")}</Pill>
       </Row>
       {mode === "tv" && (
         <Row label={t("settings.display.tvSize")} stack>

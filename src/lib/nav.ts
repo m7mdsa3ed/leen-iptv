@@ -367,7 +367,9 @@ function scrollFocused(el: HTMLElement, fast: boolean) {
     const r = el.getBoundingClientRect(), pr = sc.getBoundingClientRect()
     clipped = r.left < pr.left || r.right > pr.right
   }
-  el.scrollIntoView({ block: el.closest("nav") ? "center" : "nearest", inline: clipped ? "center" : "nearest", behavior })
+  // vertical: only when the control would leave the scroller, so a list (the settings sidebar, a filter column) stays still under the focus ring;
+  // horizontal: a rail centres a clipped card, which is what keeps the next one readable
+  el.scrollIntoView({ block: "nearest", inline: clipped ? "center" : "nearest", behavior })
   if (el === lastEl) { // where it is NOW, not where it was before the scroll: that is where recover() looks if the control disappears
     const r = el.getBoundingClientRect()
     lastBox = { left: r.left, right: r.right, top: r.top, bottom: r.bottom }

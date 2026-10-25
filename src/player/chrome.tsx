@@ -1,7 +1,7 @@
-import { useEffect, useRef, type RefObject } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import { ArrowLeft, AudioLines, Cast, ChevronDown, ChevronUp, Expand, Info, ListVideo, Minimize, MoonStar, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipForward, SlidersHorizontal, Star, Volume2, VolumeX } from "lucide-react"
 import { castSupported } from "@/lib/cast"
-import { useT } from "@/lib/i18n"
+import { fmt, useT } from "@/lib/i18n"
 import { LiveHead } from "./live"
 import { Scrubber } from "./scrubber"
 import { Chip, IconBtn } from "./ui"
@@ -17,6 +17,18 @@ function Head({ p }: { p: P }) {
     <div className="pl-head">
       <div dir="auto" className="pl-title pl-trunc">{title}</div>
       {sub && <div dir="auto" className="pl-sub pl-trunc">{sub}</div>}
+    </div>
+  )
+}
+
+/** The time over clean video, top end (a device preference: Playback tab, Settings > Playback). Ticks on its own, never focusable. */
+export function VideoClock() {
+  const [now, setNow] = useState(new Date())
+  useT() // re-render on language switch (the time format follows it)
+  useEffect(() => { const i = setInterval(() => setNow(new Date()), 15000); return () => clearInterval(i) }, [])
+  return (
+    <div aria-hidden className="pl-clock">
+      <span dir="ltr" data-ltr>{fmt.time(now)}</span>
     </div>
   )
 }

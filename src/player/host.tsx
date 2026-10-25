@@ -8,17 +8,18 @@ type Q = { queue: Item[]; index: number }
 type Host = {
   s: (Q & { key: number; start?: boolean }) | null // the running playback session (one Player instance per key)
   cur: Q | null // what that Player is on now (it can zap / change episode)
+  paused: boolean // the player shows a still frame (paused, no sheet over it): the screen saver may take the screen
 }
-export const usePlayerHost = create<Host>(() => ({ s: null, cur: null }))
+export const usePlayerHost = create<Host>(() => ({ s: null, cur: null, paused: false }))
 let n = 0
 
 /** Stop playback for good (leaving the player, stop key, sleep timer, last episode ended). */
-export const closePlayer = () => usePlayerHost.setState({ s: null, cur: null })
+export const closePlayer = () => usePlayerHost.setState({ s: null, cur: null, paused: false })
 
 /** The `player` route: starts a session in the host; leaving the route stops it. */
 export function PlayerRoute({ queue, index, start }: Q & { start?: boolean }) {
   useEffect(() => {
-    usePlayerHost.setState({ s: { key: ++n, queue, index, start }, cur: { queue, index } })
+    usePlayerHost.setState({ s: { key: ++n, queue, index, start }, cur: { queue, index }, paused: false })
     return closePlayer
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return null

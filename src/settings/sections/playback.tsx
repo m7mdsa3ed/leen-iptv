@@ -1,12 +1,14 @@
 import { Field, Pill, Row, SectionCard, Segmented, ToggleRow } from "../controls"
 import { useT } from "@/lib/i18n"
 import { useRoute } from "@/lib/nav"
+import { usePrefs, setPrefs } from "@/player/prefs"
 import { useApp } from "@/lib/store"
 
 export default function PlaybackSection() {
   const { settings, setSettings } = useApp()
   const t = useT()
   const go = useRoute((s) => s.go)
+  const player = usePrefs() // the clock over the video is a player preference, not a synced setting
   const bad = settings.proxy && !/^https?:\/\//.test(settings.proxy)
   return (
     <div className="flex flex-col gap-4">
@@ -14,6 +16,7 @@ export default function PlaybackSection() {
         <Row label={t("settings.playback.liveFormat")} description={t("settings.playback.liveFormat.desc")} stack>
           <Segmented label={t("settings.playback.liveFormat")} value={settings.liveExt} options={[{ value: "m3u8", label: "m3u8" }, { value: "ts", label: "ts" }]} onChange={(v) => setSettings({ liveExt: v })} />
         </Row>
+        <ToggleRow label={t("settings.playback.clock")} description={t("settings.playback.clock.desc")} checked={player.clock} onChange={(v) => setPrefs({ clock: v })} />
         <ToggleRow label={t("settings.playback.nextBanner")} description={t("settings.playback.nextBanner.desc")} checked={settings.nextBanner ?? true} onChange={(v) => setSettings({ nextBanner: v })} />
         <ToggleRow label={t("settings.playback.autoNext")} description={t("settings.playback.autoNext.desc")} checked={settings.autoNext ?? true} onChange={(v) => setSettings({ autoNext: v })} />
         <ToggleRow label={t("settings.playback.track")} description={t("settings.playback.track.desc")} checked={settings.trackHistory} onChange={(v) => setSettings({ trackHistory: v })} />

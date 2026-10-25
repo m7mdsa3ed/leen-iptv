@@ -63,6 +63,7 @@ const d: Dict = {
   "common.warm.title": "Getting your library ready",
   "common.warm.merge": "Preparing your library",
   "common.warm.continue": "Continue now",
+  "common.saver.wake": "Press any button to continue",
   "common.warm.note": "Loads once per session; channels, movies and shows open instantly after.",
 }
 export default d

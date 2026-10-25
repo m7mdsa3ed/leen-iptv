@@ -22,6 +22,8 @@ const d: Dict = {
   "player.quality": "الجودة",
   "player.subtitles": "الترجمة",
   "player.aspect": "أبعاد الصورة",
+  "player.clock.title": "الساعة فوق الفيديو",
+  "player.on": "مشتغل",
   "player.pip": "صورة داخل صورة",
   "player.fullscreen": "ملء الشاشة",
   "player.play": "شغّل",

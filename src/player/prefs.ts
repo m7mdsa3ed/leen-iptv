@@ -27,9 +27,9 @@ export type SubStyleKey = keyof typeof SUB_STYLE
 type SubStyle = { [K in SubStyleKey]: (typeof SUB_STYLE)[K][number] }
 
 // audioLang / subLang: last picked language (ISO code) on a media server; subLang "off" = subtitles were turned off
-type P = { vol: number; muted: boolean; fit: number; speed: number; subSize: number; audioLang: string; subLang: string } & SubStyle
+type P = { vol: number; muted: boolean; fit: number; speed: number; subSize: number; audioLang: string; subLang: string; clock: boolean } & SubStyle
 const K = "leen-player"
-const DEF: P = { vol: 1, muted: false, fit: 0, speed: 1, subSize: 100, audioLang: "", subLang: "", subFont: "default", subColor: "white", subOpacity: 100, subBg: "none", subEdge: "outline", subLine: 1.25, subWidth: 95, subAlign: "center", subPos: 8, subBold: false, subNoHi: false, subRtlFix: false }
+const DEF: P = { vol: 1, muted: false, fit: 0, speed: 1, subSize: 100, audioLang: "", subLang: "", clock: true, subFont: "default", subColor: "white", subOpacity: 100, subBg: "none", subEdge: "outline", subLine: 1.25, subWidth: 95, subAlign: "center", subPos: 8, subBold: false, subNoHi: false, subRtlFix: false }
 const pick = <T,>(list: readonly T[], v: unknown, d: T): T => (list.includes(v as T) ? (v as T) : d)
 
 const read = (): P => {
@@ -42,6 +42,7 @@ const read = (): P => {
       subSize: (SUB_SIZES as readonly number[]).includes(r.subSize as number) ? (r.subSize as number) : DEF.subSize,
       audioLang: typeof r.audioLang === "string" ? r.audioLang : "",
       subLang: typeof r.subLang === "string" ? r.subLang : "",
+      clock: typeof r.clock === "boolean" ? r.clock : DEF.clock,
       speed: (SPEEDS as readonly number[]).includes(r.speed as number) ? (r.speed as number) : DEF.speed,
       subFont: pick(SUB_STYLE.subFont, r.subFont, DEF.subFont), subColor: pick(SUB_STYLE.subColor, r.subColor, DEF.subColor),
       subBg: pick(SUB_STYLE.subBg, r.subBg, DEF.subBg), subEdge: pick(SUB_STYLE.subEdge, r.subEdge, DEF.subEdge),

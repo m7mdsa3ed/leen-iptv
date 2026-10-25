@@ -22,6 +22,8 @@ const d: Dict = {
   "player.quality": "Quality",
   "player.subtitles": "Subtitles",
   "player.aspect": "Aspect",
+  "player.clock.title": "Clock over the video",
+  "player.on": "On",
   "player.pip": "Picture in picture",
   "player.fullscreen": "Fullscreen",
   "player.play": "Play",

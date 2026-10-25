@@ -72,7 +72,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
     if (need) return
     const v = vref.current!
     const g = ++gen.current
-    setErr(""); setBuf(true); setStarted(false); statsRef.current = null
+    setErr(""); setBuf(true); setStarted(false); setPaused(false); statsRef.current = null
     aud.current = {}; stalls.current = []; played.current = false
     meas.current.attachAt = Date.now(); meas.current.startupMs = undefined
     const live_ = () => g === gen.current

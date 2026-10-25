@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
-import { Cast, LayoutGrid, PictureInPicture2, Star } from "lucide-react"
+import { Cast, Clock, LayoutGrid, PictureInPicture2, Star } from "lucide-react"
 import { SkelBar } from "@/components/gtv"
 import { useDetail } from "@/layouts/hooks/use-detail"
 import { useCatalog } from "@/lib/catalog"
@@ -113,6 +113,12 @@ function PlaybackTab({ p }: { p: P }) {
       {p.S.mediaServer && !p.live && <Group title={t("player.quality")}><Choices items={STREAM_QS.map((q) => q.id)} value={p.q.id} onPick={(id) => p.setQuality(STREAM_QS.find((q) => q.id === id)!)} label={(id) => (id === "original" ? t("player.original") : STREAM_QS.find((q) => q.id === id)!.label)} /></Group>}
       {!p.live && <Group title={t("player.speed")}><Choices items={[...SPEEDS]} value={p.speed} onPick={p.setSpeed} label={(n) => <bdi dir="ltr">{speedLabel(n)}</bdi>} /></Group>}
       <Group title={t("player.aspect")}><Choices items={FITS.map((_, i) => i)} value={p.fit} onPick={p.setFit} label={(i) => t(`player.fit.${FITS[i]}`)} /></Group>
+      <Group title={t("player.clock.title")}>
+        <div data-nav-group className="pl-wrap">
+          <Chip aria-pressed={p.clock} on={p.clock} icon={<Clock />} onClick={() => p.setClock(true)}>{t("player.on")}</Chip>
+          <Chip aria-pressed={!p.clock} on={!p.clock} icon={<Clock />} onClick={() => p.setClock(false)}>{t("player.off")}</Chip>
+        </div>
+      </Group>
       <Group title={t("player.sleep.title")}><Choices items={[0, ...SLEEP_MIN]} value={p.sleepMin} onPick={p.setSleep} label={(n) => (n ? t("player.sleep.min", { n }) : t("player.off"))} /></Group>
       {p.variants.length > 1 && (
         <Group title={t("player.variant")}>

@@ -63,6 +63,7 @@ const d: Dict = {
   "common.warm.title": "بنجهّز مكتبتك",
   "common.warm.merge": "بنرتّب المكتبة",
   "common.warm.continue": "كمّل دلوقتي",
+  "common.saver.wake": "دوس على أي زرار عشان تكمّل",
   "common.warm.note": "بتتحمّل مرة واحدة كل تشغيل، وبعدها القنوات والأفلام والمسلسلات تفتح على طول.",
 }
 export default d

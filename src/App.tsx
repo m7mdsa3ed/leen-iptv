@@ -11,6 +11,7 @@ import { TrailerModal, closeTrailer, useTrailer } from "@/components/TrailerModa
 import { RecoveryGate } from "@/settings/AccountSync"
 import { Toasts } from "@/components/tv/toast"
 import { WarmUp } from "@/components/tv/warmup"
+import { ScreenSaver } from "@/components/tv/screensaver"
 import { startReminders } from "@/lib/sports/reminders"
 import { startEpisodeWatch } from "@/lib/new-episodes"
 import { CardMenu, closeCardMenu, useCardMenu } from "@/components/tv/card-menu"
@@ -190,6 +191,7 @@ export default function App() {
       <SearchPalette />
       <OnScreenKeyboard />
       <Toasts />
+      <ScreenSaver />
     </>
   )
 }

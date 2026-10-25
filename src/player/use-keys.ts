@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { isTv } from "@/lib/device"
 import { dialogOutside, KEY, navState } from "@/lib/nav"
+import { saverOn } from "@/components/tv/screensaver"
 import type { P } from "./use-player"
 import { fsEl } from "./util"
 
@@ -21,7 +22,7 @@ const active = () => document.activeElement as HTMLElement | null
 export function useKeys(p: P & { root: () => HTMLElement | null }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (dialogOutside(".pl-root")) return // a PIN prompt, keyboard, trailer... over the player owns the keys
+      if (dialogOutside(".pl-root") || saverOn()) return // a PIN prompt, keyboard, trailer... over the player owns the keys, and so does the screen saver
       const k = e.keyCode
       const take = () => { e.preventDefault(); e.stopPropagation() }
 
