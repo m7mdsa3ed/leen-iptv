@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
 import { NEXT_LEAD, NEXT_SECS } from "./util"
 
-/** "Next episode" card state: appears NEXT_LEAD seconds before the end (or at `creditsAt`, the credits start from Plex/Jellyfin, if earlier) and (when `auto`) counts down NEXT_SECS, then calls onNext; with auto off it just waits for Play now.
+/** "Next episode" card state: appears NEXT_LEAD seconds before the end and (when `auto`) counts down NEXT_SECS, then calls onNext; with auto off it just waits for Play now.
     Cancel hides it for now; seeking back out of the last NEXT_LEAD seconds re-arms it, so it comes again at the same point. `blocked` = Cancel pressed (the episode end must not auto-advance). */
-export function useNextUp(o: { vref: RefObject<HTMLVideoElement | null>; enabled: boolean; itemId: string; onNext: () => void; auto: boolean; creditsAt?: number }) {
-  const { vref, enabled, itemId, auto, creditsAt } = o
+export function useNextUp(o: { vref: RefObject<HTMLVideoElement | null>; enabled: boolean; itemId: string; onNext: () => void; auto: boolean }) {
+  const { vref, enabled, itemId, auto } = o
   const [show, setShow] = useState(false)
   const [secs, setSecs] = useState(NEXT_SECS)
   const dismissed = useRef(false) // cancelled / already used: stays hidden until the playhead leaves the last NEXT_LEAD seconds
@@ -20,13 +20,13 @@ export function useNextUp(o: { vref: RefObject<HTMLVideoElement | null>; enabled
     const f = () => {
       const d = v.duration, c = v.currentTime
       if (!(d > 0) || !isFinite(d)) return
-      const inWin = d - c <= NEXT_LEAD || (creditsAt != null && creditsAt > d / 2 && c >= creditsAt) // last NEXT_LEAD s, or the credits start the server found (second half only: not a mid-episode marker)
+      const inWin = d - c <= NEXT_LEAD // the last NEXT_LEAD s
       if (!inWin) { dismissed.current = false; blocked.current = false } // out of the window: re-arm
       setShow(!dismissed.current && inWin && d - c >= 0)
     }
     v.addEventListener("timeupdate", f)
     return () => v.removeEventListener("timeupdate", f)
-  }, [vref, enabled, itemId, creditsAt])
+  }, [vref, enabled, itemId])
 
   useEffect(() => {
     if (!show || !auto) return setSecs(NEXT_SECS)

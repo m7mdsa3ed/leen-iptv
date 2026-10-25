@@ -149,15 +149,6 @@ export const shiftVtt = (txt: string, sec: number) => {
 
 /** Audio / subtitle streams (MediaStreams of the item); ids are the stream Index the server expects back. */
 export type SrvTrack = { id: number; label: string; def?: boolean; lang?: string; text?: boolean; detail?: string; flags?: string[] }
-/** Skippable stretch of an episode, in seconds. */
-export type Seg = { kind: "intro" | "recap" | "credits"; start: number; end: number }
-const SEG_KIND: Record<string, Seg["kind"]> = { Intro: "intro", Recap: "recap", Outro: "credits" }
-/** Jellyfin 10.10+ GET /MediaSegments/{id}: Items with Type + StartTicks/EndTicks. */
-export const mapSegments = (j: J): Seg[] =>
-  ((j?.Items ?? []) as J[]).filter((x) => SEG_KIND[x.Type] && x.EndTicks > x.StartTicks).map((x) => ({ kind: SEG_KIND[x.Type], start: x.StartTicks / 1e7, end: x.EndTicks / 1e7 }))
-/** Intro Skipper plugin (older servers): GET /Episode/{id}/IntroTimestamps/v1 -> {Valid, IntroStart, IntroEnd} in seconds. */
-export const mapIntroSkipper = (j: J): Seg[] => (j?.Valid && j.IntroEnd > j.IntroStart ? [{ kind: "intro", start: j.IntroStart, end: j.IntroEnd }] : [])
-
 export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
   const st: J[] = m?.MediaSources?.[0]?.MediaStreams ?? m?.MediaStreams ?? []
   const pick = (type: string) => st.filter((s) => s.Type === type).map((s) => {

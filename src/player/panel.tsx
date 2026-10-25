@@ -105,7 +105,7 @@ function EpisodesTab({ p }: { p: P }) {
 
 /* ---------- Playback ---------- */
 
-/** Picture, speed, quality, version, sleep timer, auto-play, skip marks and the screen actions, each a row of pills. */
+/** Picture, speed, quality, version, sleep timer, auto-play and the screen actions, each a row of pills. */
 function PlaybackTab({ p }: { p: P }) {
   const t = useT()
   return (
@@ -128,14 +128,6 @@ function PlaybackTab({ p }: { p: P }) {
       {p.episode && p.autoAll && (
         <Group title={t("player.nextEpisode")}>
           <div data-nav-group className="pl-wrap"><Chip aria-pressed={!p.autoNext} on={!p.autoNext} onClick={p.toggleShowAuto}>{p.autoNext ? t("player.autoOffBtn") : t("player.autoOnShow")}</Chip></div>
-        </Group>
-      )}
-      {p.episode && (
-        <Group title={t("player.mark.title")}>
-          <div data-nav-group className="pl-wrap">
-            {(["is", "ie", "ce"] as const).map((k) => <Chip key={k} onClick={() => p.mark(k)}>{t(`player.mark.${k}`)}</Chip>)}
-            {p.hasMarks && <Chip onClick={() => p.mark("reset")}>{t("player.mark.reset")}</Chip>}
-          </div>
         </Group>
       )}
       <Group title={t("player.tab.more")}>

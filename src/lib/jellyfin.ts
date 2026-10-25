@@ -7,7 +7,7 @@ import { t } from "./i18n"
 import { useApp } from "./store"
 import { clientId } from "./plex"
 import { firstReachable } from "./plex-pure"
-import { authHeader, imageUrl, jfActiveKind, jfCands, jfUrl, jfWatch, mapChannel, mapDetail, mapEpisode, mapItem, mapIntroSkipper, mapSegments, mapStreams, normServer, toTicks, type Img } from "./jellyfin-pure"
+import { authHeader, imageUrl, jfActiveKind, jfCands, jfUrl, jfWatch, mapChannel, mapDetail, mapEpisode, mapItem, mapStreams, normServer, toTicks, type Img } from "./jellyfin-pure"
 
 export { normServer }
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -210,12 +210,6 @@ export const jellyfinMarkUnplayed = (s: Source, item: Item) => send(s, "DELETE",
 
 /** Audio + subtitle streams to pick from. */
 export const jellyfinTracks = async (s: Source, item: Item) => mapStreams(await get<J>(s, proxy(), `/Users/${s.userId}/Items/${item.sid}`))
-
-/** Intro / recap / outro segments: the server's own, else the Intro Skipper plugin's intro. */
-export async function jellyfinSegments(s: Source, item: Item) {
-  const own = await get<J>(s, proxy(), `/MediaSegments/${item.sid}`).then(mapSegments, () => [])
-  return own.length ? own : get<J>(s, proxy(), `/Episode/${item.sid}/IntroTimestamps/v1`).then(mapIntroSkipper, () => [])
-}
 
 /** WebVTT text of one subtitle stream (the server converts text subtitles on the fly; fetched, not linked, so no CORS setup on <video>). */
 export const jellyfinSubtitle = async (s: Source, item: Item, index: number) =>

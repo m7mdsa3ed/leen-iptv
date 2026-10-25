@@ -7,7 +7,7 @@ import { fetchT, mixed, paged, plexFetch, px, scanLan } from "./net"
 import { t } from "./i18n"
 import { mkvSubtitle } from "./mkv"
 import { useApp } from "./store"
-import { allowedConns, srtToVtt, buildUrl, connKind, directType, fileOf, identity, type SrvTrack, mapDetail, mapMeta, mapSegments, mapStreams, photoUrl, plexWatch, sortConns, plexMode, type Conn, type ConnMode } from "./plex-pure"
+import { allowedConns, srtToVtt, buildUrl, connKind, directType, fileOf, identity, type SrvTrack, mapDetail, mapMeta, mapStreams, photoUrl, plexWatch, sortConns, plexMode, type Conn, type ConnMode } from "./plex-pure"
 import { hasStreamFacts, plexStream } from "./meta/facts-pure"
 
 export { sortConns }
@@ -246,9 +246,6 @@ export function plexTimeline(s: Source, item: Item, state: "playing" | "paused" 
 
 /** Audio + subtitle streams to pick from. */
 export const plexTracks = async (s: Source, item: Item) => mapStreams((await get<Container>(s, proxy(), `/library/metadata/${item.sid}`)).MediaContainer?.Metadata?.[0] ?? {})
-
-/** Intro / credits markers of an episode. */
-export const plexSegments = async (s: Source, item: Item) => mapSegments((await get<Container>(s, proxy(), `/library/metadata/${item.sid}`, { includeMarkers: 1 })).MediaContainer?.Metadata?.[0] ?? {})
 
 /** WebVTT text of one text subtitle stream. Sidecar files: Plex converts to SRT (format=srt; fetched, not linked, so no CORS setup on <video>).
     Embedded in an MKV: Plex has no endpoint for that (501), so the cues are read from the file itself (mkv.ts), partial text via onUpdate. */

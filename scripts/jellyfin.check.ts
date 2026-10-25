@@ -1,6 +1,6 @@
 // node scripts/jellyfin.check.ts
 import assert from "node:assert/strict"
-import { authHeader, fromTicks, imageUrl, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, mapSegments, mapIntroSkipper, normServer, toTicks } from "../src/lib/jellyfin-pure.ts"
+import { authHeader, fromTicks, imageUrl, jfUrl, mapChannel, mapDetail, mapEpisode, mapItem, normServer, toTicks } from "../src/lib/jellyfin-pure.ts"
 
 assert.equal(normServer(" jf.lan:8096/ "), "http://jf.lan:8096")
 assert.equal(normServer("https://jf.example.com//"), "https://jf.example.com")
@@ -70,9 +70,6 @@ assert.deepEqual(jfCands({ server: "https://jelly.example.com" }), [{ uri: "http
 assert.equal(jfActiveKind(both), "local")
 assert.equal(jfActiveKind({ ...both, server: "https://jelly.example.com" }), "remote")
 assert.equal(jfActiveKind({ server: "http://10.0.0.5:8096" }), "local")
-assert.deepEqual(mapSegments({ Items: [{ Type: "Recap", StartTicks: 0, EndTicks: 150000000 }, { Type: "Intro", StartTicks: 150000000, EndTicks: 450000000 }, { Type: "Commercial", StartTicks: 0, EndTicks: 9 }] }), [{ kind: "recap", start: 0, end: 15 }, { kind: "intro", start: 15, end: 45 }])
-assert.deepEqual(mapIntroSkipper({ Valid: true, IntroStart: 5, IntroEnd: 50 }), [{ kind: "intro", start: 5, end: 50 }]); assert.deepEqual(mapIntroSkipper({ Valid: false }), [])
-console.log("jellyfin segments ok")
 
 // watch history -> Watch entries
 import { jfWatch } from "../src/lib/jellyfin-pure.ts"

@@ -3,11 +3,10 @@ import { Play, TriangleAlert } from "lucide-react"
 import { Art } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
 import type { Item } from "@/lib/types"
-import { JUMP, type PSeg } from "./skip-pure"
 import { Chip } from "./ui"
 import { epOf, NEXT_SECS } from "./util"
 
-/* Skip and Next are placed by the player's .pl-float stack (bottom end, above the dock); they do not position themselves. */
+/* The Next card is placed by the player's .pl-float stack (bottom end, above the dock); it does not position itself. */
 
 /** "Next episode" card with the countdown when auto-play is on. On TV Play now takes focus, so OK plays it and Back cancels (use-keys). */
 export function NextCard({ item, secs, auto, tv, onPlay, onCancel }: { item: Item; secs: number; auto: boolean; tv: boolean; onPlay: () => void; onCancel: () => void }) {
@@ -31,12 +30,6 @@ export function NextCard({ item, secs, auto, tv, onPlay, onCancel }: { item: Ite
       </div>
     </div>
   )
-}
-
-/** "Skip intro / recap / credits" while the playhead is in it (or "Skip 85 s" early in an episode nobody has timings for). With the controls hidden on TV, OK skips (use-keys), except the jump. */
-export function SkipChip({ seg, onSkip }: { seg: PSeg; onSkip: () => void }) {
-  const t = useT()
-  return <Chip on size="lg" className="m-rise" onClick={onSkip}>{t(`player.skip.${seg.kind}`, { n: JUMP })}</Chip>
 }
 
 /** Playback stopped for good: what failed and why in plain words, Retry first. [data-modal] keeps the D-pad on its buttons. */

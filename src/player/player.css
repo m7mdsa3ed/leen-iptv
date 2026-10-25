@@ -2,7 +2,7 @@
    Sheet, Tag) and the layout pieces here. Nothing in the player sizes or colours itself outside these.
    Layout: clean video; on demand the top bar (pointer devices: back + actions) and the dock (bottom: what is playing, the scrubber,
    one row of controls); one sheet at a time for everything else (bottom = the panel, start = the live channel list); floating cards
-   (Skip, Next episode) stacked bottom end, always just above the dock.
+   (the Next episode card) stacked bottom end, always just above the dock.
    Compositor-friendly: only opacity / transform animate. Chrome 94 safe (no color-mix, :has, container queries). */
 
 .pl-root {

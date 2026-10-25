@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { isTv } from "@/lib/device"
 import { useRoute } from "@/lib/nav"
 import { useApp } from "@/lib/store"
-import { groupKey, srcOfId } from "@/lib/merge-pure"
+import { srcOfId } from "@/lib/merge-pure"
 import { useNotify } from "@/lib/notify"
 import { castStart, castStop } from "@/lib/cast"
 import { useMulti } from "@/lib/multi"
@@ -16,16 +16,14 @@ import type { NewEpisodesEvent } from "@/lib/new-episodes"
 import type { Item } from "@/lib/types"
 import { closePlayer, usePlayerHost } from "./host"
 import { FITS, prefs, setPrefs } from "./prefs"
-import { setMark } from "./skip-pure"
 import { useFlash } from "./indicators"
 import { usePlayback } from "./use-playback"
-import { useSegments } from "./use-segments"
 import { useNextUp } from "./use-next-up"
 import { useSidecar } from "./use-sidecar"
 import { useSource, type Picked } from "./use-source"
 import { useTracking } from "./use-tracking"
 import { useTracks } from "./use-tracks"
-import { BANNER_MS, fsEl, HIDE_MS, isEpisode, mmss } from "./util"
+import { BANNER_MS, fsEl, HIDE_MS, isEpisode } from "./util"
 
 /** What covers the video: nothing, the tabbed panel, or (live) the channel list. Exactly one at a time. */
 export type Layer = "none" | "panel" | "channels"
@@ -78,16 +76,13 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
 
   const live = S.live
   const episode = !live && isEpisode(item.id)
-  const marks = useApp((s) => s.settings.skipMarks), mk = groupKey(item.group)
-  const sg = useSegments({ vref, item, live, plex: S.plex, jf: S.jf, mark: marks?.[mk] })
   const hasNext = episode && idx < queue.length - 1
   const nextBanner = useApp((s) => s.settings.nextBanner ?? true), autoAll = useApp((s) => s.settings.autoNext ?? true)
   const noAuto = useApp((s) => s.settings.noAutoShows) ?? [], showKey = item.series ?? item.group
   const autoNext = autoAll && !noAuto.includes(showKey)
   const advance = () => { setIdx((i) => Math.min(i + 1, qref.current.length - 1)); showBanner() }
-  const nu = useNextUp({ vref, enabled: hasNext && nextBanner, itemId: item.id, onNext: advance, auto: autoNext, creditsAt: sg.creditsAt })
+  const nu = useNextUp({ vref, enabled: hasNext && nextBanner, itemId: item.id, onNext: advance, auto: autoNext })
   const nextOn = hasNext && nu.show
-  const skipOn = !!sg.seg && !nextOn // credits give way to the Next card
 
   /* ---------- what is on screen ---------- */
   const [chrome, setChrome] = useState(true)
@@ -221,19 +216,10 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
   const [sleepMin, setSleepMin] = useState(0)
   const setSleep = (n: number) => { setSleepMin(n); setSleepAt(n ? Date.now() + n * 60000 : null); fire("clock", n ? t("player.sleep.min", { n }) : t("player.off")) }
 
-  /* ---------- favorites, marks, auto-play per show ---------- */
+  /* ---------- favorites, auto-play per show ---------- */
   const isFav = useApp((s) => !!s.profileId && !!s.data[s.profileId]?.favs.includes(item.id))
   const toggleFav = () => useApp.getState().toggleFav(item.id)
   const toggleShowAuto = () => useApp.getState().setSettings({ noAutoShows: noAuto.includes(showKey) ? noAuto.filter((k) => k !== showKey) : [...noAuto, showKey] })
-  const hasMarks = !!marks?.[mk]
-  const mark = (k: "is" | "ie" | "ce" | "reset") => {
-    const v = vref.current, st = useApp.getState(), cur = st.settings.skipMarks ?? {}, toast = useNotify.getState().push
-    if (k === "reset") { const rest = { ...cur }; delete rest[mk]; st.setSettings({ skipMarks: rest }); return toast({ title: t("player.mark.cleared") }) }
-    const m = v && setMark(cur[mk], k, v.currentTime, v.duration || 0)
-    if (!m) return toast({ title: t("player.mark.bad"), body: t("player.mark.badHint") })
-    st.setSettings({ skipMarks: { ...cur, [mk]: m } })
-    toast({ title: t("player.mark.saved", { time: mmss(v!.currentTime) }), body: t(`player.mark.${k}`) })
-  }
 
   /* live: grouped variants of this channel (Settings > Sources > Group channel versions) */
   const vp = useCatalog((s) => (live ? s.primaryOf.get(item.id) ?? s.byId.get(item.id) : undefined))
@@ -339,9 +325,9 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
     poke, hide, openPanel, openChannels, closeLayer,
     play, pause, toggle, seek, seekTo, zap, next, prev, go, playItem, digit, stop, leave: back,
     vol, muted, setVolume, toggleMute, fit, setFit, cycleFit: () => setFit((fit + 1) % FITS.length), speed, setSpeed, clock, setClock, q, setQuality, sleepMin, sleepAt, setSleep,
-    isFav, toggleFav, mark, hasMarks, autoAll, autoNext, toggleShowAuto, variants, pickVariant,
+    isFav, toggleFav, autoAll, autoNext, toggleShowAuto, variants, pickVariant,
     fs, toggleFs, canPip, pip, togglePip, casting, cast, multi, details, person,
-    seg: skipOn ? sg.seg : null, skip: sg.skip, nextOn, nextItem: queue[idx + 1], nu,
+    nextOn, nextItem: queue[idx + 1], nu,
     video, guard,
   }
 }

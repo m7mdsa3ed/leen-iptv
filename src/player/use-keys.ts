@@ -12,7 +12,7 @@ const active = () => document.activeElement as HTMLElement | null
  * Remote and keyboard, in the capture phase (before the app's spatial nav). One rule set per screen state:
  *
  *  clean video (nothing focusable on screen: the app's nav is locked)
- *    VOD   OK play/pause (or Skip intro while its chip shows) · Left/Right -10 s / +10 s · Up or Info: controls · Down: panel
+ *    VOD   OK play/pause · Left/Right -10 s / +10 s · Up or Info: controls · Down: panel
  *    live  Up/Down or CH+/CH-: zap · Left/Right: channel list · OK or Info: controls · 0-9: channel number
  *  controls up      the D-pad moves between them (scrubber: Left/Right seek); Down from the tab chips opens the panel there; Back hides them
  *  panel / channels the D-pad moves inside; Up from the panel's tabs closes it; Back closes it
@@ -85,7 +85,7 @@ export function useKeys(p: P & { root: () => HTMLElement | null }) {
         }
         if (k === KEY.left || k === KEY.right) { p.seek(k === KEY.left ? -10 : 10); p.poke(); return focusSeek(p.root()) } // a held key keeps scrubbing on the bar
         if (k === KEY.down) return p.openPanel()
-        if (k === KEY.enter) { if (p.seg && p.seg.kind !== "jump") return p.skip(); p.toggle(); return p.poke() }
+        if (k === KEY.enter) return p.toggle(), p.poke()
         return p.poke()
       }
 

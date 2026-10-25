@@ -173,13 +173,6 @@ export function srtToVtt(txt: string): string {
   return "WEBVTT\n\n" + t.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2") + "\n"
 }
 
-/** Skippable stretch of an episode, in seconds. */
-export type Seg = { kind: "intro" | "recap" | "credits"; start: number; end: number }
-/** Plex markers (?includeMarkers=1): type intro | credits, offsets in ms. */
-export const mapSegments = (m: J): Seg[] =>
-  ((m?.Marker ?? []) as J[]).filter((x) => (x.type === "intro" || x.type === "credits") && x.endTimeOffset > x.startTimeOffset)
-    .map((x) => ({ kind: x.type as Seg["kind"], start: x.startTimeOffset / 1000, end: x.endTimeOffset / 1000 }))
-
 export function mapStreams(m: J): { audio: SrvTrack[]; subs: SrvTrack[] } {
   const st: J[] = m?.Media?.[0]?.Part?.[0]?.Stream ?? []
   const pick = (type: number) => st.filter((s) => s.streamType === type).map((s) => {

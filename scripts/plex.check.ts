@@ -1,6 +1,6 @@
 // node scripts/plex.check.ts
 import assert from "node:assert/strict"
-import { buildUrl, mapDetail, mapMeta, photoUrl, sortConns, allowedConns, connKind, mapSegments } from "../src/lib/plex-pure.ts"
+import { buildUrl, mapDetail, mapMeta, photoUrl, sortConns, allowedConns, connKind } from "../src/lib/plex-pure.ts"
 
 assert.equal(buildUrl("http://h:32400/", "/library/sections", { a: "x y" }, "T"), "http://h:32400/library/sections?a=x%20y&X-Plex-Token=T")
 assert.equal(buildUrl("http://h", "/identity"), "http://h/identity")
@@ -82,8 +82,6 @@ const fr = await firstReachable(["a", "b", "c"], async (c) => { if (c !== "b") t
 assert.equal(fr.cand, "b"); assert.equal(fr.errs.length, 1)
 assert.equal((await firstReachable(["a"], async () => { throw new Error("x") })).cand, undefined)
 console.log("plex remote ok")
-assert.deepEqual(mapSegments({ Marker: [{ type: "intro", startTimeOffset: 1000, endTimeOffset: 31000 }, { type: "commercial", startTimeOffset: 0, endTimeOffset: 5 }, { type: "credits", startTimeOffset: 90000, endTimeOffset: 80000 }] }), [{ kind: "intro", start: 1, end: 31 }]); assert.deepEqual(mapSegments({}), [])
-console.log("plex segments ok")
 
 // direct play: file fields + canPlayType strings
 import { fileOf, directType } from "../src/lib/plex-pure.ts"

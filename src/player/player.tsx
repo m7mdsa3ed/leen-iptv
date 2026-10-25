@@ -3,7 +3,7 @@ import { isTv, useTouch } from "@/lib/device"
 import { navState } from "@/lib/nav"
 import type { Item } from "@/lib/types"
 import { useT } from "@/lib/i18n"
-import { ErrorView, NextCard, SkipChip } from "./cards"
+import { ErrorView, NextCard } from "./cards"
 import { Chrome, VideoClock } from "./chrome"
 import { Flash, NumberEntry, Spinner } from "./indicators"
 import { Channels } from "./live"
@@ -18,7 +18,7 @@ import "./player.css"
  * The player screen. Everything it does lives in usePlayer (use-player.ts); keys in use-keys.ts; the look in player.css + ui.tsx.
  * On screen, at most one of: clean video · the chrome (top bar + the dock: what is playing, scrubber, control row; chrome.tsx) ·
  * the panel (Episodes / Audio & subtitles / Playback / Info) · the live channel list · the error. Plus what floats: the dock's
- * head alone after a change of item, Skip intro and the Next episode card (stacked above the dock), the flash, the spinner.
+ * head alone after a change of item, the Next episode card (above the dock), the flash, the spinner.
  * `start` = from the beginning.
  */
 export default function Player({ queue, index, start }: { queue: Item[]; index: number; start?: boolean }) {
@@ -98,10 +98,9 @@ export default function Player({ queue, index, start }: { queue: Item[]; index: 
       {p.num && <NumberEntry n={p.num} />}
       {p.clock && p.layer === "none" && !p.E.err && <VideoClock />}
       <Chrome p={p} vref={vref} tv={isTv} touch={touch} dock={dock} root={getRoot} />
-      {p.layer === "none" && (p.seg || (p.nextOn && p.nextItem)) && (
+      {p.layer === "none" && p.nextOn && p.nextItem && (
         <div className="pl-float">
-          {p.seg && <SkipChip seg={p.seg} onSkip={p.skip} />}
-          {p.nextOn && p.nextItem && <NextCard item={p.nextItem} secs={p.nu.secs} auto={p.autoNext} tv={isTv} onPlay={p.nu.skip} onCancel={p.nu.cancel} />}
+          <NextCard item={p.nextItem} secs={p.nu.secs} auto={p.autoNext} tv={isTv} onPlay={p.nu.skip} onCancel={p.nu.cancel} />
         </div>
       )}
       {p.layer === "panel" && <Panel p={p} />}
