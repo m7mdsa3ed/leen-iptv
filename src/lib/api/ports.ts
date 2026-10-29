@@ -37,6 +37,10 @@ export interface SyncBackend {
   metaGet(c: SyncConfig, s: SyncSession, key: string): Promise<{ data: unknown; fetched_at: string } | null>
   metaCount(c: SyncConfig, s: SyncSession): Promise<{ total: number; ids: number }>
   metaPut(c: SyncConfig, s: SyncSession, key: string, data: unknown): Promise<unknown>
+  /** unified metadata vault (server table meta_vault): one merged record per title, shared by every account */
+  vaultGet(c: SyncConfig, s: SyncSession, key: string): Promise<{ data: unknown; fetched_at: string } | null>
+  vaultPut(c: SyncConfig, s: SyncSession, key: string, data: unknown, ttlDays: number): Promise<unknown>
+  vaultCount(c: SyncConfig, s: SyncSession): Promise<number | null>
   presencePut(c: SyncConfig, s: SyncSession, presence: PlaybackPresence): Promise<unknown>
   presenceGet(c: SyncConfig, s: SyncSession): Promise<PlaybackPresence[]>
   presenceRemove(c: SyncConfig, s: SyncSession, deviceId: string, itemId: string): Promise<unknown>

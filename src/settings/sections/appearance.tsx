@@ -1,5 +1,5 @@
 import { Check } from "lucide-react"
-import { Pill, Row, SectionCard, Segmented } from "../controls"
+import { Pill, Row, SectionCard, Segmented, ToggleRow } from "../controls"
 import { useMode } from "@/lib/device"
 import { fmt, useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
@@ -52,6 +52,7 @@ export default function AppearanceSection() {
         <Segmented label={t("settings.display.saver.style")} value={settings.saverStyle ?? "art"} options={[{ value: "art", label: t("settings.display.saver.art") }, { value: "clock", label: t("settings.display.saver.clock") }]} onChange={(v) => setSettings({ saverStyle: v })} />
         <Pill onClick={startSaver}>{t("settings.display.saver.preview")}</Pill>
       </Row>
+      <ToggleRow label={t("settings.display.splashSound")} description={t("settings.display.splashSound.desc")} checked={settings.splashSound !== false} onChange={(v) => setSettings({ splashSound: v })} />
       {mode === "tv" && (
         <Row label={t("settings.display.tvSize")} stack>
           <Segmented label={t("settings.display.tvSize")} value={settings.tvScale} options={[{ value: 0.8, label: t("settings.display.tvSize.small") }, { value: 1, label: t("settings.display.tvSize.normal") }, { value: 1.2, label: t("settings.display.tvSize.large") }, { value: 1.4, label: t("settings.display.tvSize.xl") }]} onChange={(v) => setSettings({ tvScale: v })} />

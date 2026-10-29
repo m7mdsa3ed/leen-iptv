@@ -9,10 +9,16 @@ import { useRoute } from "@/lib/nav"
 import { useOpen } from "@/components/tv/ui"
 import type { Item, Kind, Source } from "@/lib/types"
 import { useSources } from "@/lib/sources"
+import { isTv } from "@/lib/device"
 import { inSource, useActiveFilter, useCatalogView } from "./hooks/use-source-filter"
 import { useStable } from "./hooks/use-category"
 
-const CAP = 20
+// Home is the heaviest screen: every card that mounts paints its artwork and queues a metadata lookup, and the D-pad measures every rail.
+// TV trims each row and the rails on it; desktop keeps the full rows.
+const CAP = isTv ? 14 : 20 // cards painted per rail
+const LIVE = 20 // the home play queue, which is never painted
+const GENRE_RAILS = isTv ? 2 : 6 // genre rails per kind (movies, series); 0 = none on TV
+const FEATURED = isTv ? 3 : 5 // spotlight banners (each one a full-width artwork)
 
 /** Home rows the user can reorder / hide (Settings > Display). A rail key maps to one of these. */
 export const HOME_ROWS = ["cont", "favs", "games", "movies", "series"] as const
@@ -74,9 +80,14 @@ export function useHomeData() {
   // genre rails: one pass over the whole catalog, so only when the catalog (or the language) changes, not on every progress save
   const genreRails = useMemo(() => {
     const genre = (k: Kind) => {
-      const first = groups[k].slice(0, 6)
+      const first = groups[k].slice(0, GENRE_RAILS)
       const m = new Map<string, Item[]>(first.map((g) => [g, []]))
-      for (const i of byKind[k]) for (const c of catsOf(i)) { const l = m.get(c); if (l && l.length < CAP) l.push(i) }
+      // one pass over the kind: stop as soon as every rail is full instead of walking the whole list
+      let left = first.length * CAP
+      for (const i of byKind[k]) {
+        for (const c of catsOf(i)) { const l = m.get(c); if (l && l.length < CAP) { l.push(i); left-- } }
+        if (left <= 0) break
+      }
       return first.map((g) => ({ k, g, items: m.get(g)! })).filter((r) => r.items.length)
     }
     const seeAll = (k: Kind, g: string) => () => go("category", { id: `${k}|${g}` })
@@ -88,19 +99,20 @@ export function useHomeData() {
   const data = useMemo(() => {
     const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter((x) => x && inSource(x, filter)).slice(0, CAP) as Item[]
     const p = Object.entries(progress).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
-    const cont = get(p), favs = get(favIds), live = byKind.live.slice(0, CAP)
+    // the play queue keeps full length: it is not painted, it is the zapping list the player gets
+    const cont = get(p), favs = get(favIds), live = byKind.live.slice(0, Math.max(CAP, LIVE))
     // hero: last continue-watching, else a favorite, else a day-stable VOD pick, else first channel
     const mv = byKind.movie, nv = mv.length + byKind.series.length
     const vod = (n: number) => (n < mv.length ? mv[n] : byKind.series[n - mv.length]) // = [...movie, ...series][n], without copying both lists
     const day = Math.floor(Date.now() / 864e5)
     const hero = cont[0] ?? favs[0] ?? (nv ? vod(day % nv) : undefined) ?? byKind.live[0]
     const kicker = (i: Item) => (cont[0] === i ? t("common.continueWatching") : favs[0] === i ? t("common.favorite") : t("common.featured"))
-    // carousel candidates (up to 5, distinct, hero first)
+    // carousel candidates (up to FEATURED, distinct, hero first)
     const featured: HeroPick[] = []
-    const add = (i: Item | undefined, k?: string) => { if (i && featured.length < 5 && !featured.some((f) => f.item === i)) featured.push({ item: i, kicker: k ?? t("common.featured") }) }
+    const add = (i: Item | undefined, k?: string) => { if (i && featured.length < FEATURED && !featured.some((f) => f.item === i)) featured.push({ item: i, kicker: k ?? t("common.featured") }) }
     add(hero, hero && kicker(hero))
     add(favs[0], t("common.favorite"))
-    for (let n = 0; n < nv && featured.length < 5; n++) add(vod((day + n * 7) % nv))
+    for (let n = 0; n < nv && featured.length < FEATURED; n++) add(vod((day + n * 7) % nv))
     if (!featured.length) add(byKind.live[0])
     const pct = (i: Item) => { const p = progress[i.id]; return p ? (p.pos / p.dur) * 100 : undefined }
     const rails: HomeRail[] = []

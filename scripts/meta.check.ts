@@ -117,3 +117,75 @@ import { jfStream, plexStream, streamInfo, tmdbExtras } from "../src/lib/meta/fa
   assert.equal(plexStream({ addedAt: 5, Media: [{ width: 3840, height: 2160, videoCodec: "h264", Part: [{ size: 9, Stream: [{ streamType: 2, languageTag: "en" }, { streamType: 2, languageTag: "en" }] }] }] }).langs?.length, 1)
   assert.equal(jfStream({ DateCreated: "1970-01-01T00:00:10Z", MediaSources: [{ Container: "mkv", Size: 5, MediaStreams: [{ Type: "Video", Codec: "av1", Width: 1280, Height: 720 }, { Type: "Audio", Codec: "aac", Channels: 2, Language: "eng" }] }] }).res, "720p")
 }
+
+// The metadata middleman (vault): one unified record per title, merged from every provider's answer
+import { applyPart, availKey, isEmptyMeta, mergeParts, personKey, seasonKey, validAvail, validPerson, validSeason, validVault, vaultBody, vaultKey, VAULT_V } from "../src/lib/meta/vault-pure.ts"
+{
+  const q = { kind: "movie" as const, title: "The Weight", year: "2023", ids: {} }
+  assert.equal(vaultKey(q, "ar-SA"), `t${VAULT_V}:ar:movie:the weight:2023`) // language-free params, per-title
+  assert.equal(vaultKey({ ...q, year: undefined }, undefined), `t${VAULT_V}:any:movie:the weight:`) // no lang = one shared record
+  assert.equal(vaultKey({ ...q, kind: "series" }, "en-US").split(":")[2], "series") // t1:en:series:...
+
+  // first non-empty value per field wins; ratings from every provider are kept, one per source; ids feed later providers
+  const a = mergeParts([
+    { plot: "panel plot", genres: ["Action"], ratings: [{ source: "IMDb", value: "6.1" }], ids: { tmdb: "12" } },
+    { title: "The Weight", plot: "tmdb plot", genres: ["Drama"], ratings: [{ source: "IMDb", value: "7.2" }, { source: "TMDB", value: "7.9" }] },
+  ])
+  assert.equal(a.plot, "panel plot")
+  assert.deepEqual(a.genres, ["Action"])
+  assert.deepEqual(a.ratings.map((r) => `${r.source}=${r.value}`), ["IMDb=6.1", "TMDB=7.9"])
+  assert.equal(a.ids.tmdb, "12")
+  // names-only cast gives way to a cast with photos, but never the other way round
+  const ids = {}
+  const m = { ...mergeParts([]) }
+  applyPart(m, { cast: [{ name: "A" }] }, ids)
+  applyPart(m, { cast: [{ name: "B", photo: "b.jpg" }] }, ids)
+  applyPart(m, { cast: [{ name: "C" }] }, ids)
+  assert.deepEqual(m.cast, [{ name: "B", photo: "b.jpg" }])
+  assert.equal(isEmptyMeta(mergeParts([{ poster: "p.jpg", title: "X" }])), true) // a poster alone is not an answer
+  assert.equal(isEmptyMeta(a), false)
+
+  // a row read back from the table is distrusted unless it looks like a Meta and says something
+  assert.equal(validVault({ genres: [], directors: [], cast: [], ratings: [], similar: [], ids: {}, plot: "p" }), true)
+  assert.equal(validVault({ genres: [], directors: [], cast: [{ name: "A" }], ratings: [], similar: [], ids: {} }), true)
+  assert.equal(validVault({ genres: [], directors: [], cast: [], ratings: [], similar: [], ids: {} }), false) // empty: re-look it up
+  assert.equal(validVault(null), false)
+  assert.equal(validVault({ ...a, genres: "Action" }), false) // wrong shape
+  assert.equal(validVault({ ...a, cast: [{ role: "x" }] }), false) // no name
+  assert.equal(validVault({ ...a, ratings: [{ source: "IMDb" }] }), false) // no value
+
+  // what is stored is trimmed: a big provider payload stays in meta_cache, this row stays small
+  const big = { ...a, cast: Array.from({ length: 40 }, (_, i) => ({ name: `P${i}` })), backdrops: ["1", "2", "3", "4", "5", "6", "7", "8"] }
+  const body = vaultBody(big)
+  assert.equal(body.cast.length, 20)
+  assert.equal(body.backdrops?.length, 6)
+  assert.equal(body.ids.tmdb, "12")
+  assert.equal(body.plot, "panel plot")
+  assert.equal(JSON.stringify(vaultBody(big)).includes("undefined"), false) // unset fields are left out, not stored as null
+
+  // seasons, people and where-to-watch are the same vault, each with its own key and validator
+  assert.equal(seasonKey("1399", 2), `s${VAULT_V}:any:1399:2`)
+  assert.equal(seasonKey("1399/../x", -1), `s${VAULT_V}:any:1399x:0`) // a provider id is never trusted in a key
+  assert.equal(personKey({ id: "287" }), `p${VAULT_V}:any:287`)
+  assert.equal(personKey({ name: "Leonardo DiCaprio" }), `p${VAULT_V}:any:leonardo dicaprio`)
+  assert.equal(availKey({ kind: "movie", title: "The Weight", year: "2023", ids: {} }, "eg"), `a${VAULT_V}:eg:movie:the weight:2023`)
+  assert.equal(availKey({ kind: "series", title: "Dark", ids: {} }, "").split(":")[1], "eg") // the default country
+  // the four key prefixes are what the SQL CHECK matches
+  for (const k of [vaultKey(q, "en"), seasonKey("1", 1), personKey({ name: "A" }), availKey({ kind: "movie", title: "A", ids: {} }, "US")])
+    assert.match(k, /^[tspa][0-9]+:[a-z0-9]{2,5}:/)
+
+  const ep = (num: number, air?: string) => ({ num, title: `E${num}`, air, guests: [], directors: [], writers: [] })
+  assert.equal(validSeason({ eps: [ep(1), ep(2)] }), true)
+  assert.equal(validSeason({ eps: [] }), false) // nothing found is never stored
+  assert.equal(validSeason({ eps: [{ title: "x" }] }), false) // no episode number
+  assert.equal(validSeason({}), false)
+  assert.equal(validPerson({ info: { name: "A", aka: [], credits: [] } }), true)
+  assert.equal(validPerson({ info: { name: "", aka: [], credits: [] } }), false)
+  assert.equal(validPerson({ info: { name: "A" } }), false) // credits must be a list
+  assert.equal(validPerson({ info: [] }), false)
+  assert.equal(validAvail({ avail: [] }), true) // "not streaming in this country" is a real answer
+  assert.equal(validAvail({ avail: [{ source: "Netflix", kind: "sub" }] }), true)
+  assert.equal(validAvail({ avail: [{ source: "Netflix" }] }), false)
+  assert.equal(validAvail({ avail: "x" }), false)
+}
+console.log("vault ok")

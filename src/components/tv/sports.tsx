@@ -47,7 +47,7 @@ export function GameCard({ g, mineId, onOpen, className }: { g: SportsGame; mine
   const t = useT()
   const side = (tm: SportsGame["home"]) => (
     <span key={tm.id} className="flex items-center gap-2">
-      {tm.badge && <img src={tm.badge} alt="" decoding="async" className="size-6 shrink-0 object-contain" />}
+      {tm.badge && <img src={tm.badge} alt="" decoding="async" loading="lazy" className="size-6 shrink-0 object-contain" />}
       <span dir="auto" className={cn("min-w-0 flex-1 truncate text-base", tm.id === mineId && "font-semibold")}>{tm.name}</span>
       {g.status !== "scheduled" && <span dir="ltr" data-ltr className="text-sm text-muted-foreground">{tm.id === g.home.id ? g.homeScore : g.awayScore}</span>}
     </span>

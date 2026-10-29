@@ -3,6 +3,8 @@ import { counted } from "./rate"
 import { cached, DAY } from "./cache"
 import { norm } from "./title"
 import { mapWatchmodeSources, watchmodeRef, watchmodeSearchHit } from "./watchmode-pure"
+import { availGet, availPut } from "./vault"
+import { availKey } from "./vault-pure"
 import type { Avail, ProviderCfg } from "./types"
 
 const BASE = "https://api.watchmode.com/v1"
@@ -25,6 +27,8 @@ export function watchmodeId(q: WmTitle, key: string): Promise<string | null> {
 }
 
 /** Where a title can be watched in the configured country. Availability changes daily, so it has its own short cache (2 days), apart from Meta (30).
+    The merged answer is shared through the vault too (one country listens once for everyone), but only when this device may read it:
+    with sharing off, every device asks Watchmode on its own, exactly as before.
     Returns [] (never throws) without a key, when rate limited, offline or the answer has an unexpected shape: Detail simply shows nothing. */
 export async function watchmodeAvail(input: WmTitle, cfg: ProviderCfg): Promise<Avail[]> {
   const key = cfg.key?.trim()
@@ -33,7 +37,14 @@ export async function watchmodeAvail(input: WmTitle, cfg: ProviderCfg): Promise<
   try {
     const id = await watchmodeId(input, key)
     if (!id) return []
-    return await cached(`wm:src:${id}:${region}`, 2 * DAY, async () => mapWatchmodeSources(await wmGet(`/title/${id}/sources/?regions=${encodeURIComponent(region)}`, key)), (v) => !v.length)
+    const vk = availKey({ kind: input.kind, title: input.title, year: input.year, ids: {} }, region)
+    return await cached(`wm:src:${id}:${region}`, 2 * DAY, async () => {
+      const shared = await availGet(vk)
+      if (shared) return shared.avail
+      const r = mapWatchmodeSources(await wmGet(`/title/${id}/sources/?regions=${encodeURIComponent(region)}`, key))
+      availPut(vk, r) // an empty list is a real answer here ("not streaming in this country") and is kept too
+      return r
+    }, (v) => !v.length)
   } catch {
     return [] // 429, offline, bad key or region: availability is a bonus, never an error on the Detail page
   }

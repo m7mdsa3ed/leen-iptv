@@ -28,7 +28,8 @@ export default function Player({ queue, index, start }: { queue: Item[]; index: 
   const touch = useTouch() && !isTv
   const p = usePlayer({ queue, index, start, vref })
   const getRoot = () => root.current
-  const dock = p.layer === "none" && !p.E.err && (p.chrome || p.banner) // the dock: what is playing, + the controls while they are up
+  // the dock: what is playing (paused: the title's metadata, paused.tsx), + the controls while they are up
+  const dock = p.stopped || (p.layer === "none" && !p.E.err && (p.chrome || p.banner))
   useKeys({ ...p, root: getRoot })
 
   /* the app's D-pad nav stays out while nothing focusable is on screen (the keys are the player's then) */
@@ -92,7 +93,7 @@ export default function Player({ queue, index, start }: { queue: Item[]; index: 
         onDoubleClick={() => !isTv && ptr.current === "mouse" && p.toggleFs(root.current)}
         {...p.video}
       />
-      <Subtitles vref={vref} lift={dock} />
+      <Subtitles vref={vref} lift={dock && !p.stopped} /> // paused: the panel covers them
       {p.E.buf && !p.E.err && <Spinner title={p.item.name} started={p.E.started} label={t("player.loading")} />}
       <Flash f={p.flash} />
       {p.num && <NumberEntry n={p.num} />}

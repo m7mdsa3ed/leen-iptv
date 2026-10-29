@@ -124,6 +124,9 @@ export function useBackStep(open: boolean, close: () => void, global = false) {
     return () => void steps.splice(steps.indexOf(step), 1)
   }, [open, global])
 }
+/** True while any page has an open Back step (a Settings sidebar sheet, a profile form): App uses it to keep that hidden tab alive. */
+export const hasBackStep = () => steps.length > 0
+
 /** App's Back chain: closes the innermost open step of the page on top (or a global one); false when there is none. */
 export const backStep = () => {
   const depth = useRoute.getState().stack.length

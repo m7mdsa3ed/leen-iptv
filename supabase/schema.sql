@@ -153,3 +153,67 @@ end $$;
 
 revoke all on function public.meta_put(text, jsonb) from public, anon;
 grant execute on function public.meta_put(text, jsonb) to authenticated;
+
+-- ===== Unified metadata ("the vault") =====
+-- One record per thing the app looks up, written by the app's metadata middleman: every device reads this row first and
+-- only calls TMDB / OMDb / Plex / Watchmode on a miss. It is NOT a provider payload cache (that is meta_cache above):
+-- it holds the already-merged answer the app shows, so it stays small.
+-- Kinds, by the start of the key:
+--   t<v>:<lang>:<movie|series>:<title>:<year>  one merged title (Meta)
+--   s<v>:<lang>:<tmdb id>:<season>            one season's episodes
+--   p<v>:<any>:<person id|name>               one person profile
+--   a<v>:<region>:<kind>:<title>:<year>       where a title can be watched in one country
+create table if not exists public.meta_vault (
+  key text primary key check (key ~ '^[tspa][0-9]+:[a-z0-9]{2,5}:' and length(key) <= 300),
+  data jsonb not null check (jsonb_typeof(data) = 'object' and pg_column_size(data) <= 200000),
+  fetched_at timestamptz not null default now(),
+  "by" uuid default auth.uid()
+);
+-- an older table was titles only: widen its key check instead of keeping the narrow one
+alter table public.meta_vault drop constraint if exists meta_vault_key_check;
+alter table public.meta_vault add constraint meta_vault_key_check check (key ~ '^[tspa][0-9]+:[a-z0-9]{2,5}:' and length(key) <= 300);
+-- rows written before a shape change are never read (the app bumps the version in the key)
+create index if not exists meta_vault_fetched_at_idx on public.meta_vault (fetched_at desc);
+
+-- Each kind validates on its own: a title record must say something about the title, a season must list episodes,
+-- a person must have an object, and availability must be a list.
+create or replace function public.meta_vault_ok(p_key text, p_data jsonb) returns boolean
+language plpgsql immutable set search_path = public as $$
+begin
+  if jsonb_typeof(p_data) <> 'object' then return false; end if;
+  case split_part(p_key, ':', 1)
+    when 't1' then
+      return p_data ? 'ids' and jsonb_typeof(p_data->'ids') = 'object'
+        and (jsonb_typeof(p_data->'cast') is null or jsonb_typeof(p_data->'cast') = 'array')
+        and (jsonb_typeof(p_data->'plot') = 'string' or jsonb_array_length(coalesce(p_data->'cast', '[]'::jsonb)) > 0);
+    when 's1' then
+      return p_data ? 'eps' and jsonb_typeof(p_data->'eps') = 'array' and jsonb_array_length(p_data->'eps') > 0;
+    when 'p1' then
+      return p_data ? 'info' and jsonb_typeof(p_data->'info') = 'object' and p_data->'info' <> '{}'::jsonb;
+    when 'a1' then
+      return p_data ? 'avail' and jsonb_typeof(p_data->'avail') = 'array';
+    else return false;
+  end case;
+end $$;
+
+alter table public.meta_vault drop constraint if exists meta_vault_shape_check;
+alter table public.meta_vault add constraint meta_vault_shape_check check (public.meta_vault_ok(key, data));
+
+alter table public.meta_vault enable row level security;
+drop policy if exists "meta_vault_read" on public.meta_vault;
+create policy "meta_vault_read" on public.meta_vault for select to authenticated using (true); -- no insert / update / delete policies on purpose
+
+-- Writes go through this function only: it validates the shape, stamps the time, and keeps a row younger than the TTL
+-- (so a device that had older data does not overwrite a better record another one just merged).
+create or replace function public.meta_vault_put(p_key text, p_data jsonb, p_ttl interval default interval '30 days') returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'not_signed_in'; end if;
+  if not public.meta_vault_ok(p_key, p_data) then raise exception 'bad_meta_row'; end if;
+  insert into public.meta_vault as m (key, data, fetched_at, "by") values (p_key, p_data, now(), auth.uid())
+  on conflict (key) do update set data = excluded.data, fetched_at = now(), "by" = auth.uid()
+  where m.fetched_at < now() - p_ttl;
+end $$;
+
+revoke all on function public.meta_vault_put(text, jsonb, interval) from public, anon;
+grant execute on function public.meta_vault_put(text, jsonb, interval) to authenticated;

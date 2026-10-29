@@ -28,13 +28,13 @@ export default function PersonPage({ id, name }: { id?: string; name?: string })
   return (
     <Shell page="" title={title} sub>
     <div className="under-top under-bottom relative -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
-      {info?.photo && <img src={info.photo} alt="" aria-hidden decoding="async" className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] w-full object-cover object-top opacity-20" />}
+      {info?.photo && <img src={info.photo} alt="" aria-hidden decoding="async" loading="lazy" className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] w-full object-cover object-top opacity-20" />}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-t from-background via-transparent to-transparent" />
       <div className="relative">
         {!isTv && <RoundButton label={t("common.back")} onClick={back}><ArrowLeft className="rtl-flip" /></RoundButton>}
         <div className="m-rise mt-6 flex flex-col gap-6 md:mt-10 md:flex-row md:gap-10">
           {info?.photo
-            ? <img src={info.photo} alt="" decoding="async" className="aspect-[2/3] w-36 shrink-0 self-start rounded-2xl bg-surface-2 object-cover shadow-2xl md:w-64" />
+            ? <img src={info.photo} alt="" decoding="async" loading="lazy" className="aspect-[2/3] w-36 shrink-0 self-start rounded-2xl bg-surface-2 object-cover shadow-2xl md:w-64" />
             : <div className="grid aspect-[2/3] w-36 shrink-0 place-items-center self-start rounded-2xl bg-surface-2 text-5xl font-medium md:w-64">{title.slice(0, 1)}</div>}
           <div className="min-w-0 md:flex-1">
             <h1 dir="auto" className="text-3xl font-medium tracking-tight text-foreground md:text-5xl">{title}</h1>

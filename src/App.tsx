@@ -1,4 +1,4 @@
-import { memo, Suspense, useEffect, useMemo, useRef, type ComponentType, type ReactNode } from "react"
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react"
 import { Empty, PinModal, usePinAsk, focusFirstSoon } from "@/components/tv/ui"
 import { Boundary } from "@/components/tv/boundary"
 import { useCatalog } from "@/lib/catalog"
@@ -23,7 +23,7 @@ import { closeLogoMatch, closeMatch, useLogoMatch, useMatch } from "@/components
 import { LogoModal } from "@/components/tv/logo-modal"
 import { closeListModal, useListModal } from "@/components/tv/lists"
 import { ExitConfirm, askExit, closeExit, useExitAsk } from "@/components/tv/exit-confirm"
-import { backStep, installNav, useRoute } from "@/lib/nav"
+import { backStep, hasBackStep, installNav, useRoute } from "@/lib/nav"
 import { CARD_K } from "@/lib/cards"
 import { SearchPalette, closePalette, installPaletteKeys, usePalette } from "@/components/tv/search-palette"
 import { OnScreenKeyboard, closeKeyboard, installKeyboard, useKbd } from "@/components/tv/keyboard"
@@ -97,6 +97,48 @@ function Gate({ frozen, children }: { frozen: boolean; children: ReactNode }) {
   return children
 }
 
+/** Tab roots kept mounted after you navigate away from them (not stacked: a TAB switch). Switching tabs used to unmount the page, so coming
+    back re-ran its data hooks, rebuilt every card and reloaded its artwork; kept here, they stay warm (hidden, and frozen while off screen).
+    A page with an open inner step of its own (the Settings sidebar sheet, a profile form) must keep running instead: a frozen page would never
+    register its steps, and Back would skip them. */
+const KEEP = 4
+const TAB_ROOT = new Set(["home", "live", "sports", "movies", "series"])
+/** The entrance class is dropped once played: display none->block would otherwise replay it when a page is revealed again. */
+const endAnim = (e: React.AnimationEvent<HTMLElement>) => {
+  if (e.target === e.currentTarget || (e.target as HTMLElement).hasAttribute("data-page-content")) e.currentTarget.classList.remove("m-rise", "page-enter")
+}
+function TabViews({ stack, top, warming }: { stack: { name: string; p?: Record<string, unknown> }[]; top: number; warming: boolean }) {
+  const root = stack[0]
+  const [kept, setKept] = useState<string[]>(["home"]) // last opened first; home goes when it falls out, so a refresh is cheap
+  useEffect(() => {
+    const k = root.name
+    if (!TAB_ROOT.has(k)) return
+    setKept((old) => (old[0] === k ? old : [k, ...old.filter((x) => x !== k)].slice(0, KEEP)))
+  }, [root.name])
+  const shownHere = top === 0 ? root.name : undefined
+  const names = shownHere && !kept.includes(shownHere) ? [shownHere, ...kept] : kept // first render of a new tab paints it in the same frame
+  // a hidden tab that left a step open stays RUNNING: it has to observe its own step closing, and a frozen page renders no updates
+  const live = useBackStepLive()
+  return (
+    <>
+      {names.map((n) => (
+        <div key={`tab:${n}`} className="page-enter absolute inset-0" style={{ display: n === shownHere ? "block" : "none" }} onAnimationEnd={endAnim}>
+          <Suspense fallback={null}>
+            <Gate frozen={warming || (n !== shownHere && !live(n))}>{n === "home" ? <Home /> : <Page r={{ name: n }} />}</Gate>
+          </Suspense>
+        </div>
+      ))}
+    </>
+  )
+}
+
+/** Which cached tab has an open Back step right now (see useBackStep): only that one, plus the visible one, is allowed to render. */
+function useBackStepLive() {
+  const [, bump] = useState(0)
+  useEffect(() => useRoute.subscribe(() => bump((n) => n + 1)), []) // a route change is when a step usually opens or closes
+  return useCallback((name: string) => hasBackStep() && name === useRoute.getState().stack[0].name, [])
+}
+
 export default function App() {
   const stack = useRoute((s) => s.stack)
   const profileId = useApp((s) => s.profileId)
@@ -165,14 +207,11 @@ export default function App() {
     })
   }, [top, stack[top]?.name, warming])
 
-  // the entrance class is dropped once played: display none->block would otherwise replay it when Back reveals a stacked page
-  const endAnim = (e: React.AnimationEvent<HTMLElement>) => {
-    if (e.target === e.currentTarget || (e.target as HTMLElement).hasAttribute("data-page-content")) e.currentTarget.classList.remove("m-rise", "page-enter")
-  }
-  // stacked pages stay mounted (scroll + focus preserved), only the top is visible
+  // stacked pages stay mounted (scroll + focus preserved), only the top is visible; the stack's root is a cached tab view instead
   return (
     <>
-      {stack.map((r, i) => (
+      <TabViews stack={stack} top={top} warming={warming} />
+      {stack.map((r, i) => i === 0 ? null : (
         <div key={`${i}:${r.name}`} className={`${SHELL_PAGES.has(r.name) ? "page-enter" : "m-rise"} absolute inset-0`} style={{ display: i === top ? "block" : "none" }} onAnimationEnd={endAnim}>
           <Suspense fallback={null}><Gate frozen={i !== top || warming}><Boundary><Page r={r} /></Boundary></Gate></Suspense>
         </div>

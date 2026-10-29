@@ -6,6 +6,7 @@ import { normalizeCfg } from "@/lib/meta"
 import { fetchPosters, uploadLocal } from "@/lib/meta/backfill"
 import { clearPosters } from "@/lib/catalog"
 import { sharedCounts } from "@/lib/meta/shared"
+import { vaultCounts } from "@/lib/meta/vault"
 import { PROVIDERS } from "@/lib/meta/providers"
 import type { ProviderCfg } from "@/lib/meta/types"
 import { fmt, useT } from "@/lib/i18n"
@@ -19,7 +20,12 @@ export default function MetadataSection() {
   const shared = settings.sharedMeta !== false
   const [cached, setCached] = useState(0)
   const [rows, setRows] = useState<{ total: number; ids: number } | null | undefined>(undefined) // undefined = loading, null = not available
-  const loadRows = () => { setRows(undefined); void sharedCounts().then(setRows) }
+  const [vault, setVault] = useState<number | null | undefined>(undefined) // merged titles in the vault: undefined = loading, null = not available
+  const loadRows = () => {
+    setRows(undefined); setVault(undefined)
+    void sharedCounts().then(setRows)
+    void vaultCounts().then(setVault)
+  }
   const [up, setUp] = useState<{ done: number; total: number; wait: boolean } | null>(null)
   const [upMsg, setUpMsg] = useState("")
   const stop = useRef(false)
@@ -90,6 +96,9 @@ export default function MetadataSection() {
       </SectionCard>
       <SectionCard title={t("settings.meta.cache")} description={t("settings.meta.cache.desc")}>
         <ToggleRow label={t("settings.meta.shared")} description={t("settings.meta.shared.desc")} checked={shared} onChange={(v) => { setSettings({ sharedMeta: v }); if (v) void upload() }} />
+        <Row label={vault === undefined ? t("settings.meta.vault.loading") : vault !== null ? t("settings.meta.vault", { n: fmt.number(vault) }) : t("settings.meta.vault.none")} description={t("settings.meta.vault.desc")}>
+          <Pill onClick={loadRows}>{t("settings.meta.rows.refresh")}</Pill>
+        </Row>
         <Row label={rows === undefined ? t("settings.meta.rows.loading") : rows ? t("settings.meta.rows", { n: fmt.number(rows.total), ids: fmt.number(rows.ids) }) : t("settings.meta.rows.none")} description={t("settings.meta.rows.desc")}>
           <Pill onClick={loadRows}>{t("settings.meta.rows.refresh")}</Pill>
         </Row>

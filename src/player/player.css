@@ -48,6 +48,17 @@ html[data-mode=tv] .pl-root { --pl-h: 3rem; --pl-fs-title: 2rem; }
 .pl-dock-ctrls:not([data-on]) { display: none; }   /* banner only (after a zap / a new episode): just the head */
 .pl-dock-ctrls[data-on] { animation: m-fade-k var(--dur) var(--ease) backwards; }
 .pl-head { display: flex; flex-direction: column; gap: .375rem; min-width: 0; max-width: 48rem; }
+/* the pause panel (paused.tsx): the dock becomes the bottom half of the screen, its gradient carrying the title's metadata.
+   The paused gradient holds solid lower down than --scrim-bottom, since the plot and the cast sit over it. */
+.pl-dock[data-paused] { gap: 0; justify-content: flex-end; min-height: 50%; padding-top: 8rem; background: linear-gradient(to top, var(--background) 0, var(--background) 46%, var(--fade-mid) 80%, var(--fade-to)); }
+.pl-dock[data-paused] .pl-dock-ctrls { gap: .75rem; padding-top: 1.5rem; }
+.pl-paused { display: flex; align-items: flex-start; gap: 1.75rem; min-width: 0; max-width: 84rem; }
+.pl-paused[data-live] { align-items: center; }
+.pl-paused-art { flex: none; width: 7rem; overflow: hidden; border-radius: var(--pl-r-sm); box-shadow: 0 10px 34px rgba(0, 0, 0, .55); }
+@media (min-width: 640px) { .pl-paused-art { width: 9.5rem; } }
+.pl-paused-body { display: flex; flex: 1; flex-direction: column; gap: .5rem; min-width: 0; max-width: 56rem; }
+.pl-paused-plot { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+@media (max-height: 520px) { .pl-paused-art { width: 5rem; } .pl-paused-plot { -webkit-line-clamp: 2; } }
 .pl-ctrls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--pl-gap) 1.5rem; }
 .pl-cluster { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .pl-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 2.5rem; background: rgba(0, 0, 0, .25); }

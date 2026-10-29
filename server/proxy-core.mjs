@@ -3,6 +3,7 @@
 // so every segment/key goes back through /p too. Returns true when it handled the request.
 import { Readable } from "node:stream"
 import { lookup } from "node:dns/promises"
+import { imageWidth, writeResized } from "./image.mjs"
 
 // SSRF guard: block loopback / unspecified / link-local (metadata) targets; RFC1918 stays allowed for LAN servers.
 // ponytail: resolve-then-fetch, so DNS rebinding can still race it; pin the resolved IP if that matters.
@@ -24,6 +25,22 @@ export function proxyHandler(req, res) {
   if (req.method === "OPTIONS") return res.writeHead(204, CORS).end(), true
   const target = u.searchParams.get("url")
   if (!/^https?:\/\//.test(target ?? "")) return res.writeHead(400, CORS).end("bad url"), true
+  // GET /p?url=...&w=342: a card-sized copy of a poster (server/image.mjs). Not for streams, playlists or anything with a range.
+  const width = req.method === "GET" ? imageWidth(u.searchParams.get("w")) : undefined
+  if (width && !req.headers.range) {
+    void (async () => {
+      const headers = { "user-agent": req.headers["user-agent"] || "Leen" }
+      try { if (await writeResized({ res, url: target, width, CORS, headers })) return } catch { /* fall through to the plain proxy */ }
+      if (!res.headersSent && !res.writableEnded) streamThrough(req, res, target, CORS)
+    })()
+    return true
+  }
+  streamThrough(req, res, target, CORS)
+  return true
+}
+
+/** The plain forward: any method/body, redirects followed by hand, HLS playlists rewritten, body streamed back. */
+function streamThrough(req, res, target, CORS) {
   const ctl = new AbortController()
   res.on("close", () => ctl.abort()) // viewer left: stop pulling the upstream stream
   ;(async () => {
@@ -75,5 +92,4 @@ export function proxyHandler(req, res) {
       else res.destroy()
     }
   })()
-  return true
 }

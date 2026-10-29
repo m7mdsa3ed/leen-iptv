@@ -8,6 +8,8 @@ import { cleanTitle, matchId, norm } from "./title"
 import { cached, forget, META_TTL, scheduleCachePrune } from "./cache"
 import type { EpisodeMeta, Ids, Meta, PersonInfo, PersonRef, Provider, ProviderCfg, Query, SimilarRef } from "./types"
 import { matchKeyCached } from "@/lib/merge-pure"
+import { applyPart, emptyMeta, isEmptyMeta, personKey, seasonKey } from "./vault-pure"
+import { forgetVault, personGet, personPut, seasonGet, seasonPut, vaultGet, vaultPut } from "./vault"
 
 
 /** Saved config merged with the registry: unknown ids dropped, new providers appended (disabled). */
@@ -17,10 +19,19 @@ export function normalizeCfg(saved: ProviderCfg[] | undefined): ProviderCfg[] {
   return out
 }
 
-const emptyMeta = (): Meta => ({ genres: [], ratings: [], cast: [], directors: [], similar: [], ids: {} })
-
-/** Run providers in priority order; the first non-empty value per field wins, ratings from all are kept. Ids found early feed later providers. */
-export async function loadMeta(q: Query, cfgs: ProviderCfg[], onFail?: () => void): Promise<Meta> {
+/**
+ * The title's info: the shared vault first (one merged record for every account), else the providers in priority order,
+ * merged into one Meta and written back to the vault. The first non-empty value per field wins, ratings from all are
+ * kept, ids found early feed later providers.
+ * `o.fresh` = the user overrode this title (a manual match, Refresh metadata): skip the shared record and merge again.
+ * `o.share` (default true) = write the merge back to the vault, replacing the row now (a refresh) instead of waiting
+ * out its TTL. A manual match does not share: that record is one user's correction, and the row under this title
+ * belongs to everyone.
+ */
+export async function loadMeta(q: Query, cfgs: ProviderCfg[], onFail?: () => void, o: { fresh?: boolean; share?: boolean } = {}): Promise<Meta> {
+  const lang = cfgs.find((c) => c.enabled && c.lang)?.lang
+  const shared = o.fresh ? null : await vaultGet(q, lang)
+  if (shared) return shared
   const m = emptyMeta()
   const ids: Ids = { ...q.ids }
   for (const c of cfgs) {
@@ -28,21 +39,11 @@ export async function loadMeta(q: Query, cfgs: ProviderCfg[], onFail?: () => voi
     if (!p || !c.enabled) continue
     let r
     try { r = await p.fetch({ ...q, ids }, c) } catch { onFail?.(); continue } // one broken provider must not hide the others
-    if (!r) continue
-    for (const k of ["title", "year", "plot", "poster", "backdrop", "logo", "cert", "awards"] as const) m[k] ||= r[k]
-    m.runtime ||= r.runtime
-    if (!m.backdrops?.length && r.backdrops?.length) m.backdrops = r.backdrops
-    if (!m.trailers?.length && r.trailers?.length) m.trailers = r.trailers
-    for (const k of ["tagline", "original", "status", "next"] as const) (m as unknown as Record<string, unknown>)[k] ||= r[k]
-    for (const k of ["languages", "countries", "studios", "crew", "seasons"] as const) if (!m[k]?.length && r[k]?.length) (m[k] as unknown[]) = r[k]!
-    for (const k of ["genres", "directors", "similar"] as const) if (!m[k].length && r[k]?.length) (m[k] as unknown[]) = r[k]!
-    // cast: names-only lists (Xtream, OMDb) give way to a list that has photos
-    if (r.cast?.length && (!m.cast.length || (!m.cast.some((c) => c.photo) && r.cast.some((c) => c.photo)))) m.cast = r.cast
-    for (const x of r.ratings ?? []) if (!m.ratings.some((y) => y.source === x.source)) m.ratings.push(x)
-    ids.tmdb ||= r.ids?.tmdb
-    ids.imdb ||= r.ids?.imdb
+    applyPart(m, r, ids)
   }
-  m.ids = ids
+  m.ids = { ...ids }
+  // a manual match is one user's correction, and nothing found is not an answer: neither is stored for everyone
+  if (o.share !== false) vaultPut(q, lang, m, !!o.fresh)
   return m
 }
 
@@ -50,7 +51,7 @@ const sigOf = (cfgs: ProviderCfg[]) => cfgs.filter((c) => c.enabled).map((c) => 
 /** Cache key of a title lookup: what the title IS (kind + cleaned name + year), not the item id, so the same movie from another source / profile reuses the entry. A panel-provided id (`xid`) tells remakes apart. */
 const lookupKey = (kind: string, ct: { title: string; year?: string }, xid: string, matched: string | undefined, sig: string) => `meta5:${kind}:${norm(ct.title)}:${ct.year ?? ""}:${xid}:${matched ?? ""}:${sig}`
 /** no provider knew the title (a lookup that found it has a plot or a cast) */
-export const isEmptyMeta = (x: Meta) => !(x.plot || x.cast.length)
+export { isEmptyMeta }
 
 /** Settings > Fix matches: look a title up the way Detail would (same cache entry, no panel info) so it counts as checked. true = a provider knew it. */
 export async function checkTitle(item: Item, cfgs: ProviderCfg[]): Promise<boolean> {
@@ -153,8 +154,10 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
       if (c && live) setMetaState({ key: titleKey, value: withBase(c.v, matched ? undefined : base) }) // stale-while-revalidate: show what we have at once
       // fresh entries return without a request; misses/stale go through the shared cache (one in-flight call per title)
       // a provider that failed (rate limit, offline) must not leave an empty answer in the cache for a day: the new match would show nothing until then
-      const load = async () => { let failed = false; const r = await loadMeta(q, run, () => (failed = true)); if (failed && isEmptyMeta(r)) throw new Error("lookup failed"); return r }
-      const m = online ? await cached(key, META_TTL, load, isEmptyMeta).catch(emptyMeta) : await loadMeta(q, run)
+      // a manual match is this user's correction: the vault is skipped and never written for it (the title is someone else's too)
+      const opts = { fresh: !!matched || rev > 0, share: !matched }
+      const load = async () => { let failed = false; const r = await loadMeta(q, run, () => (failed = true), opts); if (failed && isEmptyMeta(r)) throw new Error("lookup failed"); return r }
+      const m = online ? await cached(key, META_TTL, load, isEmptyMeta).catch(emptyMeta) : await loadMeta(q, run, undefined, opts)
       if (live) setMetaState({ key: titleKey, value: withBase(m, matched ? undefined : base) }) // a manual match beats server data too. The cache holds the provider data only: source data (`base`) is merged fresh each time
       // older id-only matches: store what the catalog should show (title, poster, backdrop, year) now that we know it
       const cur = useApp.getState().settings.metaMatch
@@ -170,6 +173,7 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
     if (tmdb) forceTmdb(tmdb) // fetch from TMDB, not from the shared cache
     if (meta?.ids.imdb) forceTmdb(meta.ids.imdb) // same for OMDb
     await forget([keyRef.current, ...(meta?.ids.imdb ? [`om:plot=full&i=${meta.ids.imdb}`] : []), ...(tmdb ? [`season:tmdb:${tmdb}:`] : [])].filter(Boolean))
+    await forgetVault() // and this device's copy of the merged record (the vault itself is re-merged and rewritten)
     setRev((n) => n + 1)
   }
   return { meta, loading, online, matched, refresh, rev }
@@ -178,20 +182,33 @@ export function useMeta(item: Item | undefined, xtream: Record<string, unknown> 
 /** Provider episodes of one season (by TMDB id), cached for META_TTL (30 days); `rev` changes = load again (after a refresh). null until loaded, or when no provider can tell. */
 export function useSeasonMeta(tmdb: string | undefined, season: number | null, rev = 0) {
   const saved = useApp((s) => s.settings.meta)
-  const cfg = useMemo(() => normalizeCfg(saved).find((c) => c.enabled && c.key && PROVIDERS.find((p) => p.id === c.id)?.season), [saved])
+  const cfgs = useMemo(() => normalizeCfg(saved), [saved])
+  const cfg = useMemo(() => cfgs.find((c) => c.enabled && c.key && PROVIDERS.find((p) => p.id === c.id)?.season), [cfgs])
+  // a shared season needs no key here: this device reads what another one fetched (the caller only asks with a TMDB id)
+  const share = useMemo(() => cfgs.some((c) => c.enabled && c.id !== "xtream" && (c.key || !PROVIDERS.find((p) => p.id === c.id)?.needsKey)), [cfgs])
   const [eps, setEps] = useState<EpisodeMeta[] | null>(null)
   useEffect(() => {
     setEps(null)
-    if (!tmdb || season === null || !cfg) return
+    if (!tmdb || season === null || (!cfg && !share)) return
     let live = true
-    const p = PROVIDERS.find((x) => x.id === cfg.id)!
+    const p = cfg ? PROVIDERS.find((x) => x.id === cfg.id)! : undefined
     const today = new Date().toISOString().slice(0, 10)
     // a season still airing (an episode with no date or a future one) is re-checked daily like an empty answer, so new episodes and dates show up
-    cached(`season:${cfg.id}:${tmdb}:${season}:${cfg.lang ?? ""}`, META_TTL, async () => (await p.season!(tmdb, season, cfg)) ?? [], (x) => !x.length || x.some((e) => !e.air || e.air > today))
+    const airing = (x: EpisodeMeta[]) => !x.length || x.some((e) => !e.air || e.air > today) // also the "nothing found" re-check
+    const vk = seasonKey(tmdb, season)
+    const load = async () => {
+      const shared = rev ? null : await seasonGet(vk) // the merged season every device shares
+      if (shared) return shared.eps
+      if (!p || !cfg) return [] // no provider on this device: show the panel's own episodes
+      const r = (await p.season!(tmdb, season, cfg)) ?? []
+      seasonPut(vk, r, airing(r)) // a season still airing replaces its row now, so everyone sees the new episodes
+      return r
+    }
+    cached(`season:${cfg?.id ?? "shared"}:${tmdb}:${season}:${cfg?.lang ?? ""}`, META_TTL, load, airing)
       .then((r) => live && setEps(r))
       .catch(() => {}) // a season the provider does not have (numbering differs) just leaves the panel's episodes as they are
     return () => { live = false }
-  }, [tmdb, season, cfg, rev])
+  }, [tmdb, season, cfg, share, rev])
   return eps
 }
 
@@ -238,29 +255,34 @@ export function usePerson(ref: PersonRef) {
   const saved = useApp((s) => s.settings.meta)
   const cfgs = useMemo(() => normalizeCfg(saved), [saved])
   const usable = cfgs.filter((c) => c.enabled && c.key && PROVIDERS.find((p) => p.id === c.id)?.person)
+  // the shared profile counts even without a key here: this device reads what another one fetched
+  const share = cfgs.some((c) => c.enabled && c.id !== "xtream" && (c.key || !PROVIDERS.find((p) => p.id === c.id)?.needsKey))
   const sig = usable.map((c) => `${c.id}:${c.lang ?? ""}`).join(",")
   const [info, setInfo] = useState<PersonInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    if (!usable.length) return
+    if (!usable.length && !share) return
     let live = true
     setInfo(null); setError("")
     const key = `person:${ref.id ?? ref.name}:${sig}`
+    const vk = personKey(ref)
     ;(async () => {
       setLoading(true)
       const c = await get<{ at: number; p: PersonInfo }>(key)
       if (c && Date.now() - c.at < 30 * 864e5) return live && void setInfo(c.p)
+      const shared = await personGet(vk) // the profile every device shares
+      if (shared) { void set(key, { at: Date.now(), p: shared.info }); return live && void setInfo(shared.info) }
       for (const cfg of usable) {
         const p = await PROVIDERS.find((x) => x.id === cfg.id)!.person!(ref, cfg)
-        if (p) { void set(key, { at: Date.now(), p }); return live && void setInfo(p) }
+        if (p) { personPut(vk, p); void set(key, { at: Date.now(), p }); return live && void setInfo(p) }
       }
     })().catch((e) => live && setError(e instanceof Error ? e.message : String(e))).finally(() => live && setLoading(false))
     return () => { live = false }
   }, [ref.id, ref.name, sig]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { info, loading, error, available: usable.length > 0 }
+  return { info, loading, error, available: usable.length > 0 || share }
 }
 
 /* ---------- genres ---------- */

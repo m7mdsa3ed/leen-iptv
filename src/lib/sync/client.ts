@@ -134,6 +134,20 @@ export const api = {
   },
   /** writes only through meta_put(): the server validates, stamps the time and never replaces a row younger than 7 days */
   metaPut: (c: Config, s: Session, key: string, data: unknown) => req(c, "/rest/v1/rpc/meta_put", { token: s.access, body: { p_key: key, p_data: data } }),
+  /** unified metadata vault: one merged record per title (RLS: any signed-in user may read); null = never merged yet */
+  async vaultGet(c: Config, s: Session, key: string): Promise<{ data: unknown; fetched_at: string } | null> {
+    const r = (await req(c, `/rest/v1/meta_vault?select=data,fetched_at&key=eq.${encodeURIComponent(key)}`, { token: s.access })) as { data: unknown; fetched_at: string }[]
+    return r[0] ?? null
+  },
+  /** writes only through meta_vault_put(): the server validates the shape and keeps a row younger than the TTL */
+  vaultPut: (c: Config, s: Session, key: string, data: unknown, ttlDays: number) =>
+    req(c, "/rest/v1/rpc/meta_vault_put", { token: s.access, body: { p_key: key, p_data: data, p_ttl: `${Math.max(1, Math.round(ttlDays))} days` } }),
+  /** how many merged titles the vault holds (PostgREST exact count, RLS applies); null = not readable right now */
+  async vaultCount(c: Config, s: Session): Promise<number | null> {
+    let range = ""
+    await req(c, "/rest/v1/meta_vault?select=key&limit=1", { token: s.access, headers: { Prefer: "count=exact" }, onResponse: (r) => { range = r.headers.get("content-range") ?? "" } })
+    return range.includes("/") ? Number(range.split("/")[1]) || 0 : null
+  },
   presencePut: (c: Config, s: Session, presence: import("@/lib/api/ports").PlaybackPresence) => req(c, "/rest/v1/playback_presence?on_conflict=user_id,device_id", { method: "POST", token: s.access, headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: { user_id: s.id, ...presence } }),
   async presenceGet(c: Config, s: Session) {
     return (await req(c, `/rest/v1/playback_presence?select=device_id,device_name,profile_name,item_id,item_name,item_kind,status,position,duration,updated_at&user_id=eq.${s.id}&status=neq.stopped&order=updated_at.desc`, { token: s.access })) as import("@/lib/api/ports").PlaybackPresence[]

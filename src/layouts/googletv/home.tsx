@@ -5,6 +5,7 @@ import { Card, Rail, SkelRail, small } from "@/components/gtv"
 import { GameCard, SkelGames } from "@/components/tv/sports"
 import type { Item } from "@/lib/types"
 import { fmt, useT } from "@/lib/i18n"
+import { isTv } from "@/lib/device"
 import { useHomeData } from "../home-data"
 import { useUpcomingGames } from "@/lib/sports/use-games"
 import { matchRoute, teamInGame } from "@/lib/sports/games"
@@ -13,8 +14,8 @@ import { useRoute } from "@/lib/nav"
 import { GRail, useLeft } from "./parts"
 
 const TITLES: Record<string, string> = { favs: "gtv.home.watchlist" }
-/** Rails painted on the first frame; the rest follow in a transition right after (same order, same list). */
-const FIRST_RAILS = 4
+/** Rails painted on the first frame; the rest follow in a transition right after (same order, same list). TV paints fewer first: it is the slowest to lay out. */
+const FIRST_RAILS = isTv ? 3 : 4
 
 type Flags = ReturnType<typeof useCardFlags>
 /** One rail: the opener is stable per rail (item + the rail as zapping queue), so memoised Cards skip re-rendering. Cards are GRail's direct children (it stages them on TV). */
@@ -91,7 +92,7 @@ export default function Home() {
           {rails.map((r) => r.key === "games" ? (
             games.length > 0 ? (
               <Rail key="games" title={t("gtv.home.nextGames")}>
-                {games.slice(0, 12).map((g) => {
+                {games.slice(0, isTv ? 9 : 12).map((g) => {
                   const route = matchRoute(follows, g)
                   return <GameCard key={g.id} g={g} mineId={teamInGame(follows, g)} onOpen={() => route && go("match", route)} />
                 })}

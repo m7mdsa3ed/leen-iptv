@@ -33,10 +33,16 @@ export function Panel({ p }: { p: P }) {
     ["info", t("player.tab.info"), true],
   ] as [Tab, string, boolean][]).filter(([, , on]) => on)
   const cur = tabs.some(([k]) => k === p.tab) ? p.tab : tabs[0][0]
+  // Focus starts on the open tab, except on Episodes: there it starts on the episode you are playing, so Down lands in the list
+  // where you are (the list can still be a skeleton, then it takes over: see EpisodesTab).
   useEffect(() => {
-    const id = requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>("[data-tabs] [aria-selected=true]")?.focus({ preventScroll: true }))
+    const id = requestAnimationFrame(() => {
+      const root = ref.current
+      const row = cur === "episodes" ? root?.querySelector<HTMLElement>("[data-ep][data-cur]") : null
+      ;(row ?? root?.querySelector<HTMLElement>("[data-tabs] [aria-selected=true]"))?.focus({ preventScroll: true })
+    })
     return () => cancelAnimationFrame(id)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- the tab at open time
   return (
     <Sheet side="bottom" label={t("player.tab.options")} onClose={p.closeLayer} sref={ref}
       head={
@@ -74,8 +80,37 @@ function EpisodesTab({ p }: { p: P }) {
   const here = D.episodes.find((e) => e.item.id === p.item.id)
   const set = useRef(false)
   useEffect(() => { if (here && !set.current) { set.current = true; if (D.season !== here.season) D.setSeason(here.season) } }, [here, D.season]) // eslint-disable-line react-hooks/exhaustive-deps
-  // the playing episode in view once the list is there
-  useEffect(() => { requestAnimationFrame(() => document.querySelector<HTMLElement>(".pl-sheet [data-ep][data-cur]")?.scrollIntoView({ block: "nearest" })) }, [D.season, D.shown.length])
+  // the playing episode in view once the list is there (the panel's open effect focuses it, so this is for a list that arrives late)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      const row = document.querySelector<HTMLElement>(".pl-sheet [data-ep][data-cur]")
+      if (!row) return
+      row.scrollIntoView({ block: "nearest" })
+      // ...and it takes focus while nothing in the list has it yet (still a skeleton, or focus left on the tabs)
+      const a = document.activeElement as HTMLElement | null
+      if (!a || !a.closest("[data-modal]") || a.closest("[data-tabs]")) row.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [D.season, D.shown.length])
+  // Scrolling the sheet yourself (a touch flick, a wheel, a drag on the list) hands focus to the episode you land on: the playing
+  // one, while its row is on screen, so OK and the D-pad start from where you are. A D-pad move inside the list is left alone.
+  useEffect(() => {
+    const sc = document.querySelector<HTMLElement>(".pl-sheet .pl-sheet-body")
+    if (!sc) return
+    let t = 0
+    const settle = () => {
+      t = 0
+      if ((document.activeElement as HTMLElement | null)?.closest(".pl-list")) return // the D-pad / a click already picked a row
+      const row = sc.querySelector<HTMLElement>("[data-ep][data-cur]")
+      if (!row) return
+      const r = row.getBoundingClientRect(), b = sc.getBoundingClientRect()
+      if (r.bottom < b.top || r.top > b.bottom) return // the playing episode is out of view: leave focus alone
+      row.focus({ preventScroll: true })
+    }
+    const onScroll = () => { clearTimeout(t); t = window.setTimeout(settle, 140) }
+    sc.addEventListener("scroll", onScroll, { passive: true })
+    return () => { clearTimeout(t); sc.removeEventListener("scroll", onScroll) }
+  }, [])
   if (!D.episodes.length) return D.loading || !series ? <div className="pl-list">{[0, 1, 2].map((i) => <SkelBar key={i} className="h-20 w-full" />)}</div> : <p className="pl-note">{t("gtv.detail.noEpisodes")}</p>
   const queue = D.episodes.map((e) => e.item)
   return (

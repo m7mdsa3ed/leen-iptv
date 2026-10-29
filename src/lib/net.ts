@@ -1,4 +1,5 @@
 import { t } from "./i18n"
+import { useApp } from "./store"
 // ponytail: optional CORS proxy (server/proxy.mjs); packaged webOS apps usually don't need it, hosted/web ones do.
 // Proxy formats: "https://host/path?url={url}" (template, URL-encoded), "https://proxy.corsfix.com/?" (ends in ? or =, raw URL appended),
 // or a bare base like "http://lan:8787" (our server/proxy.mjs, /p?url=).
@@ -14,6 +15,20 @@ export const probeProxy = async () => {
 
 /** True when this https page can't load the (http) URL directly. */
 export const mixed = (url: string) => location.protocol === "https:" && url.startsWith("http:")
+
+/** Artwork at `w` pixels through OUR proxy's resize route (server/image.mjs). Any other proxy, or none, gets the URL unchanged:
+    a third-party proxy that ignores `w` would still serve the original, and an unresized image is always better than a broken one. */
+export const imageUrl = (url: string, w: number) => {
+  const p = useApp.getState().settings.proxy?.trim() || ""
+  // a panel logo is usually plain http: on an https page the browser blocks it, so it MUST go through a proxy even though that loses the resize
+  if (mixed(url)) return px(url, p)
+  if (p) {
+    if (p.includes("{url}")) return url // template proxies cannot carry a width
+    if (/[?=]$/.test(p)) return url
+    return `${p.replace(/\/+$/, "")}/p?w=${w}&url=${encodeURIComponent(url)}`
+  }
+  return local ? `/p?w=${w}&url=${encodeURIComponent(url)}` : url
+}
 
 export const px = (url: string, proxy: string) => {
   const p = proxy.trim()

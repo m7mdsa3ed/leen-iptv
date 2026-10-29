@@ -321,6 +321,8 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
 
   return {
     item, queue, idx, live, episode, S, E, T,
+    /* a pause with nothing over the picture: the dock shows the title's metadata instead of its head (paused.tsx) */
+    stopped: E.paused && layer === "none" && !E.err && !nextOn,
     chrome, layer, tab, setTab, banner, num, flash, hover, scrubbing,
     poke, hide, openPanel, openChannels, closeLayer,
     play, pause, toggle, seek, seekTo, zap, next, prev, go, playItem, digit, stop, leave: back,

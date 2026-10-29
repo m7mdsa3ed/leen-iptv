@@ -5,6 +5,7 @@ import { History, List, ListPlus, Lock, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { isTv, useMode } from "@/lib/device"
+import { imageUrl } from "@/lib/net"
 import { focusFirst, useRoute } from "@/lib/nav"
 import { useApp, useLists, useProfile } from "@/lib/store"
 import { openListModal } from "./lists"
@@ -126,17 +127,37 @@ export const Chips = memo(function Chips({ items, active, onPick, locked, onKey,
   return cat ? <div ref={ref} data-nav-aside={side ? "" : undefined} className="cat-side">{row}</div> : row
 })
 
-/** TMDB posters at tile size: panels often link the `original` (about 2000x3000) and metadata uses w500; a TV decodes every one of them on its slow CPU. */
-const tileSize = (u?: string) => u?.replace(/\/t\/p\/(original|w500)\//, "/t/p/w342/")
+/** TMDB posters at tile size: panels often link the `original` (about 2000x3000) and metadata uses w500; a TV decodes every one of them on its slow CPU.
+    `w` = the width the tile is painted at: TMDB gets the matching size, anything else is resized by our own proxy when it is available. */
+const tileSize = (u?: string, w?: number) => {
+  if (!u) return u
+  if (u.includes("/t/p/")) return u.replace(/\/t\/p\/(original|w500|w780|w1280)\//, `/t/p/${w && w <= 185 ? "w185" : w && w <= 342 ? "w342" : "w500"}/`)
+  return w ? imageUrl(u, w) : u
+}
 
-/** Channel logo / poster: `logo`, then `logoAlt` when that link is dead, then a name tile. */
-export function Logo({ item, className }: { item: Item; className?: string }) {
+/** 200px margin: a tile starts loading shortly before it scrolls in, so it is never seen empty, but a rail 3 screens down costs nothing. */
+const LAZY_ROOT = { rootMargin: "200px" }
+
+/** Channel logo / poster: `logo`, then `logoAlt` when that link is dead, then a name tile.
+    The <img> is always rendered (it holds the frame the caller sized), but it gets no `src` until it is near the viewport: an <img>
+    without src requests nothing, and the observer watches the image itself, so it must keep its box - never wrap it in `display: contents`. */
+export function Logo({ item, className, w }: { item: Item; className?: string; w?: number }) {
   const [n, setN] = useState(0)
-  useEffect(() => setN(0), [item.logo, item.logoAlt])
-  const src = [tileSize(item.logo), item.logo, item.logoAlt].filter((u, i, a) => u && a.indexOf(u) === i)[n] // the full-size link stays as the fallback
-  return src ? (
-    <img key={src} src={src} alt="" loading="lazy" decoding="async" onError={() => setN(n + 1)} className={cn("object-contain", className)} />
-  ) : <NameTile item={item} className={className} />
+  const [seen, setSeen] = useState(false)
+  const box = useRef<HTMLImageElement>(null)
+  useEffect(() => { setN(0) }, [item.logo, item.logoAlt])
+  useEffect(() => {
+    const el = box.current
+    if (seen || !el) return
+    if (typeof IntersectionObserver === "undefined") { setSeen(true); return } // Chromium 94 has it; a host without it just loads eagerly
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setSeen(true); io.disconnect() } }, LAZY_ROOT)
+    io.observe(el)
+    return () => io.disconnect()
+  }, [seen])
+  // a card asks for a card-sized copy through the local proxy (server/image.mjs); the full-size link stays as the fallback
+  const src = [tileSize(item.logo, w), item.logo, item.logoAlt].filter((u, i, a) => u && a.indexOf(u) === i)[n]
+  if (!src) return <NameTile item={item} className={className} />
+  return <img ref={box} key={src} src={seen ? src : undefined} alt="" loading="lazy" decoding="async" onError={() => setN(n + 1)} className={cn("object-contain", className)} />
 }
 
 const hue = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h) % 360 }

@@ -3,6 +3,7 @@ import { ArrowLeft, AudioLines, Cast, ChevronDown, ChevronUp, Expand, Info, List
 import { castSupported } from "@/lib/cast"
 import { fmt, useT } from "@/lib/i18n"
 import { LiveHead } from "./live"
+import { PausedInfo } from "./paused"
 import { Scrubber } from "./scrubber"
 import { Chip, IconBtn } from "./ui"
 import type { P } from "./use-player"
@@ -79,9 +80,9 @@ export function Chrome({ p, vref, tv, touch, dock, root }: { p: P; vref: RefObje
         </div>
       )}
 
-      <div ref={ref} data-on={dock ? "" : undefined} data-controls className="pl-layer pl-dock"
+      <div ref={ref} data-on={dock ? "" : undefined} data-controls className="pl-layer pl-dock" data-paused={p.stopped ? "" : undefined}
         onPointerEnter={() => (p.hover.current = true)} onPointerLeave={() => (p.hover.current = false)}>
-        <Head p={p} />
+        {p.stopped ? <PausedInfo p={p} /> : <Head p={p} />}
         <div data-on={on ? "" : undefined} className="pl-dock-ctrls">
           {!p.live && <Scrubber vref={vref} on={on} onSeek={p.seekTo} onToggle={p.toggle} scrubbing={p.scrubbing} />}
           <div className="pl-ctrls">
