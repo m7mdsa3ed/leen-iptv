@@ -1,4 +1,4 @@
-// CORS proxy handler: /p?url=<encoded> (any method; body and x-plex-*/accept/content-type/authorization/range/api-key/x-user-agent headers are forwarded). Shared by `pnpm proxy` and the Vite dev/preview server.
+// CORS proxy handler: /p?url=<encoded> (any method; body and x-plex-*/accept/content-type/authorization/x-api-key/anthropic-*/x-goog-api-key/range/api-key/x-user-agent headers are forwarded). Shared by `pnpm proxy` and the Vite dev/preview server.
 // Follows redirects (providers 302 streams to other hosts that send no CORS headers) and rewrites HLS playlists
 // so every segment/key goes back through /p too. Returns true when it handled the request.
 import { Readable } from "node:stream"
@@ -43,10 +43,12 @@ export function proxyHandler(req, res) {
 function streamThrough(req, res, target, CORS) {
   const ctl = new AbortController()
   res.on("close", () => ctl.abort()) // viewer left: stop pulling the upstream stream
+  // an upstream that never answers would hold one of the browser's 6 connections to this origin (posters and the stream share them) until restart
+  const slow = setTimeout(() => ctl.abort(new Error("upstream timeout")), 20000)
   ;(async () => {
     try {
       const headers = {}
-      for (const [k, v] of Object.entries(req.headers)) if (/^(x-plex-.*|x-emby-authorization|accept|content-type|range|api-key|x-user-agent)$/.test(k)) headers[k] = v
+      for (const [k, v] of Object.entries(req.headers)) if (/^(x-plex-.*|x-emby-authorization|accept|content-type|range|api-key|x-user-agent|authorization|x-api-key|anthropic-version|anthropic-beta|x-goog-api-key|openai-organization)$/.test(k)) headers[k] = v
       const init = { method: req.method, headers, redirect: "manual", signal: ctl.signal }
       if (req.method !== "GET" && req.method !== "HEAD") {
         const chunks = []
@@ -64,6 +66,7 @@ function streamThrough(req, res, target, CORS) {
         if (!/^https?:/.test(cur)) throw new Error("bad redirect")
         if (up.status === 303 || ((up.status === 301 || up.status === 302) && req.method === "POST")) { init.method = "GET"; delete init.body }
       }
+      clearTimeout(slow) // headers arrived: the body may stream for hours
       const type = up.headers.get("content-type") || ""
       const out = { ...CORS, "content-type": type }
       for (const h of ["content-range", "accept-ranges", "content-length"]) if (up.headers.get(h) && !(h === "content-length" && up.headers.get("content-encoding"))) out[h] = up.headers.get(h) // fetch already decoded the body
@@ -88,6 +91,7 @@ function streamThrough(req, res, target, CORS) {
       if (!up.body) return res.end()
       Readable.fromWeb(up.body).on("error", () => res.destroy()).pipe(res)
     } catch (e) {
+      clearTimeout(slow)
       if (!res.headersSent) res.writeHead(/blocked/.test(String(e)) ? 403 : 502, CORS).end(`${e}${e?.cause ? ` (${e.cause.code ?? e.cause})` : ""}`) // cause = ECONNREFUSED / ETIMEDOUT / ENOTFOUND
       else res.destroy()
     }

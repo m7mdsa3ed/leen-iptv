@@ -43,14 +43,17 @@ export async function writeResized({ res, url, width, CORS, headers }) {
     lib(file).pipe(res).on("error", () => res.destroy())
     return true
   }
-  let up
+  // a dead poster host must not hold the browser's connection (it shares the 6 per origin with the stream) for minutes
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), 8000)
+  let up, buf
   try {
-    up = await fetch(encodeURI(decodeURI(url)), { headers, redirect: "follow" })
-  } catch { return false }
-  if (!up.ok || !TYPES.test(up.headers.get("content-type") || "")) return false // not a raster poster: plain proxy handles it
-  const len = Number(up.headers.get("content-length") || 0)
-  if (len > MAX_BYTES) return false
-  const buf = Buffer.from(await up.arrayBuffer())
+    up = await fetch(encodeURI(decodeURI(url)), { headers, redirect: "follow", signal: ctl.signal })
+    if (!up.ok || !TYPES.test(up.headers.get("content-type") || "")) return false // not a raster poster: plain proxy handles it
+    const len = Number(up.headers.get("content-length") || 0)
+    if (len > MAX_BYTES) return false
+    buf = Buffer.from(await up.arrayBuffer())
+  } catch { return false } finally { clearTimeout(timer) }
   if (buf.length > MAX_BYTES) return false
   let out
   try {
