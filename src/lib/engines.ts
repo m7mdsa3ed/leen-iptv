@@ -7,7 +7,7 @@ import mpegtsUrl from "mpegts.js/dist/mpegts.js?url"
     Their UMD builds are loaded as classic scripts (file:// can't split an IIFE bundle), each one on the first playback that needs it, then reused. */
 export type Engines = { Hls: typeof Hls; mpegts: typeof mpegts }
 
-const load = (src: string) => new Promise<void>((ok, bad) => {
+export const load = (src: string) => new Promise<void>((ok, bad) => {
   const s = document.createElement("script")
   s.src = src
   s.onload = () => ok()

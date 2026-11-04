@@ -92,6 +92,28 @@ export function RoundButton({ label, active, className, type = "button", ...p }:
   )
 }
 
+/** The top bar's small icon button, the same height, shape and icon size as the status chips beside it (queue, sources, bell): 32 px (44 on TV) with a 14 px
+    (16 on TV) icon. Use it for actions that live in that cluster; RoundButton is the full-size one (search, back, dialogs). */
+export function ChipButton({ label, className, type = "button", children, ...p }: Btn & { label: string }) {
+  return (
+    <button
+      data-nav
+      data-pill
+      data-round
+      type={type}
+      aria-label={label}
+      title={label}
+      {...p}
+      className={cn(
+        "grid shrink-0 place-items-center rounded-full bg-surface-2 text-foreground size-8 [&_svg]:size-3.5 [html[data-mode=tv]_&]:size-11 [html[data-mode=tv]_&_svg]:size-4",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 /** Coloured initial circle (not interactive; wrap in a button). Size via className, default size-10. */
 export const Avatar = ({ name, color, photo, className }: { name: string; color: string; photo?: string; className?: string }) => (
   <div style={{ background: color }} className={cn("grid size-10 shrink-0 place-items-center overflow-hidden rounded-full font-medium text-white", className)}>

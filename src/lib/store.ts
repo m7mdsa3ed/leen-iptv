@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { del } from "idb-keyval"
 import type { ColorThemeId } from "@/lib/themes"
 import { persist, type PersistStorage } from "zustand/middleware"
 import { LAYOUT_IDS } from "./layouts"
@@ -10,12 +11,13 @@ import type { LayoutId } from "./layouts"
 import type { MetaMatch, Profile, Source, Watch } from "./types"
 import type { Follow } from "./sports/types"
 import type { SubsCfg } from "./subs-pure"
+import type { ChatCfg, VoiceCfg } from "./agent/spec"
 import type { More } from "./browse-pure"
 
 /** A user-made group of live channels (name is its key within a profile). */
 export type LiveList = { name: string; items: string[] }
 type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number; next?: 1 }>; lists?: LiveList[]; follows?: Follow[] }
-export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; colorTheme?: ColorThemeId; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; screensaver?: number; saverStyle?: "art" | "clock"; splashSound?: boolean; cardSize?: "small" | "normal" | "large" | "xl"; gridSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; autoNext?: boolean; noAutoShows?: string[]; meta?: ProviderCfg[]; metaMatch?: Record<string, MetaMatch>; logoMatch?: Record<string, string>; sharedMeta?: boolean; metaPosters?: boolean; autoMeta?: boolean; unmatched?: Record<string, string>; groupMedia?: boolean; groupLive?: boolean; sportsNotify?: { enabled: boolean; lead: number }; notifyOff?: boolean; notify?: { digest?: boolean; live?: boolean; final?: boolean; episodes?: boolean }; subs?: SubsCfg }
+export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; colorTheme?: ColorThemeId; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; screensaver?: number; saverStyle?: "art" | "clock"; splashSound?: boolean; cardSize?: "small" | "normal" | "large" | "xl"; gridSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; autoNext?: boolean; noAutoShows?: string[]; meta?: ProviderCfg[]; metaMatch?: Record<string, MetaMatch>; logoMatch?: Record<string, string>; sharedMeta?: boolean; metaPosters?: boolean; autoMeta?: boolean; unmatched?: Record<string, string>; groupMedia?: boolean; groupLive?: boolean; sportsNotify?: { enabled: boolean; lead: number }; notifyOff?: boolean; notify?: { digest?: boolean; live?: boolean; final?: boolean; episodes?: boolean }; subs?: SubsCfg; voice?: VoiceCfg; chat?: ChatCfg }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
 const empty = (): PData => ({ favs: [], recents: [], progress: {}, lists: [], follows: [] })

@@ -1,7 +1,7 @@
 import type { ComponentType } from "react"
 import { t, useT } from "@/lib/i18n"
 import { useRoute } from "@/lib/nav"
-import { Bell, Captions, Cloud, FileText, History, Info, Layers, LayoutGrid, MonitorSmartphone, Palette, Play, Trophy, UserRound, Wrench, type LucideIcon } from "lucide-react"
+import { Bell, Captions, Cloud, FileText, History, Info, Layers, LayoutGrid, MonitorSmartphone, Palette, Play, Sparkles, Trophy, UserRound, Wrench, type LucideIcon } from "lucide-react"
 import AccountSection from "./sections/account"
 import ProfilesSection from "./sections/profiles"
 import SourcesSection from "./sections/sources"
@@ -14,10 +14,11 @@ import MetadataSection from "./sections/metadata"
 import FixesSection from "./sections/fixes"
 import SportsSection from "./sections/sports"
 import NotificationsSection from "./sections/notifications"
+import AssistantSection from "./sections/assistant"
 import HistorySection from "./sections/history"
 import AboutSection from "./sections/about"
 
-export type SectionKey = "account" | "profiles" | "sources" | "appearance" | "browsing" | "playback" | "subtitles" | "device" | "metadata" | "fixes" | "sports" | "notifications" | "history" | "about"
+export type SectionKey = "account" | "profiles" | "sources" | "appearance" | "browsing" | "playback" | "subtitles" | "device" | "metadata" | "fixes" | "sports" | "notifications" | "assistant" | "history" | "about"
 export type SectionGroup = "account" | "library" | "playback" | "display" | "system"
 export type SectionDef = { key: SectionKey; group: SectionGroup; parent?: SectionKey; children?: SectionDef[]; title: string; icon: LucideIcon; description: string; Component: ComponentType }
 /** Sidebar groups, top to bottom: who you are, what you watch, how it plays, how it looks, the device. Members come from each section's `group`, in SECTIONS order. */
@@ -44,6 +45,7 @@ export const SECTIONS: SectionDef[] = [
   def("fixes", "library", Wrench, FixesSection),
   def("sports", "library", Trophy, SportsSection),
   def("notifications", "library", Bell, NotificationsSection),
+  def("assistant", "library", Sparkles, AssistantSection),
   def("playback", "playback", Play, PlaybackSection),
   def("subtitles", "playback", Captions, SubtitlesSection, "playback"),
   def("history", "playback", History, HistorySection),

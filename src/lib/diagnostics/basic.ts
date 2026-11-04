@@ -3,6 +3,8 @@ import { loadEngines } from "@/lib/engines"
 import pkg from "../../../package.json"
 import { fmt, t } from "@/lib/i18n"
 import { getOverride } from "@/lib/device"
+import { cameraCount, cameraSupported } from "@/lib/media/camera"
+import { micCount, micSupported } from "@/lib/media/mic"
 import { px } from "@/lib/net"
 import { useApp } from "@/lib/store"
 import { probe, say } from "./probe"
@@ -45,6 +47,22 @@ export function deviceChecks(): Check[] {
       return res(full > 0.9 ? "warn" : "ok", e.quota ? t("diag.dev.storage.of", { used: mb(e.usage), total: mb(e.quota) }) : `${mb(e.usage)} MB`, full > 0.9 ? t("diag.dev.storage.hint") : undefined)
     }),
     d("version", async () => res("ok", `Leen TV ${pkg.version}`)),
+    // Presence only: starting recognition or capture would raise the system permission overlay (on webOS it can steal focus).
+    d("speech", async () => {
+      const w = window as unknown as Record<string, unknown>
+      const api = ["SpeechRecognition", "webkitSpeechRecognition"].find((k) => typeof w[k] === "function")
+      return api ? res("ok", t("diag.dev.speech.ok", { api })) : res("warn", t("diag.dev.speech.no"), t("diag.dev.speech.hint"))
+    }),
+    d("mic", async () => {
+      if (!micSupported()) return res("warn", t("diag.dev.mic.no"), t("diag.dev.mic.hint"))
+      const n = await micCount()
+      return n ? res("ok", t("diag.dev.mic.ok", { n })) : res("warn", t("diag.dev.mic.none"), t("diag.dev.mic.hint"))
+    }),
+    d("camera", async () => {
+      if (!cameraSupported()) return res("warn", t("diag.dev.camera.no"), t("diag.dev.camera.hint"))
+      const n = await cameraCount()
+      return n ? res("ok", t("diag.dev.camera.ok", { n })) : res("warn", t("diag.dev.camera.none"), t("diag.dev.camera.hint"))
+    }),
   ]
 }
 

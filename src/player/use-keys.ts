@@ -2,6 +2,7 @@ import { useEffect } from "react"
 import { isTv } from "@/lib/device"
 import { dialogOutside, KEY, navState } from "@/lib/nav"
 import { saverOn } from "@/components/tv/screensaver"
+import { openVoice, voiceReady } from "@/lib/agent/ui"
 import type { P } from "./use-player"
 import { fsEl } from "./util"
 
@@ -45,6 +46,7 @@ export function useKeys(p: P & { root: () => HTMLElement | null }) {
       if (k === KEY.ff) return take(), p.seek(30)
       if (k === KEY.rw) return take(), p.seek(-10)
       if (k === KEY.red) return take(), p.toggleFav()
+      if (k === KEY.blue && voiceReady()) return take(), openVoice()
       if (k === KEY.green || k === KEY.blue) return take(), p.openPanel("av")
       if (k === KEY.yellow) return take(), p.cycleFit()
       if (k === KEY.info) return take(), p.layer === "none" && (p.chrome ? p.hide() : p.poke())

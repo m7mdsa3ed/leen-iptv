@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { build as viteBuild, defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import cascadeLayers from "@csstools/postcss-cascade-layers";
@@ -15,6 +15,25 @@ const streamProxy = (): Plugin => {
   const mw = (req: unknown, res: unknown, next: () => void) => { if (!proxyHandler(req, res)) next() }
   return { name: "stream-proxy", configureServer: (s) => void s.middlewares.use(mw), configurePreviewServer: (s) => void s.middlewares.use(mw) }
 }
+
+// The AI SDK (realtime hook + Gemini Live model, ~300 KB) is built here as its own classic-script bundle and loaded on the first use of the voice
+// assistant (src/lib/agent/load.ts), like hls.js: the app bundle is one IIFE, so import() would be inlined into it and an old TV would parse the SDK at startup.
+// React stays external (the bundle reads the app's copy from window.__leenReact / __leenJsx, set by the loader), so hooks run against one React.
+export const AI_BUNDLE = path.join(import.meta.dirname, "node_modules/.cache/leen-ai")
+const aiBundle = (): Plugin => ({
+  name: "ai-sdk-bundle",
+  async buildStart() {
+    await viteBuild({
+      configFile: false, logLevel: "warn", root: import.meta.dirname,
+      define: { "process.env.NODE_ENV": '"production"' },
+      build: {
+        target: "chrome94", outDir: AI_BUNDLE, emptyOutDir: true, copyPublicDir: false, sourcemap: false,
+        lib: { entry: "src/lib/agent/sdk.ts", formats: ["iife"], name: "LeenAI", fileName: () => "ai-sdk.js" },
+        rollupOptions: { external: ["react", "react/jsx-runtime"], output: { globals: { react: "__leenReact", "react/jsx-runtime": "__leenJsx" } } },
+      },
+    })
+  },
+})
 
 // Post-build: Vite's postcss hook doesn't run the polyfill after Tailwind, and file:// can't load type=module scripts.
 const webosCompat = (): Plugin => ({
@@ -48,7 +67,7 @@ const precacheList = (): Plugin => ({
 // Tailwind v4 emits all of those, so downlevel CSS for chrome94 (webOS 23+ and up).
 export default defineConfig({
   base: "./", // packaged webOS apps load from file://
-  plugins: [react(), tailwindcss(), webosCompat(), streamProxy(), precacheList()],
+  plugins: [aiBundle(), react(), tailwindcss(), webosCompat(), streamProxy(), precacheList()],
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
   css: {
     transformer: "lightningcss",

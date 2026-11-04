@@ -25,6 +25,9 @@ import { closeListModal, useListModal } from "@/components/tv/lists"
 import { ExitConfirm, askExit, closeExit, useExitAsk } from "@/components/tv/exit-confirm"
 import { backStep, hasBackStep, installNav, useRoute } from "@/lib/nav"
 import { CARD_K } from "@/lib/cards"
+import { VoiceOverlay } from "@/components/tv/voice"
+import { ChatOverlay } from "@/components/tv/chat"
+import { closeChat, closeVoice, installVoiceKey, useChatUi, useVoice } from "@/lib/agent/ui"
 import { SearchPalette, closePalette, installPaletteKeys, usePalette } from "@/components/tv/search-palette"
 import { OnScreenKeyboard, closeKeyboard, installKeyboard, useKbd } from "@/components/tv/keyboard"
 import { useApp } from "@/lib/store"
@@ -158,6 +161,8 @@ export default function App() {
   useEffect(() =>
     installNav(() => {
       if (useKbd.getState().el) return closeKeyboard()
+      if (useChatUi.getState().open) return closeChat()
+      if (useVoice.getState().open && useVoice.getState().mode === "full") return closeVoice() // the docked capsule leaves Back to the page under it
       if (usePalette.getState().open) return closePalette()
       const ask = usePinAsk.getState().ask
       if (ask) return ask.resolve(false), usePinAsk.setState({ ask: null })
@@ -175,6 +180,7 @@ export default function App() {
   useBackfillMatches()
   useEffect(() => installKeyboard(), [])
   useEffect(() => installPaletteKeys(), [])
+  useEffect(() => installVoiceKey(), [])
   useEffect(() => { startReminders(); startEpisodeWatch() }, []) // sports alerts + new episodes while the app is open
   const catNav = useApp((s) => s.settings.catNav ?? "bar")
   useEffect(() => { document.documentElement.dataset.catnav = catNav }, [catNav])
@@ -228,6 +234,8 @@ export default function App() {
       <RecoveryGate />
       <TrailerModal />
       <SearchPalette />
+      <VoiceOverlay />
+      <ChatOverlay />
       <OnScreenKeyboard />
       <Toasts />
       <ScreenSaver />

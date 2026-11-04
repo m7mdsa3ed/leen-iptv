@@ -5,6 +5,8 @@ import { useT } from "@/lib/i18n"
 import { MetaQueueButton } from "@/components/tv/meta-queue"
 import { InboxButton } from "@/components/tv/inbox"
 import { HealthButton } from "@/components/tv/health"
+import { VoiceButton } from "@/components/tv/voice"
+import { ChatButton } from "@/components/tv/chat"
 import { Avatar, LeenMark, Pill, RoundButton } from "@/components/gtv"
 import { Clock } from "@/components/tv/ui"
 import { useBackStep } from "@/lib/nav"
@@ -26,7 +28,7 @@ export default function Shell({ page, title, children, sub }: ShellProps) {
     </RoundButton>
   )
   const avatar = <ProfileButton page={page} go={go} />
-  const queue = <><MetaQueueButton /><HealthButton /><InboxButton /></> // titles waiting for metadata (activity panel) + source health + the notifications bell
+  const queue = <><VoiceButton /><ChatButton /><MetaQueueButton /><HealthButton /><InboxButton /></> // voice assistant + titles waiting for metadata (activity panel) + source health + the notifications bell
   const state = <span className={cn("text-muted-foreground", tv ? "text-xl" : "text-sm")}>{status === "loading" ? t("gtv.shell.updating") + " " : ""}<Clock /></span>
   return (
     // bars, safe areas and their gradients: see "Bars and safe areas" in index.css (.topbar = exactly --hdr tall, .float-nav = floating pill inside --nav-h)

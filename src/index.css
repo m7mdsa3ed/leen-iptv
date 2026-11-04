@@ -299,6 +299,38 @@ html[data-mode=tv] [data-tile][data-fade] img[loading=lazy] { transition: none; 
 .bg-drift { animation: m-fade-k 700ms var(--ease) backwards; }
 html[data-motion=full] .bg-drift { animation: m-fade-k 700ms var(--ease) backwards, bg-drift-k 30s ease-in-out 0s infinite alternate; will-change: transform; }
 
+/* voice window: slow colour blobs over a see-through scrim. Transform only. Full motion drifts them; reduced / off (the TV default is reduced) leave a still wash.
+   Painted behind the window's content (-z), so captions and shelves stay on top. */
+.aurora { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; transition: opacity 600ms var(--ease); }
+.aurora > i { position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; }
+.aurora > i:nth-child(1) { top: -34vmax; inset-inline-start: -22vmax; background: radial-gradient(closest-side, rgba(66, 133, 244, .8), rgba(66, 133, 244, 0)); }
+.aurora > i:nth-child(2) { bottom: -38vmax; inset-inline-end: -18vmax; background: radial-gradient(closest-side, rgba(29, 233, 182, .55), rgba(29, 233, 182, 0)); }
+.aurora > i:nth-child(3) { top: 8vmax; inset-inline-end: 12vmax; width: 52vmax; height: 52vmax; background: radial-gradient(closest-side, rgba(255, 138, 101, .5), rgba(255, 138, 101, 0)); }
+@keyframes aurora-a-k { to { transform: translate3d(26vmax, 14vmax, 0) scale(1.15); } }
+@keyframes aurora-b-k { to { transform: translate3d(-24vmax, -16vmax, 0) scale(1.2); } }
+@keyframes aurora-c-k { to { transform: translate3d(-18vmax, 20vmax, 0) scale(.85); } }
+html[data-motion=full] .aurora > i { will-change: transform; }
+html[data-motion=full] .aurora > i:nth-child(1) { animation: aurora-a-k 19s ease-in-out infinite alternate; }
+html[data-motion=full] .aurora > i:nth-child(2) { animation: aurora-b-k 23s ease-in-out infinite alternate; }
+html[data-motion=full] .aurora > i:nth-child(3) { animation: aurora-c-k 17s ease-in-out infinite alternate; }
+
+/* the voice window's see-through scrim: a blur over the app where the GPU allows it; the TV has no backdrop-filter (see the old-TV rule below), so it is darker there */
+.voice-scrim { background: rgba(8, 10, 16, .5); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+html[data-mode=tv] .voice-scrim { background: rgba(8, 10, 16, .74); }
+
+/* chat "working" dots: three dots fading in turn (opacity only). Off = still dots. */
+@keyframes typing-k { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.typing { display: inline-flex; gap: .3rem; align-items: center; }
+.typing > i { width: .45rem; height: .45rem; border-radius: 50%; background: currentColor; opacity: .6; animation: typing-k 1.2s ease-in-out infinite; }
+.typing > i:nth-child(2) { animation-delay: .2s; }
+.typing > i:nth-child(3) { animation-delay: .4s; }
+
+/* chat side panel: slides in from the end edge (the other way in RTL) */
+@keyframes side-in-k { from { opacity: 0; transform: translate3d(calc(var(--side, 1) * 3rem), 0, 0); } }
+.side-in { animation: side-in-k var(--dur-slow) var(--ease) backwards; }
+[dir=rtl] .side-in { --side: -1; }
+html[data-motion=reduced] .side-in { animation-name: m-fade-k; animation-duration: 150ms; }
+
 html[data-mode=tv] .skel::after { animation: none; }
 
 /* reduced: opacity fades only (<=150ms); focus scale stays */
