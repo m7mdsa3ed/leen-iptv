@@ -1,4 +1,5 @@
 import { catsOf } from "@/lib/merge-pure"
+import { resumable } from "@/lib/progress-pure"
 import { useCallback, useEffect, useMemo } from "react"
 import { fmt, t, useLang } from "@/lib/i18n"
 import { useNotify } from "@/lib/notify"
@@ -98,7 +99,7 @@ export function useHomeData() {
 
   const data = useMemo(() => {
     const get = (ids: string[]) => ids.map((i) => byId.get(i)).filter((x) => x && inSource(x, filter)).slice(0, CAP) as Item[]
-    const p = Object.entries(progress).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
+    const p = Object.entries(progress).filter(([, v]) => resumable(v)).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
     // the play queue keeps full length: it is not painted, it is the zapping list the player gets
     const cont = get(p), favs = get(favIds), live = byKind.live.slice(0, Math.max(CAP, LIVE))
     // hero: last continue-watching, else a favorite, else a day-stable VOD pick, else first channel
@@ -114,7 +115,7 @@ export function useHomeData() {
     add(favs[0], t("common.favorite"))
     for (let n = 0; n < nv && featured.length < FEATURED; n++) add(vod((day + n * 7) % nv))
     if (!featured.length) add(byKind.live[0])
-    const pct = (i: Item) => { const p = progress[i.id]; return p ? (p.pos / p.dur) * 100 : undefined }
+    const pct = (i: Item) => { const p = progress[i.id]; return p && !p.next ? (p.pos / p.dur) * 100 : undefined }
     const rails: HomeRail[] = []
     const card = (l: Item[]) => (l.some((i) => i.kind !== "live") ? "poster" : "wide") as "wide" | "poster"
     if (cont.length) rails.push({ key: "cont", title: t("common.continueWatching"), kind: "wide", card: card(cont), items: cont, pct })

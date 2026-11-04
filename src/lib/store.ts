@@ -14,7 +14,7 @@ import type { More } from "./browse-pure"
 
 /** A user-made group of live channels (name is its key within a profile). */
 export type LiveList = { name: string; items: string[] }
-type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number }>; lists?: LiveList[]; follows?: Follow[] }
+type PData = { favs: string[]; recents: string[]; progress: Record<string, { pos: number; dur: number; t: number; next?: 1 }>; lists?: LiveList[]; follows?: Follow[] }
 export type Settings = { proxy: string; proxyStreams: boolean; liveExt: "m3u8" | "ts"; tvScale: number; trackHistory: boolean; accountChoice: "unset" | "guest" | "account"; theme: "system" | "dark" | "light"; colorTheme?: ColorThemeId; layout: LayoutId; motion: "full" | "reduced" | "off"; sourceBadges: boolean; language: "auto" | "en" | "ar"; keyboard?: "auto" | "on" | "off"; catNav?: "bar" | "sidebar"; screensaver?: number; saverStyle?: "art" | "clock"; splashSound?: boolean; cardSize?: "small" | "normal" | "large" | "xl"; gridSize?: "small" | "normal" | "large" | "xl"; cardInfo?: "show" | "hide"; startPage?: "home" | "live" | "movies" | "series"; homeOrder?: string[]; homeHide?: string[]; nextBanner?: boolean; autoNext?: boolean; noAutoShows?: string[]; meta?: ProviderCfg[]; metaMatch?: Record<string, MetaMatch>; logoMatch?: Record<string, string>; sharedMeta?: boolean; metaPosters?: boolean; autoMeta?: boolean; unmatched?: Record<string, string>; groupMedia?: boolean; groupLive?: boolean; sportsNotify?: { enabled: boolean; lead: number }; notifyOff?: boolean; notify?: { digest?: boolean; live?: boolean; final?: boolean; episodes?: boolean }; subs?: SubsCfg }
 
 const COLORS = ["#7c5cff", "#ef4444", "#10b981", "#f59e0b", "#06b6d4", "#ec4899"]
@@ -50,7 +50,7 @@ interface S {
   toggleListChannel: (name: string, id: string) => void
   toggleLock: (key: string) => void
   pushRecent: (id: string) => void
-  setProgress: (id: string, pos: number, dur: number, series?: string) => void
+  setProgress: (id: string, pos: number, dur: number, series?: string, more?: boolean) => void
   markSeen: (entries: { id: string; dur?: number }[], seen: boolean) => void
   pullProgress: (list: Watch[]) => void
   setSettings: (p: Partial<Settings>) => void
@@ -99,7 +99,7 @@ export const useApp = create<S>()(
       addProfile: (name, pin) =>
         set((s) => ({ profiles: [...s.profiles, { id: uid(), name, pin, color: COLORS[s.profiles.length % COLORS.length], locked: [] }] })),
       updateProfile: (id, p) => set((s) => ({ profiles: s.profiles.map((x) => (x.id === id ? { ...x, ...p } : x)) })),
-      removeProfile: (id) => set((s) => ({ profiles: s.profiles.filter((x) => x.id !== id), profileId: s.profileId === id ? null : s.profileId })),
+      removeProfile: (id) => { void del(`chat:${id}`).catch(() => {}); set((s) => ({ profiles: s.profiles.filter((x) => x.id !== id), profileId: s.profileId === id ? null : s.profileId })) }, // its typed-chat history goes with it (lib/agent/chat-store.ts)
       setProfile: (id) => {
         try { id ? sessionStorage.setItem("iptv-profile", id) : sessionStorage.removeItem("iptv-profile") } catch { /* private mode */ }
         set({ profileId: id })
@@ -148,8 +148,12 @@ export const useApp = create<S>()(
           ),
         })),
       pushRecent: (id) => set((s) => upd(s, (d) => ({ ...d, recents: [id, ...d.recents.filter((x) => x !== id)].slice(0, 40) }))),
-      // an episode also writes the series entry (last episode wins) so Continue watching, which lists catalog items, can show the series
-      setProgress: (id, pos, dur, series) => set((s) => upd(s, (d) => { const p = { pos, dur, t: Date.now() }; return { ...d, progress: { ...d.progress, [id]: p, ...(series ? { [series]: p } : {}) } } })),
+      // an episode also writes the series entry (last episode wins) so Continue watching, which lists catalog items, can show the series;
+      // a finished episode with more after it marks that entry `next`, so the show stays listed
+      setProgress: (id, pos, dur, series, more) => set((s) => upd(s, (d) => {
+        const p = { pos, dur, t: Date.now() }, sp = more && dur > 0 && pos / dur >= 0.95 ? { ...p, next: 1 as const } : p
+        return { ...d, progress: { ...d.progress, [id]: p, ...(series ? { [series]: sp } : {}) } }
+      })),
       // ponytail: "unseen" = position 0 (not a delete) so sync's last-writer-wins carries it and server resume is not re-seeded
       markSeen: (entries, seen) => set((s) => upd(s, (d) => {
         const progress = { ...d.progress }, t = Date.now()

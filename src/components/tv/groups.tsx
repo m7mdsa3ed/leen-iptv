@@ -6,6 +6,7 @@ import { useApp, useLists, usePData, useProfile } from "@/lib/store"
 import { useCatalog } from "@/lib/catalog"
 import { useActiveFilter, useCatalogView, inSource } from "@/layouts/hooks/use-source-filter"
 import { catsOf, findLock } from "@/lib/merge-pure"
+import { resumable } from "@/lib/progress-pure"
 import type { Item, Kind } from "@/lib/types"
 import { useMode } from "@/lib/device"
 import { useT } from "@/lib/i18n"
@@ -27,7 +28,7 @@ export function useContinue(kind: Kind, off = false): Item[] {
   const recents = kind === "live" ? d.recents : undefined, progress = kind === "live" ? undefined : d.progress
   return useMemo(() => {
     if (off) return NONE
-    const ids = recents ?? Object.entries(progress ?? {}).filter(([, v]) => v.dur > 0 && v.pos / v.dur < 0.95 && v.pos > 30).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
+    const ids = recents ?? Object.entries(progress ?? {}).filter(([, v]) => resumable(v)).sort((a, b) => b[1].t - a[1].t).map(([k]) => k)
     return ids.map((id) => byId.get(id)).filter((i): i is Item => !!i && i.kind === kind && inSource(i, filter))
   }, [off, kind, byId, recents, progress, filter])
 }

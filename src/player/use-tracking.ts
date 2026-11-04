@@ -34,10 +34,10 @@ function follow(v: HTMLVideoElement) {
  * Server reports key on the item / source id, so a store update (sync pull, source edit) never stops a transcode mid-play.
  */
 export function useTracking(o: {
-  vref: RefObject<HTMLVideoElement | null>; item: Item; live: boolean; src?: SourceMeta; plex: SourceMeta | null; jf: SourceMeta | null
+  vref: RefObject<HTMLVideoElement | null>; item: Item; live: boolean; more: boolean; src?: SourceMeta; plex: SourceMeta | null; jf: SourceMeta | null
   resume: MutableRefObject<number>; fromStart: MutableRefObject<string>; meas: MutableRefObject<Meas>; statsRef: MutableRefObject<Stats | null>
 }) {
-  const { vref, item, live, src, plex, jf, resume, fromStart, meas, statsRef } = o
+  const { vref, item, live, more, src, plex, jf, resume, fromStart, meas, statsRef } = o
   const trackHistory = useApp((s) => s.settings.trackHistory)
 
   /* resume point + recents */
@@ -50,10 +50,10 @@ export function useTracking(o: {
   /* saved progress */
   useEffect(() => {
     if (live) return
-    const save = () => { const v = vref.current; if (v && v.duration > 0) useApp.getState().setProgress(item.id, v.currentTime, v.duration, item.series) }
+    const save = () => { const v = vref.current; if (v && v.duration > 0) useApp.getState().setProgress(item.id, v.currentTime, v.duration, item.series, more) }
     const id = setInterval(save, 10000)
     return () => { clearInterval(id); save() }
-  }, [item.id, live]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [item.id, live, more]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* now playing on the other devices (independent of the saved progress) */
   useEffect(() => {

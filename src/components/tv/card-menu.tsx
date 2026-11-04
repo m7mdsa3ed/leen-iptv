@@ -3,6 +3,7 @@ import { create } from "zustand"
 import { Pill } from "@/components/gtv"
 import { useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
+import { resumable } from "@/lib/progress-pure"
 import { focusFirst } from "@/lib/nav"
 import type { Item } from "@/lib/types"
 
@@ -15,7 +16,7 @@ export const closeCardMenu = () => useCardMenu.setState({ cur: null })
 /** Long-press handler for a card that is in progress (Continue watching): the menu offers to remove it. undefined = nothing to offer, the card has no menu. */
 export function useRemoveMenu(item: Item) {
   const t = useT()
-  const on = useApp((s) => { const p = s.profileId ? s.data[s.profileId]?.progress[item.id] : undefined; return !!p && p.dur > 0 && p.pos > 30 && p.pos / p.dur < 0.95 })
+  const on = useApp((s) => { const p = s.profileId ? s.data[s.profileId]?.progress[item.id] : undefined; return resumable(p) })
   return on ? () => openCardMenu(item, [{ label: t("common.removeContinue"), run: () => useApp.getState().markSeen([{ id: item.id }], false) }]) : undefined
 }
 

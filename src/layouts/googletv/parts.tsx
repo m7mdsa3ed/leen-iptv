@@ -26,5 +26,5 @@ export function GRail({ title, children, onSeeAll }: { title?: ReactNode; childr
 export function useLeft() {
   const d = usePData()
   useT()
-  return (i: Item) => { const p = d.progress[i.id]; return p && p.dur > p.pos ? fmt.plural("gtv.minLeft", Math.max(1, Math.ceil((p.dur - p.pos) / 60))) : undefined }
+  return (i: Item) => { const p = d.progress[i.id]; return p && !p.next && p.dur > p.pos ? fmt.plural("gtv.minLeft", Math.max(1, Math.ceil((p.dur - p.pos) / 60))) : undefined }
 }

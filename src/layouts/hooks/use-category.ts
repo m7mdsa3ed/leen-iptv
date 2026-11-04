@@ -17,7 +17,7 @@ export const sortsFor = (l: Item[], t: (k: string) => string) => {
   return SORTS.filter((s) => (s !== "rating" && s !== "year" && s !== "added") || has[s]).map((s): [Sort, string] => [s, t(`hooks.sort.${s}`)])
 }
 /** Progress percent of an item, undefined when never played. */
-export const pctOf = (progress: Record<string, { pos: number; dur: number } | undefined>, i: Item) => { const p = progress[i.id]; return p && (p.pos / p.dur) * 100 }
+export const pctOf = (progress: Record<string, { pos: number; dur: number; next?: 1 } | undefined>, i: Item) => { const p = progress[i.id]; return p && !p.next ? (p.pos / p.dur) * 100 : undefined }
 /** A stable callback (same function every render) that always runs the latest `f`: lets cards/chips stay memoised while `f` closes over fresh state. */
 export function useStable<A extends unknown[], R>(f: (...a: A) => R): (...a: A) => R {
   const ref = useRef(f)

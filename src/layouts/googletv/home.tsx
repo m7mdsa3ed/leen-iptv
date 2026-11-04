@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useState } from "react"
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react"
 import { Play } from "lucide-react"
 import { Shell, TvButton, Empty, useCardFlags } from "@/components/tv/ui"
 import { Card, Rail, SkelRail, small } from "@/components/gtv"
@@ -44,7 +44,16 @@ export default function Home() {
     const id = requestAnimationFrame(() => startTransition(() => setAllRails(true))) // after the first paint of the top rails
     return () => cancelAnimationFrame(id)
   }, [ready, allRails])
-  const rails = allRails ? h.rails : h.rails.slice(0, FIRST_RAILS)
+  // one "Your watchlist" rail: started titles first (with progress), then favorites not already in it; it takes the slot of whichever row comes first
+  const merged = useMemo(() => {
+    const c = h.rails.find((r) => r.key === "cont"), f = h.rails.find((r) => r.key === "favs")
+    if (!c || !f) return h.rails
+    const items = [...c.items, ...f.items.filter((i) => !c.items.includes(i))]
+    const one = { ...c, key: "favs", items, card: c.card === "poster" || f.card === "poster" ? "poster" as const : "wide" as const }
+    const first = h.rails.find((r) => r === c || r === f)
+    return h.rails.flatMap((r) => (r === first ? [one] : r === c || r === f ? [] : [r]))
+  }, [h.rails])
+  const rails = allRails ? merged : merged.slice(0, FIRST_RAILS)
   const meta = (item: Item) => [item.year && fmt.digits(item.year), item.rating ? `★ ${Number.isFinite(Number(item.rating)) ? fmt.decimal(Number(item.rating)) : item.rating}` : "", item.genres?.slice(0, 2).join(", ") || item.group, item.dur && item.dur > 60 ? fmt.duration(item.dur) : ""].filter(Boolean).join("  •  ")
 
   return (
@@ -99,7 +108,7 @@ export default function Home() {
               </Rail>
             ) : gamesLoading ? <SkelGames key="games" /> : null
           ) : (
-            <CardRail key={r.key} title={TITLES[r.key] ? t(TITLES[r.key]) : r.title} onSeeAll={r.seeAll} items={r.items} variant={r.card ?? r.kind} pct={r.pct} sub={r.key === "cont" ? left : (i) => r.sub?.(i)} open={h.open} flags={flags} />
+            <CardRail key={r.key} title={TITLES[r.key] ? t(TITLES[r.key]) : r.title} onSeeAll={r.seeAll} items={r.items} variant={r.card ?? r.kind} pct={r.pct} sub={r.pct ? left : (i) => r.sub?.(i)} open={h.open} flags={flags} />
           ))}
         </div>
       )}

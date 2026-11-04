@@ -69,7 +69,7 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
   const resume = useRef(0)
   const E = usePlayback({ vref, item, live: S.live, raw: S.raw, url: S.url, direct: S.direct, toProxy: S.toProxy, src: S.src, fallback: S.fallback && (() => { const v = vref.current; if (v && v.currentTime > 0) resume.current = v.currentTime; S.fallback!() }) })
   const fromStart = useRef(o.start ? item.id : "")
-  useTracking({ vref, item, live: S.live, src: S.src, plex: S.plex, jf: S.jf, resume, fromStart, meas: E.meas, statsRef: E.statsRef })
+  useTracking({ vref, item, live: S.live, more: idx < queue.length - 1, src: S.src, plex: S.plex, jf: S.jf, resume, fromStart, meas: E.meas, statsRef: E.statsRef })
   const [flash, fire] = useFlash()
   const T = useTracks({ vref, item, S, E, picked, setPicked: (p) => setPick({ ...p, id: item.id }), resume, onAuto: (name) => fire("sub", name) })
   useSidecar(vref, T.sidecar, T.offset ?? 0)

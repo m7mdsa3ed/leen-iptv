@@ -1,7 +1,7 @@
 // Pure sync core (no alias imports, no DOM) so `node scripts/sync.check.ts` can run it.
 // Everything is a flat map of timestamped entities; merge = per-key last-writer-wins with tombstones.
 export type Ent = { t: number; del?: 1; v?: unknown }
-export type Prog = { pos: number; dur: number; t: number }
+export type Prog = { pos: number; dur: number; t: number; next?: 1 }
 export type Day = { sec: number; sessions: number; live: number; movie: number; series: number }
 /** keys: p/<profileId> s/<sourceId> f/<profileId>/<itemId> r/<profileId>/<itemId> l/<profileId>/<list> t/<profileId>/<provider:teamId> m/<titleKey> g/<logoKey> c/<setting> u/<titleKey> */
 export type Snapshot = { v: 1; e: Record<string, Ent>; progress: Record<string, Prog>; days: Record<string, Day> }
