@@ -9,7 +9,7 @@ import { rate } from "@/lib/quality"
 import { t as tn } from "@/lib/i18n"
 import type { Item, Source } from "@/lib/types"
 import { attach, release, type Stream, type Track } from "./engine"
-import { engineToLoad, MAX_AUTO, mpegtsAction, nativeAction, watchdogMs, ZAP_DELAY, type Fail } from "./engine-pure"
+import { engineToLoad, failAction, HANDOFF_MS, MAX_AUTO, mpegtsAction, nativeAction, watchdogMs, ZAP_DELAY, type Fail } from "./engine-pure"
 import { audioLabel, type Stats } from "./stats"
 
 export type { Track }
@@ -22,6 +22,7 @@ if (typeof window !== "undefined") {
   if (useCatalog.getState().status === "ready") warm()
   else { const off = useCatalog.subscribe((c) => { if (c.status === "ready") { off(); warm() } }) }
 }
+let closedAt = 0 // when the last stream (any player, any Multiview tile) was stopped: the next one waits HANDOFF_MS after it
 const say = (f: Fail) => (f.why === "http" ? statusMsg(f.code) : f.why === "cors" ? corsHint() : f.why === "blocked" ? tn("errors.http.blocked", { host: f.host }) : tn(MSG[f.why]))
 
 /**
@@ -59,8 +60,10 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
   useEffect(() => { if (need) void LOAD[need]().then(() => setEng(loadedEngines()), () => setErr(tn("errors.stream.unavailable"))) }, [need, retryN]) // Retry also re-tries a script that failed to load
   useEffect(() => { if (err) meas.current.errTotal++ }, [err])
 
-  /** Final error. A refused stream on an Xtream account at its connection limit gets the real reason. */
+  /** Final error, after the automatic retries (failAction). A refused stream on an Xtream account at its connection limit gets the real reason. */
   const fail = (f: Fail) => {
+    const a = failAction(f, auto.current)
+    if (a.do === "retry") { auto.current++; return later(a.ms) }
     const g = gen.current, msg = say(f)
     if (!f.account || src?.type !== "xtream") return setErr(msg)
     void connInfo(src, proxy).then((c) => { if (g === gen.current) setErr(c && c.act >= c.max ? tn("errors.maxConn", { act: c.act, max: c.max }) : msg) })
@@ -94,13 +97,15 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
     }
     const wasFirst = first.current
     first.current = false
-    const t = live && !wasFirst ? window.setTimeout(start, ZAP_DELAY) : (start(), 0)
+    const wait = Math.max(live && !wasFirst ? ZAP_DELAY : 0, closedAt + HANDOFF_MS - Date.now())
+    const t = wait > 0 ? window.setTimeout(start, wait) : (start(), 0)
     // a provider that accepts the connection but sends nothing raises no error: restart (twice), then give up
     const wd = window.setTimeout(() => { if (!played.current) { if (auto.current++ < MAX_AUTO) setRetryN((n) => n + 1); else fail({ why: "stuck", account: true }) } }, watchdogMs(live))
     return () => {
       clearTimeout(t); clearTimeout(wd)
       timers.current.forEach(clearTimeout); timers.current = []
-      stream.current?.stop(); stream.current = null; hls.current = null
+      if (stream.current) { stream.current.stop(); closedAt = Date.now() }
+      stream.current = null; hls.current = null
       release(v)
     }
   }, [url, live, retryN, viaHls, eng, need]) // eslint-disable-line react-hooks/exhaustive-deps

@@ -30,6 +30,15 @@ export const MAX_TRIES = 3 // recoveries per outage (hls network / media, mpegts
 export const MAX_AUTO = 2 // watchdog restarts before "stuck"
 export const watchdogMs = (live: boolean) => (live ? 15000 : 25000) // connected but nothing played: restart
 export const ZAP_DELAY = 300 // zapping fast (CH+ held): only the channel you settle on opens a connection
+export const HANDOFF_MS = 1000 // a new stream waits this long after the last one closed: a provider allowing 1-2 connections still counts the old one for a moment
+
+/** A failure that would end playback. Right after a switch (next episode, another movie) the provider often refuses the new stream
+    until it has dropped the old connection, so it is retried (2 s, 4 s) while automatic restarts are left; a missing title (404/410)
+    and anything not the account's (Cloudflare block) fail at once. */
+export function failAction(f: Fail, tries: number): { do: "retry"; ms: number } | { do: "fail" } {
+  if (!f.account || tries >= MAX_AUTO || (f.why === "http" && (f.code === 404 || f.code === 410))) return { do: "fail" }
+  return { do: "retry", ms: 2000 * (tries + 1) }
+}
 
 export type HlsErr = { type: "network" | "media" | "other"; code?: number; blocked?: string }
 export type HlsAct = { do: "proxy" } | { do: "restart" } | { do: "recover" } | { do: "fail"; fail: Fail }

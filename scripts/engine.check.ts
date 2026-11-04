@@ -1,6 +1,6 @@
 // node scripts/engine.check.ts - player engine decisions (src/player/engine-pure.ts)
 import assert from "node:assert/strict"
-import { engineToLoad, hlsAction, isHlsUrl, mpegtsAction, nativeAction, pickEngine } from "../src/player/engine-pure.ts"
+import { engineToLoad, failAction, hlsAction, isHlsUrl, mpegtsAction, nativeAction, pickEngine } from "../src/player/engine-pure.ts"
 
 // engine choice: playlists -> hls.js, live TS -> mpegts.js, files -> native; a failed native URL retried through hls.js
 assert.equal(isHlsUrl("http://x/live/a/b/1.m3u8"), true)
@@ -56,5 +56,12 @@ assert.deepEqual(nativeAction(base), { do: "hls" })
 assert.deepEqual(nativeAction({ ...base, triedHls: true, code: 4 }), { do: "fail", fail: { why: "format", account: true } })
 assert.deepEqual(nativeAction({ ...base, live: true, code: 3 }), { do: "fail", fail: { why: "corrupt", account: true } })
 assert.deepEqual(nativeAction({ ...base, usedHls: true }), { do: "fail", fail: { why: "cannot", account: true } })
+
+// a refused stream right after a switch is retried (the provider still counts the old connection); a missing title or a Cloudflare block is not
+assert.deepEqual(failAction({ why: "http", code: 403, account: true }, 0), { do: "retry", ms: 2000 })
+assert.deepEqual(failAction({ why: "cannot", account: true }, 1), { do: "retry", ms: 4000 })
+assert.deepEqual(failAction({ why: "http", code: 403, account: true }, 2), { do: "fail" })
+assert.deepEqual(failAction({ why: "http", code: 404, account: true }, 0), { do: "fail" })
+assert.deepEqual(failAction({ why: "blocked", host: "x", account: false }, 0), { do: "fail" })
 
 console.log("engine ok")
