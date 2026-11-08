@@ -66,7 +66,8 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
     if (a.do === "retry") { auto.current++; return later(a.ms) }
     const g = gen.current, msg = say(f)
     if (!f.account || src?.type !== "xtream") return setErr(msg)
-    void connInfo(src, proxy).then((c) => { if (g === gen.current) setErr(c && c.act >= c.max ? tn("errors.maxConn", { act: c.act, max: c.max }) : msg) })
+    // asked fresh (maxAge 0): the count right after the refusal is the message
+    void connInfo(src, proxy, 0).then((c) => { if (g === gen.current) setErr(c && c.act >= c.max ? tn("errors.maxConn", { act: c.act, max: c.max }) : msg) })
   }
   const later = (ms: number) => { timers.current.push(window.setTimeout(() => setRetryN((n) => n + 1), ms)) }
 

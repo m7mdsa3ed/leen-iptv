@@ -1,6 +1,7 @@
 // CORS proxy handler: /p?url=<encoded> (any method; body and x-plex-*/accept/content-type/authorization/x-api-key/anthropic-*/x-goog-api-key/range/api-key/x-user-agent headers are forwarded). Shared by `pnpm proxy` and the Vite dev/preview server.
-// Follows redirects (providers 302 streams to other hosts that send no CORS headers) and rewrites HLS playlists
-// so every segment/key goes back through /p too. Returns true when it handled the request.
+// A GET's redirect is handed back to the browser as /p?url=<target> (providers 302 streams to other hosts that send no CORS headers,
+// and to per-session token URLs that must be the ones the player keeps hitting); a POST's is followed here. HLS playlists are
+// rewritten so every segment/key goes back through /p too. Returns true when it handled the request.
 import { Readable } from "node:stream"
 import { lookup } from "node:dns/promises"
 import { imageWidth, writeResized } from "./image.mjs"
@@ -64,6 +65,13 @@ function streamThrough(req, res, target, CORS) {
         if (n >= 8) throw new Error("too many redirects")
         cur = new URL(loc, cur).href
         if (!/^https?:/.test(cur)) throw new Error("bad redirect")
+        // A GET is redirected in the BROWSER (to /p?url=<where it went>), not followed here: a player keeps re-fetching a live playlist
+        // from the URL its response came back under (XMLHttpRequest.responseURL), and an Xtream /live/<user>/<pass>/<id>.m3u8 answers
+        // every hit with a 302 to a NEW session token. Followed here, each refresh re-opened a session on the panel and the panel
+        // counted them as extra connections (403 / 502 within a minute); followed by the browser, the refreshes hit the token URL,
+        // one session for the whole stream, exactly like direct playback. POSTs keep the manual chain (a body re-sent through a redirect
+        // is the method change below, and the browser would drop it).
+        if (req.method === "GET" || req.method === "HEAD") { clearTimeout(slow); void up.body?.cancel(); return res.writeHead(302, { ...CORS, location: `/p?url=${encodeURIComponent(cur)}` }).end() }
         if (up.status === 303 || ((up.status === 301 || up.status === 302) && req.method === "POST")) { init.method = "GET"; delete init.body }
       }
       clearTimeout(slow) // headers arrived: the body may stream for hours

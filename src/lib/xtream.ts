@@ -76,17 +76,31 @@ export async function loadXtreamKind(s: Source, proxy: string, kind: XtreamKind,
   return mapXtream(s.id, kind, JSON.parse(dec.decode(c)), JSON.parse(dec.decode(l)))
 }
 
-/** Account status from the panel: expiry (ms, 0 = never), connections in use vs allowed (max 0 = unknown); null when unreachable. */
-export async function accountInfo(s: Source, proxy: string): Promise<{ status?: string; exp: number; act: number; max: number } | null> {
+/* Panels rate-limit player_api.php per IP (nginx limit_req, XUI anti-flood: 403 / 502 for a while), so the answers several screens ask for
+   at once are shared: one request in flight per key, kept for `maxAge`. Memory only: a new launch asks again. */
+const memo = new Map<string, { at: number; p: Promise<unknown> }>()
+function shared<T>(key: string, maxAge: number, run: () => Promise<T>): Promise<T> {
+  const hit = memo.get(key)
+  if (hit && Date.now() - hit.at < maxAge) return hit.p as Promise<T>
+  const p = run()
+  memo.set(key, { at: Date.now(), p })
+  p.catch(() => { if (memo.get(key)?.p === p) memo.delete(key) }) // a failure is not kept
+  return p
+}
+const srcKey = (s: Source, proxy: string) => `${s.server}|${s.user}|${s.pass}|${proxy}`
+
+/** Account status from the panel: expiry (ms, 0 = never), connections in use vs allowed (max 0 = unknown); null when unreachable.
+    Shared for `maxAge` ms (default 30 s: Home, Settings and the player's Info tab ask for the same thing). */
+export async function accountInfo(s: Source, proxy: string, maxAge = 30_000): Promise<{ status?: string; exp: number; act: number; max: number } | null> {
   try {
-    const ui = (await (await fetchT(px(api(s), proxy), 8000)).json())?.user_info
+    const ui = (await shared(`acc|${srcKey(s, proxy)}`, maxAge, () => fetchT(px(api(s), proxy), 8000).then((r) => r.json())))?.user_info
     return ui ? { status: ui.status, exp: Number(ui.exp_date) * 1000 || 0, act: Number(ui.active_cons) || 0, max: Number(ui.max_connections) || 0 } : null
   } catch { return null }
 }
 
-/** Connections in use vs allowed, for the "max connections" message; null when the server won't say. */
-export async function connInfo(s: Source, proxy: string): Promise<{ act: number; max: number } | null> {
-  const a = await accountInfo(s, proxy)
+/** Connections in use vs allowed, for the "max connections" message; null when the server won't say. `maxAge` 0 = ask now (after a refused stream). */
+export async function connInfo(s: Source, proxy: string, maxAge?: number): Promise<{ act: number; max: number } | null> {
+  const a = await accountInfo(s, proxy, maxAge)
   return a?.max ? { act: a.act, max: a.max } : null
 }
 
@@ -97,7 +111,8 @@ export async function vodInfo(s: Source, proxy: string, sid: string) {
 
 /** Current and upcoming programme data, when the Xtream panel exposes its short EPG. */
 export async function xtreamShortEpg(s: Source, proxy: string, sid: string): Promise<R[]> {
-  const r = await call<{ epg_listings?: R[] }>(s, proxy, "get_short_epg", `&stream_id=${encodeURIComponent(sid)}&limit=6`)
+  // the banner, the paused dock and the Info tab all ask for the playing channel: one request, kept 4 min (each refreshes every 5)
+  const r = await shared(`epg|${srcKey(s, proxy)}|${sid}`, 4 * 60_000, () => call<{ epg_listings?: R[] }>(s, proxy, "get_short_epg", `&stream_id=${encodeURIComponent(sid)}&limit=6`))
   return arr<R>(r.epg_listings)
 }
 

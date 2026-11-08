@@ -21,6 +21,7 @@ import { jellyfinDetail, jellyfinMarkPlayed, jellyfinMarkUnplayed } from "@/lib/
 import { seriesInfo, vodInfo } from "@/lib/xtream"
 
 type Info = Record<string, string | number | undefined>
+const DETAIL_FRESH = 60 * 60_000 // an Xtream title's info/episodes cached within the hour is shown without asking the panel again
 
 /** Rating chips: merged provider ratings, else the Xtream/catalog rating. */
 export type DetailRating = { source: string; value: string; votes?: string }
@@ -91,15 +92,24 @@ export function useDetail(id: string) {
       setLoaded(true)
     }
     const key = `det:${selected.id}`
-    void get<{ at: number; v: Got }>(key).then((c) => { if (c && !shown) apply(c.v) }, () => {}) // never over a fresher answer
-    const run: Promise<Got> = src.type === "plex" || src.type === "jellyfin"
-      ? (src.type === "plex" ? plexDetail : jellyfinDetail)(src, proxy, selected).then((r) => ({ info: r.info as Info, meta: r.meta, episodes: r.episodes }))
-      : selected.kind === "series"
-      ? seriesInfo(src, proxy, selected).then((r) => ({ info: r.info, episodes: r.episodes }))
-      : vodInfo(src, proxy, selected.sid).then((r) => ({ info: r, episodes: [] }))
-    run.then((r) => { apply(r); void set(key, { at: Date.now(), v: r }).catch(() => {}) })
-      .catch((e) => live && !shown && setErr(explain(e))) // the cached copy on screen: a failed refresh stays quiet
-      .finally(() => live && setLoaded(true))
+    const xtream = src.type === "xtream"
+    const fetchIt = () => {
+      if (!live) return
+      const run: Promise<Got> = src.type === "plex" || src.type === "jellyfin"
+        ? (src.type === "plex" ? plexDetail : jellyfinDetail)(src, proxy, selected).then((r) => ({ info: r.info as Info, meta: r.meta, episodes: r.episodes }))
+        : selected.kind === "series"
+        ? seriesInfo(src, proxy, selected).then((r) => ({ info: r.info, episodes: r.episodes }))
+        : vodInfo(src, proxy, selected.sid!).then((r) => ({ info: r, episodes: [] }))
+      run.then((r) => { apply(r); void set(key, { at: Date.now(), v: r }).catch(() => {}) })
+        .catch((e) => live && !shown && setErr(explain(e))) // the cached copy on screen: a failed refresh stays quiet
+        .finally(() => live && setLoaded(true))
+    }
+    void get<{ at: number; v: Got }>(key).then((c) => {
+      if (c && !shown) apply(c.v) // never over a fresher answer
+      // an Xtream copy younger than DETAIL_FRESH is not asked again (panels rate-limit player_api.php per IP, and every back-and-forth
+      // between a show and its episodes reopened Detail); a media server is always asked (watched state lives there)
+      if (!(xtream && c && Date.now() - c.at < DETAIL_FRESH)) fetchIt()
+    }, fetchIt) // no IndexedDB (private mode): just ask
     return () => { live = false }
   }, [selId, src, proxy]) // eslint-disable-line react-hooks/exhaustive-deps
 
