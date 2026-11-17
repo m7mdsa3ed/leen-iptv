@@ -8,10 +8,11 @@ import { Chrome, VideoClock } from "./chrome"
 import { Flash, NumberEntry, Spinner } from "./indicators"
 import { Channels } from "./live"
 import { Panel } from "./panel"
-import { FITS } from "./prefs"
+import { FITS, prefs } from "./prefs"
 import { Subtitles } from "./subtitles"
 import { useKeys } from "./use-keys"
 import { usePlayer } from "./use-player"
+import { fsEl } from "./util"
 import "./player.css"
 
 /**
@@ -53,6 +54,14 @@ export default function Player({ queue, index, start }: { queue: Item[]; index: 
   }, [p.chrome, p.layer, p.E.err, p.nextOn])
   useEffect(() => { if (p.E.err) requestAnimationFrame(() => root.current?.querySelector<HTMLElement>("[role=alertdialog] [data-autofocus]")?.focus()) }, [p.E.err])
 
+  /* touch devices: fullscreen as playback starts (the tap that opened the player still counts as a user gesture). Refused (opened
+     by a reload or a link): asked once more on the first touch. Leaving fullscreen after that is the viewer's choice. */
+  const fsRetry = useRef(false)
+  useEffect(() => {
+    if (touch && prefs().fsOnPlay && !fsEl()) void p.enterFs(root.current, true).then((ok) => { fsRetry.current = !ok })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const retryFs = () => { if (fsRetry.current) { fsRetry.current = false; if (!fsEl()) void p.enterFs(root.current, true) } }
+
   /* pointer: mouse click = play / pause, double click = fullscreen; touch tap = controls, double tap on a side = -10 / +10 s, swipe up = panel */
   const ptr = useRef("mouse")
   const tap = useRef({ at: 0, timer: 0 })
@@ -76,6 +85,7 @@ export default function Player({ queue, index, start }: { queue: Item[]; index: 
       onMouseMove={() => { if (ptr.current === "mouse") p.poke() }}
       onTouchStart={(e) => { swipe.current = (e.target as HTMLElement).closest("[data-seek],[data-modal]") ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
       onTouchEnd={(e) => {
+        retryFs()
         const s = swipe.current
         swipe.current = null
         if (!s || p.layer !== "none" || p.E.err) return

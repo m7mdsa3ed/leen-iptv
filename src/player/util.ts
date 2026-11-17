@@ -27,3 +27,12 @@ export function describe(item: { id: string; kind: string; name: string; group: 
 }
 
 export const fsEl = () => document.fullscreenElement || (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement
+
+/* Screen Orientation lock: Chromium/Android only, and only while the page is fullscreen; iOS has the function but rejects it. */
+export type OrientLock = "landscape" | "portrait"
+type Lockable = { lock?: (o: OrientLock) => Promise<void>; unlock?: () => void; type?: string }
+const so = (): Lockable | undefined => (typeof screen !== "undefined" ? (screen.orientation as unknown as Lockable | undefined) : undefined)
+export const canLockOrient = () => typeof so()?.lock === "function"
+export const lockOrient = (o: OrientLock) => { const s = so(); return s?.lock ? s.lock(o) : Promise.reject(new Error("unsupported")) }
+export const unlockOrient = () => { try { so()?.unlock?.() } catch { /* not locked / unsupported */ } }
+export const isPortrait = () => so()?.type?.startsWith("portrait") ?? matchMedia("(orientation: portrait)").matches

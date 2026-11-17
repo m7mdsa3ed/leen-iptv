@@ -11,7 +11,7 @@ import { STREAM_QS } from "@/lib/quality"
 import type { Item } from "@/lib/types"
 import { AvTab } from "./panel-av"
 import { InfoTab } from "./panel-info"
-import { FITS, SLEEP_MIN, SPEEDS } from "./prefs"
+import { FITS, ORIENTS, SLEEP_MIN, SPEEDS, setPrefs, usePrefs } from "./prefs"
 import { Chip, Choices, Group, Row, Sheet, Tag } from "./ui"
 import type { P, Tab } from "./use-player"
 import { speedLabel } from "./util"
@@ -143,6 +143,7 @@ function EpisodesTab({ p }: { p: P }) {
 /** Picture, speed, quality, version, sleep timer, auto-play and the screen actions, each a row of pills. */
 function PlaybackTab({ p }: { p: P }) {
   const t = useT()
+  const { orient } = usePrefs()
   return (
     <div className="pl-grid">
       {p.S.mediaServer && !p.live && <Group title={t("player.quality")}><Choices items={STREAM_QS.map((q) => q.id)} value={p.q.id} onPick={(id) => p.setQuality(STREAM_QS.find((q) => q.id === id)!)} label={(id) => (id === "original" ? t("player.original") : STREAM_QS.find((q) => q.id === id)!.label)} /></Group>}
@@ -154,6 +155,7 @@ function PlaybackTab({ p }: { p: P }) {
           <Chip aria-pressed={!p.clock} on={!p.clock} icon={<Clock />} onClick={() => p.setClock(false)}>{t("player.off")}</Chip>
         </div>
       </Group>
+      {p.canTurn && <Group title={t("player.orient.title")}><Choices items={[...ORIENTS]} value={orient} onPick={(o) => setPrefs({ orient: o })} label={(o) => t(`player.orient.${o}`)} /></Group>}
       <Group title={t("player.sleep.title")}><Choices items={[0, ...SLEEP_MIN]} value={p.sleepMin} onPick={p.setSleep} label={(n) => (n ? t("player.sleep.min", { n }) : t("player.off"))} /></Group>
       {p.variants.length > 1 && (
         <Group title={t("player.variant")}>

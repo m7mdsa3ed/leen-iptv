@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
-import { ArrowLeft, AudioLines, Cast, ChevronDown, ChevronUp, Expand, Info, ListVideo, Minimize, MoonStar, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipForward, SlidersHorizontal, Star, Volume2, VolumeX } from "lucide-react"
+import { ArrowLeft, AudioLines, Cast, ChevronDown, ChevronUp, Expand, Info, ListVideo, Minimize, MoonStar, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, RotateCwSquare, SkipForward, SlidersHorizontal, Star, Volume2, VolumeX } from "lucide-react"
 import { castSupported } from "@/lib/cast"
 import { fmt, useT } from "@/lib/i18n"
 import { LiveHead } from "./live"
@@ -36,7 +36,7 @@ export function VideoClock() {
 
 /**
  * Everything over the video while it is "up", one layout on every device:
- *  top (pointer devices only): back · cast / picture in picture / favorite
+ *  top (pointer devices only): back · cast / picture in picture / favorite (touch: + rotate, fullscreen)
  *  dock (bottom): what is playing · the scrubber (VOD) · one row = transport (desktop) | tab chips | volume + fullscreen (desktop)
  *  phone: the big transport in the centre, chips as icons
  * `dock` = the head alone (after a zap / a new episode) or with the controls (`on`). Hidden = faded out and not focusable.
@@ -68,6 +68,8 @@ export function Chrome({ p, vref, tv, touch, dock, root }: { p: P; vref: RefObje
             {touch && <IconBtn label={t("player.favorite")} on={p.isFav} onClick={p.toggleFav}><Star className={p.isFav ? "fill-current" : ""} /></IconBtn>}
             {castSupported() && <IconBtn label={t("player.cast")} on={p.casting} onClick={() => void p.cast()}><Cast /></IconBtn>}
             {p.canPip && <IconBtn label={t("player.pip")} on={p.pip} onClick={p.togglePip}><PictureInPicture2 /></IconBtn>}
+            {touch && p.canTurn && <IconBtn label={t("player.rotate")} onClick={() => p.rotate(root())}><RotateCwSquare /></IconBtn>}
+            {touch && <IconBtn label={t(p.fs ? "player.exitFullscreen" : "player.fullscreen")} onClick={() => p.toggleFs(root())}>{p.fs ? <Minimize /> : <Expand />}</IconBtn>}
           </div>
         </div>
       )}

@@ -15,7 +15,7 @@ import { askPin } from "@/components/tv/ui"
 import type { NewEpisodesEvent } from "@/lib/new-episodes"
 import type { Item } from "@/lib/types"
 import { closePlayer, usePlayerHost } from "./host"
-import { FITS, prefs, setPrefs } from "./prefs"
+import { FITS, prefs, setPrefs, usePrefs } from "./prefs"
 import { useFlash } from "./indicators"
 import { usePlayback } from "./use-playback"
 import { useNextUp } from "./use-next-up"
@@ -23,7 +23,7 @@ import { useSidecar } from "./use-sidecar"
 import { useSource, type Picked } from "./use-source"
 import { useTracking } from "./use-tracking"
 import { useTracks } from "./use-tracks"
-import { BANNER_MS, fsEl, HIDE_MS, isEpisode } from "./util"
+import { BANNER_MS, canLockOrient, fsEl, HIDE_MS, isEpisode, isPortrait, lockOrient, unlockOrient, type OrientLock } from "./util"
 
 /** What covers the video: nothing, the tabbed panel, or (live) the channel list. Exactly one at a time. */
 export type Layer = "none" | "panel" | "channels"
@@ -31,6 +31,8 @@ export type Tab = "episodes" | "av" | "playback" | "info"
 
 // ponytail: module-level so the picked quality carries to the next episode; resets to Original on reload
 let lastQ: StreamQ = STREAM_QS[0]
+// the browser said no to an orientation lock once (NotSupportedError, or no page fullscreen): stop offering Rotate this session
+let lockRefused = false
 
 /** PIN-aware: run fn now, or after the profile PIN when the item's category is locked. */
 export function useGuard() {
@@ -236,14 +238,47 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
     return () => { document.removeEventListener("fullscreenchange", f); document.removeEventListener("webkitfullscreenchange", f) }
   }, [])
   const exitFs = () => { const d = document as unknown as Record<string, (() => Promise<void> | void) | undefined>; void Promise.resolve((d.exitFullscreen || d.webkitExitFullscreen)?.call(document)).catch(() => {}) }
-  // the request can reject silently: try the player, then the page, then the <video>'s own fullscreen (iOS)
-  const toggleFs = (rootEl?: HTMLElement | null) => {
-    if (fsEl()) return exitFs()
+  // the request can reject silently: try the player, then the page, then the <video>'s own fullscreen (iOS; not for `auto`: a
+  // native fullscreen nobody asked for takes over the controls)
+  const enterFs = (rootEl?: HTMLElement | null, auto = false): Promise<boolean> => {
     type Fs = { requestFullscreen?: () => Promise<void> | void; webkitRequestFullscreen?: () => void; webkitEnterFullscreen?: () => void }
     const req = (el: Element | null | undefined) => { const e = el as unknown as Fs | null; const f = e?.requestFullscreen || e?.webkitRequestFullscreen; return f ? Promise.resolve(f.call(e)) : Promise.reject(new Error("unsupported")) }
-    req(rootEl).catch(() => req(document.documentElement)).catch(() => (vref.current as unknown as Fs | null)?.webkitEnterFullscreen?.())
+    const p = req(rootEl).catch(() => req(document.documentElement))
+    return (auto ? p : p.catch(() => (vref.current as unknown as Fs | null)?.webkitEnterFullscreen?.())).then(() => true, () => false)
   }
-  useEffect(() => () => { if (fsEl() === document.documentElement) exitFs() }, [])
+  const toggleFs = (rootEl?: HTMLElement | null) => { if (fsEl()) exitFs(); else void enterFs(rootEl) }
+  useEffect(() => () => { unlockOrient(); if (fsEl() === document.documentElement) exitFs() }, [])
+
+  /* screen orientation (touch devices, fullscreen only): Settings/Playback tab `orient` = follow the video's shape, always
+     landscape, or the device's own rotation; the top bar's Rotate button picks one for this session. The lock works even with
+     the system's auto-rotate off (Chromium/Android); where it is refused (iOS) the button goes away. */
+  const { orient } = usePrefs()
+  const [turn, setTurn] = useState<OrientLock | null>(null)
+  const [wide, setWide] = useState<boolean | null>(null) // the video's shape, once known
+  const [canTurn, setCanTurn] = useState(() => !isTv && !lockRefused && canLockOrient())
+  useEffect(() => {
+    const v = vref.current
+    if (!v) return
+    const f = () => setWide(v.videoWidth && v.videoHeight ? v.videoWidth >= v.videoHeight : null)
+    v.addEventListener("loadedmetadata", f); v.addEventListener("resize", f)
+    return () => { v.removeEventListener("loadedmetadata", f); v.removeEventListener("resize", f) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const want: OrientLock | null = turn ?? (orient === "landscape" ? "landscape" : orient === "video" && wide !== null ? (wide ? "landscape" : "portrait") : null)
+  const refuse = (say: boolean) => {
+    lockRefused = true; setCanTurn(false); setTurn(null)
+    if (say) useNotify.getState().push({ title: t("player.rotate.unsupported") })
+  }
+  useEffect(() => {
+    if (!canTurn || !fs) return
+    if (!want) return unlockOrient()
+    lockOrient(want).catch((e: unknown) => {
+      if (e instanceof Error && e.name === "NotSupportedError") refuse(!!turn) // else e.g. AbortError: a newer lock replaced it
+    })
+  }, [fs, want, canTurn]) // eslint-disable-line react-hooks/exhaustive-deps
+  const rotate = (rootEl?: HTMLElement | null) => {
+    setTurn((want ?? (isPortrait() ? "portrait" : "landscape")) === "landscape" ? "portrait" : "landscape")
+    if (!fsEl()) void enterFs(rootEl, true).then((ok) => { if (!ok) refuse(true) }) // the lock needs page fullscreen (iPhone has none)
+  }
   const canPip = !isTv && typeof document !== "undefined" && !!document.pictureInPictureEnabled
   const [pip, setPip] = useState(false)
   const togglePip = () => { const v = vref.current; if (v) void (document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture()).catch(() => {}) }
@@ -329,7 +364,7 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
     play, pause, toggle, seek, seekTo, zap, next, prev, go, playItem, digit, stop, leave: back,
     vol, muted, setVolume, toggleMute, fit, setFit, cycleFit: () => setFit((fit + 1) % FITS.length), speed, setSpeed, clock, setClock, q, setQuality, sleepMin, sleepAt, setSleep,
     isFav, toggleFav, autoAll, autoNext, toggleShowAuto, variants, pickVariant,
-    fs, toggleFs, canPip, pip, togglePip, casting, cast, multi, details, person,
+    fs, toggleFs, enterFs, canTurn, rotate, canPip, pip, togglePip, casting, cast, multi, details, person,
     nextOn, nextItem: queue[idx + 1], nu,
     video, guard,
   }
