@@ -1,0 +1,41 @@
+name: Release IPK
+
+# Push a tag like v1.2.3 -> builds the webOS .ipk and attaches it to a GitHub Release.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write # create the release with the built-in GITHUB_TOKEN
+
+jobs:
+  ipk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Build-time config (anon key only). Missing secrets = a build without account sync.
+      - run: pnpm build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_PUBLIC_APP_URL: ${{ secrets.VITE_PUBLIC_APP_URL }}
+
+      # Stamp the tag's version into the packaged appinfo.json (repo copy stays as is).
+      - run: node -e 'const f="dist/appinfo.json",j=require("./"+f);j.version=process.argv[1];require("fs").writeFileSync(f,JSON.stringify(j,null,2))' "${GITHUB_REF_NAME#v}"
+
+      - run: npx -y -p @webos-tools/cli ares-package dist --no-minify -o out
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.ipk
+          generate_release_notes: true
