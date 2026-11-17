@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { Check } from "lucide-react"
 import { KEY } from "@/lib/nav"
 
@@ -8,10 +9,10 @@ type Trigger = { open: boolean; toggle: (e: React.MouseEvent<HTMLElement>) => vo
 /**
  * Overflow ("⋯") menu for Detail actions (Mark watched, Remove from Continue watching, Match metadata).
  * The layout renders its own trigger button so it matches its neighbours. The popover is position: fixed (no hero / overflow clips it), flips above
- * the button near the bottom of the screen, keeps the D-pad inside ([data-modal]) and closes on Back / Esc / a click outside; focus returns to the trigger.
+ * the button near the bottom of the screen, is portalled to body (an animated / isolated ancestor such as the Detail hero would trap it under the next section), keeps the D-pad inside ([data-modal]) and closes on Back / Esc / a click outside; focus returns to the trigger.
  */
 export function ActionsMenu({ items, trigger }: { items: Act[]; trigger: (t: Trigger) => ReactNode }) {
-  const [pos, setPos] = useState<null | { top?: number; bottom?: number; start: number }>(null)
+  const [pos, setPos] = useState<null | { top?: number; bottom?: number; start: number; max: number }>(null)
   const trig = useRef<HTMLElement | null>(null)
   const box = useRef<HTMLDivElement>(null)
   const close = (refocus = true) => { setPos(null); if (refocus) trig.current?.focus() }
@@ -20,7 +21,9 @@ export function ActionsMenu({ items, trigger }: { items: Act[]; trigger: (t: Tri
     trig.current = e.currentTarget
     const r = e.currentTarget.getBoundingClientRect()
     const rtl = document.documentElement.dir === "rtl"
-    setPos({ ...(window.innerHeight - r.bottom > 260 ? { top: r.bottom + 8 } : { bottom: window.innerHeight - r.top + 8 }), start: rtl ? window.innerWidth - r.right : r.left })
+    const below = window.innerHeight - r.bottom > 260
+    // long pick lists (decades, sizes) scroll inside the menu instead of running off screen
+    setPos({ ...(below ? { top: r.bottom + 8 } : { bottom: window.innerHeight - r.top + 8 }), start: rtl ? window.innerWidth - r.right : r.left, max: (below ? window.innerHeight - r.bottom : r.top) - 24 })
   }
   useEffect(() => {
     if (!pos) return
@@ -34,11 +37,11 @@ export function ActionsMenu({ items, trigger }: { items: Act[]; trigger: (t: Tri
   return (
     <>
       {trigger({ open: !!pos, toggle })}
-      {pos && (
+      {pos && createPortal(
         <div
           ref={box} data-modal role="menu"
-          style={{ position: "fixed", top: pos.top, bottom: pos.bottom, insetInlineStart: pos.start }}
-          className="m-pop z-50 flex min-w-60 max-w-[90vw] flex-col gap-1 rounded-2xl bg-surface-3 p-2 text-foreground shadow-2xl"
+          style={{ position: "fixed", top: pos.top, bottom: pos.bottom, insetInlineStart: pos.start, maxHeight: pos.max }}
+          className="m-pop no-scrollbar z-50 flex min-w-60 max-w-[90vw] flex-col gap-1 overflow-y-auto rounded-2xl bg-surface-3 p-2 text-foreground shadow-2xl"
           // Back / Esc close the menu only: stop it before the app-level handler (on window) navigates back
           onKeyDown={(e) => { if (e.keyCode === KEY.back || e.keyCode === KEY.esc || e.keyCode === KEY.bksp) { e.preventDefault(); e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); close() } }}
         >
@@ -52,7 +55,8 @@ export function ActionsMenu({ items, trigger }: { items: Act[]; trigger: (t: Tri
               {a.checked && <Check aria-hidden className="size-5 shrink-0" />}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

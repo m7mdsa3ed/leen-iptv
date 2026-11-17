@@ -63,7 +63,7 @@ export default function LeaguePage({ id, name }: { id?: string; name?: string })
 
   return (
     <Shell page="sports" title={title} sub>
-    <div className="under-top under-bottom relative -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
+    <div className="under-top under-bottom relative -ms-[var(--gs)] -me-[var(--gx)] overflow-y-auto ps-[var(--gs)] pe-[var(--gx)]">
       <div className="relative mx-auto w-full max-w-4xl">
         {!isTv && <RoundButton label={t("common.back")} onClick={back}><ArrowLeft className="rtl-flip" /></RoundButton>}
         <div className="m-rise mt-6 flex flex-col gap-4 md:flex-row md:items-center">

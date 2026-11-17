@@ -10,7 +10,7 @@ import type { Item, Kind } from "@/lib/types"
 
 /** Google TV Movies / Shows: category pill row and a filter bar over one big poster grid (All = every rail merged). */
 export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
-  const { status, groups, genres, g, setG, list, cats, toggleCat, clearCats, activeCount, q, setQ, sort, setSort, sorts, pct, isLocked, canLock, toggleLock: toggle, open, openCategory, openGenre, kindLabel, page } = useBrowse(kind)
+  const { status, groups, genres, g, setG, list, cats, toggleCat, clearCats, refined, q, setQ, sort, setSort, sorts, pct, isLocked, canLock, toggleLock: toggle, open, openCategory, openGenre, kindLabel, page } = useBrowse(kind)
   const mode = useMode()
   const count = useGroupCount(kind)
   const flags = useCardFlags()
@@ -25,8 +25,8 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
               onPick={(c) => (c === ALL || c === CONT || c === FAV || (groups.includes(c) && !isLocked(c)) ? setG(c) : groups.includes(c) ? openCategory(c) : openGenre(c))}
               onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
               onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== CONT && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
-            {/* filter bar: the Filters button opens the multi-select panel, then the title search, the sort pills and the picked chips */}
-            <BrowseFilters kind={kind} q={q} setQ={setQ} sort={sort} setSort={setSort} sorts={sorts} cats={cats} toggleCat={toggleCat} clearCats={clearCats} activeCount={activeCount} label={t("gtv.browse.filter")} />
+            {/* filter dock: title search, facet menus (sort, watch state, decade, rating, grid size), All filters panel; then the count and the active chips */}
+            <BrowseFilters kind={kind} q={q} setQ={setQ} sort={sort} setSort={setSort} sorts={sorts} cats={cats} toggleCat={toggleCat} clearCats={clearCats} label={t("gtv.browse.filter")} shown={refined || g !== ALL ? list.length : undefined} />
           </>)
           const grid = (head?: React.ReactNode, cls?: string) => (<>
             <VGrid items={list} head={head} className={cls} minW={mode === "tv" ? 270 : mode === "mobile" ? 105 : 190} label={56} render={(i: Item) => <Card key={i.id} fluid item={i} pct={pct(i)} onOpen={open} fav={flags.fav(i)} locked={flags.locked(i)} badge={flags.badge} />} />

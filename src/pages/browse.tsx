@@ -10,7 +10,7 @@ import type { Item, Kind } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
-  const { groups, status, g, setG, items, list, cats, toggleCat, clearCats, activeCount, refined, q, setQ, sort, setSort, sorts, rails, genres: genreNames, pct, isLocked, canLock, toggleLock: toggle, open, openCategory, openGenre, kindLabel, page } = useBrowse(kind)
+  const { groups, status, g, setG, items, list, cats, toggleCat, clearCats, refined, q, setQ, sort, setSort, sorts, rails, genres: genreNames, pct, isLocked, canLock, toggleLock: toggle, open, openCategory, openGenre, kindLabel, page } = useBrowse(kind)
   const mode = useMode()
   const count = useGroupCount(kind)
   const t = useT()
@@ -24,7 +24,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
             <Chips cat count={count} items={[ALL, ...(count(CONT) || g === CONT ? [CONT] : []), FAV, ...groups]} active={g} onPick={(c) => (c === ALL || c === CONT || c === FAV ? setG(c) : openCategory(c))} locked={isLocked}
               onKey={(e, c) => { if (e.keyCode === KEY.yellow) toggle(c) }}
               onCtx={(e, c) => { if (mode !== "tv" && canLock && c !== CONT && c !== FAV && c !== ALL) { e.preventDefault(); toggle(c) } }} />
-            <BrowseFilters kind={kind} q={q} setQ={setQ} sort={sort} setSort={setSort} sorts={sorts} cats={cats} toggleCat={toggleCat} clearCats={clearCats} activeCount={activeCount} label={t("pages.browse.filter")} />
+            <BrowseFilters kind={kind} q={q} setQ={setQ} sort={sort} setSort={setSort} sorts={sorts} cats={cats} toggleCat={toggleCat} clearCats={clearCats} label={t("pages.browse.filter")} shown={refined ? list.length : g === ALL ? undefined : items.length} />
           </>)
           // mobile: filters scroll with the content, which starts under the top bar and runs under the bottom bar (under-top / under-bottom)
           const up = "under-top"
@@ -34,7 +34,7 @@ export default function Browse({ kind }: { kind: Exclude<Kind, "live"> }) {
           const body = (head?: React.ReactNode) => refined
             ? list.length ? grid(list, head) : null
             : g === ALL
-              ? rails.length ? <div className={cn("under-bottom -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] no-scrollbar", head && up)}>{head}{genreNames.length > 0 && <section className="mb-2"><SectionTitle>{t("pages.browse.genres")}</SectionTitle><Chips items={genreNames} active="" onPick={(n) => openGenre(n)} /></section>}{rails.map(([c, a]) => <Rail key={c} title={c} onSeeAll={() => openCategory(c)}>{a.map(card)}</Rail>)}</div> : null
+              ? rails.length ? <div className={cn("under-bottom -ms-[var(--gs)] -me-[var(--gx)] h-full overflow-y-auto ps-[var(--gs)] pe-[var(--gx)] no-scrollbar", head && up)}>{head}{genreNames.length > 0 && <section className="mb-2"><SectionTitle>{t("pages.browse.genres")}</SectionTitle><Chips items={genreNames} active="" onPick={(n) => openGenre(n)} /></section>}{rails.map(([c, a]) => <Rail key={c} title={c} onSeeAll={() => openCategory(c)}>{a.map(card)}</Rail>)}</div> : null
               : items.length ? grid(items, head) : null
           { const b = body(filters); if (b) return b }
           return (

@@ -42,8 +42,13 @@ html[data-mode=tv] .pl-root { --pl-h: 3rem; --pl-fs-title: 2rem; }
 .pl-layer { pointer-events: none; opacity: 0; visibility: hidden; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur); }
 .pl-layer[data-on] { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 .pl-layer :is(button, input) { pointer-events: auto; }
-.pl-top { position: absolute; inset: 0 0 auto; display: flex; align-items: center; gap: var(--pl-gap); padding: max(1.25rem, var(--safe-t)) var(--gx) 3.5rem; background: var(--scrim-top); transform: translate3d(0, -8px, 0); }
-.pl-dock { position: absolute; inset: auto 0 0; display: flex; flex-direction: column; gap: 1.25rem; padding: 6rem var(--gx) max(1.5rem, var(--safe-b)); background: var(--scrim-bottom); transform: translate3d(0, 8px, 0); }
+.pl-top { position: absolute; inset: 0 0 auto; display: flex; align-items: center; gap: 1rem; padding: max(1.25rem, var(--safe-t)) var(--gx) 4.5rem; background: var(--scrim-top); transform: translate3d(0, -8px, 0); }
+.pl-head-top { gap: .125rem; }
+.pl-head-top .pl-title { font-size: var(--pl-fs-l); }
+.pl-head-top .pl-sub { font-size: var(--pl-fs-s); }
+.pl-dock { position: absolute; inset: auto 0 0; display: flex; flex-direction: column; gap: 1rem; padding: 6rem var(--gx) max(1.5rem, var(--safe-b)); background: var(--scrim-bottom); transform: translate3d(0, 8px, 0); }
+/* the title sits in the top bar (desktop / tablet): the dock shows it only on its own (after a zap / a new episode), not under the controls */
+.pl-dock[data-tophead] > .pl-head { display: none; } /* data-tophead is set only while the controls are up (chrome.tsx): no :has() on Chrome 94 */
 .pl-dock-ctrls { display: flex; flex-direction: column; gap: .5rem; }
 .pl-dock-ctrls:not([data-on]) { display: none; }   /* banner only (after a zap / a new episode): just the head */
 .pl-dock-ctrls[data-on] { animation: m-fade-k var(--dur) var(--ease) backwards; }
@@ -59,9 +64,20 @@ html[data-mode=tv] .pl-root { --pl-h: 3rem; --pl-fs-title: 2rem; }
 .pl-paused-body { display: flex; flex: 1; flex-direction: column; gap: .5rem; min-width: 0; max-width: 56rem; }
 .pl-paused-plot { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
 @media (max-height: 520px) { .pl-paused-art { width: 5rem; } .pl-paused-plot { -webkit-line-clamp: 2; } }
-.pl-ctrls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--pl-gap) 1.5rem; }
+.pl-ctrls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--pl-gap) 1.25rem; }
+.pl-chips { margin-inline-start: auto; }
+.pl-volume { gap: .25rem; }
+.pl-ends { font-size: var(--pl-fs-s); color: var(--pl-fg-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pl-cluster { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
-.pl-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 2.5rem; background: rgba(0, 0, 0, .25); }
+/* centre transport (pointer devices): the big play-pause flanked by -10 / +10 and, a step further out, previous / next episode or channel.
+   Only the buttons take pointer events, so a tap between them still reaches the video (hide / show the controls). */
+.pl-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: clamp(1rem, 4vw, 3rem); background: radial-gradient(circle at center, rgba(0, 0, 0, .35), rgba(0, 0, 0, 0) 45%); transform: scale(.96); }
+.pl-center .pl-ibtn { background: rgba(0, 0, 0, .35); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.pl-center .pl-ibtn[data-size=lg] { width: calc(var(--pl-h-lg) * 1.15); height: calc(var(--pl-h-lg) * 1.15); background: rgba(255, 255, 255, .92); color: #111; }
+.pl-center .pl-side { opacity: .85; }
+.pl-center .pl-ibtn:disabled { opacity: .3; }
+@media (hover: hover) { .pl-center .pl-ibtn[data-size=lg]:hover { background: #fff; color: #111; } }
+@media (max-width: 639px) { .pl-center .pl-side { display: none; } } /* phones: previous / next live in the panel's Episodes tab */
 /* the clock over clean video (chrome.tsx VideoClock): top end, out of the way of the dock and of the top bar */
 .pl-clock { position: absolute; z-index: 4; inset-block-start: max(1rem, var(--safe-t)); inset-inline-end: max(1rem, var(--safe-l), var(--safe-r)); padding: .25rem .75rem; border-radius: 999px; background: var(--pl-osd); font-size: var(--pl-fs-l); font-variant-numeric: tabular-nums; color: #fff; pointer-events: none; transition: opacity var(--dur) var(--ease); }
 .pl-root[data-dock] .pl-clock { opacity: 0; visibility: hidden; transition: opacity var(--dur) var(--ease), visibility 0s linear var(--dur); }
@@ -108,14 +124,19 @@ html[data-mode=tv] .pl-root { --pl-h: 3rem; --pl-fs-title: 2rem; }
 .pl-scrub { display: flex; align-items: center; gap: 1rem; }
 .pl-time { min-width: 4.5rem; font-size: var(--pl-fs-s); color: var(--pl-fg-2); }
 .pl-bar { position: relative; display: flex; flex: 1; align-items: center; height: var(--pl-h); touch-action: none; }
-.pl-bar .pl-track { height: 5px; transition: height var(--dur-fast) var(--ease); }
-.pl-bar:focus .pl-track, .pl-bar:active .pl-track { height: 9px; }
-.pl-knob { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 999px; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, .5); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.pl-bar .pl-track { height: 5px; transition: transform var(--dur-fast) var(--ease); }
+.pl-bar:hover .pl-track, .pl-bar:focus .pl-track, .pl-bar:active .pl-track { transform: scaleY(1.7); } /* transform, not height: nothing re-lays out */
+html[data-mode=tv] .pl-bar .pl-track { height: 6px; }
+.pl-buf { background: rgba(255, 255, 255, .4); }
+.pl-hover { background: rgba(255, 255, 255, .55); }
+.pl-knob { position: absolute; top: 50%; width: 14px; height: 8px; margin: -4px 0 0 -7px; border-radius: 50% / 50%; border-radius: 999px; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, .5); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
 .pl-bar:hover .pl-knob, .pl-bar:focus .pl-knob, .pl-bar:active .pl-knob { opacity: 1; }
+/* the knob lives inside the track that scales 1.7x on hover / focus: drawn flat (14x8) so it reads round once scaled */
 .pl-bar:focus .pl-knob { box-shadow: 0 0 0 5px rgba(255, 255, 255, .3), 0 1px 6px rgba(0, 0, 0, .5); }
 html .pl-root .pl-bar:focus { outline: none; box-shadow: none; }
 .pl-bubble { position: absolute; bottom: 100%; margin-bottom: .75rem; padding: .25rem .625rem; border-radius: var(--pl-r-sm); background: var(--pl-osd); font-size: var(--pl-fs-s); white-space: nowrap; transform: translateX(-50%); }
-.pl-vol { width: 6rem; accent-color: #fff; }
+.pl-vol { width: 6.5rem; accent-color: #fff; }
+@media (max-width: 899px) { .pl-vol { display: none; } }
 
 /* ---- sheets (ui.tsx Sheet): the panel (bottom) and the channel list (start) ---- */
 .pl-scrim { position: absolute; inset: 0; z-index: 9; background: rgba(0, 0, 0, .5); }

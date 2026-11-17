@@ -1,6 +1,7 @@
 import { Backdrop } from "@/components/Backdrop"
-import { Fragment, useState, type ReactNode } from "react"
-import { ArrowLeft, Bookmark, BookmarkCheck, Check, ChevronLeft, ChevronRight, Clapperboard, Info, MoreHorizontal, Play, RefreshCw, Star, X } from "lucide-react"
+import { Fragment, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react"
+import { ArrowLeft, Bookmark, BookmarkCheck, Check, ChevronLeft, ChevronRight, Clapperboard, Info, LayoutGrid, List, MoreHorizontal, Play, RefreshCw, Star, X } from "lucide-react"
+import { useApp } from "@/lib/store"
 import { ActionsMenu } from "@/components/tv/actions-menu"
 import { Empty, Shell } from "@/components/tv/ui"
 import { useCatalog } from "@/lib/catalog"
@@ -17,30 +18,53 @@ import type { Person, Trailer } from "@/lib/meta/types"
 import { Awards, TitleArt } from "@/components/tv/title-art"
 import { WhereToWatch } from "@/components/tv/where-to-watch"
 import { SourceBadge, SourceChooser } from "../source-ui"
+import { GRail } from "../parts"
 
 type D = ReturnType<typeof useDetail>
-type Tab = "episodes" | "about" | "cast" | "trailers" | "similar"
 const DIRECT = ["Director"], CREATE = ["Creator"], WRITE = ["Writer", "Screenplay", "Story", "Novel", "Teleplay"]
 const DAY = { year: "numeric", month: "short", day: "numeric" } as const
+const LONG_PLOT = 200 // characters: a longer hero plot gets More / Less
 
 /**
- * Details, one composition for movies and shows. The backdrop stays fixed behind the page and fades into it; over it a poster card
- * (md and up) beside the title block: title art, meta line, ratings, plot, genre pills, the action bar (Play / Trailer / Watched /
- * Watchlist / More), a credits line and the source picker. Below, tabs show one section at a time: Episodes (shows: season pills
- * over episode rows; a row plays, its (i) opens the episode dialog), About, Cast & crew, Trailers, More like this.
+ * Details, one composition for movies and shows (layout.css "Details").
+ * 1. A cinematic hero that fills the first screen: the backdrop full bleed (behind the transparent side rail), shaded only on the text side and the
+ *    bottom; over it the kind eyebrow, title art, facts, ratings, genres, a 3-line plot that expands in place, then the action bar: one big Play
+ *    (Resume from / Play from beginning when in progress, with the progress inside the button) and round captioned actions (Trailer, Watchlist,
+ *    Watched, More). Credits line and the source picker under it.
+ * 2. Everything else is ONE scroll of sections, no tabs (nothing hidden behind an extra press; Down on the remote discovers it):
+ *    Episodes (shows: season chips, list / grid), Trailers & extras, Cast & crew, More like this, About (poster, full plot, facts, where to watch).
+ * Desktop / tablet: once the hero's actions scroll away a slim bar (Back, title, Play) stays at the top. Phones: the art sits above the text.
  */
 export default function Detail({ id }: { id: string }) {
   const t = useT()
   const { lang } = useLang()
   const D = useDetail(id)
   const ready = useCatalog((s) => s.status === "ready")
-  const [tab, setTab] = useState<Tab | null>(null)
+  const mobile = useMode() === "mobile"
   const [ep, setEp] = useState<Episode | null>(null)
+  const [more, setMore] = useState(false) // hero plot expanded in place
+  const [compact, setCompact] = useState(false) // the hero's actions scrolled out of view: the slim bar shows (desktop / tablet)
+  const scroller = useRef<HTMLDivElement>(null)
+  const actions = useRef<HTMLDivElement>(null)
+  const uid = useId()
+  const grid = useApp((s) => s.settings.epView === "grid")
+  const setSettings = useApp((s) => s.setSettings)
   const { item, isSeries, loading, plot, ratings, poster, backdrops, fav, toggleFav, similar, open, stream, seasons, season, shown } = D
+  const has = !!item
+  useEffect(() => setMore(false), [id])
+  useEffect(() => {
+    const el = actions.current, root = scroller.current
+    if (isTv || mobile || !el || !root) return setCompact(false)
+    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting && e.boundingClientRect.top < 0), { root })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [has, mobile])
+
   const re = isSeries ? D.episodes[D.resumeIdx] : undefined
   const rp = item && (isSeries ? re?.item : item)
   const pr = rp ? D.progress(rp) : undefined
   const left = D.resuming && pr && pr.dur > pr.pos ? Math.max(1, Math.ceil((pr.dur - pr.pos) / 60)) : 0
+  const barPct = D.resuming && rp ? D.pct(rp) : 0
   const code = re ? t("pages.episode.code", { s: re.season, e: re.num }) : ""
   const mainLabel = isSeries && re
     ? [t(D.resuming ? "gtv.detail.resumeEp" : "gtv.detail.playEp", { code }), left ? fmt.plural("gtv.minLeft", left) : ""].filter(Boolean).join(" · ")
@@ -53,7 +77,6 @@ export default function Detail({ id }: { id: string }) {
   const gb = stream.size ? `${fmt.number(Math.round(stream.size / 1e8) / 10)} GB` : ""
   const audio = [stream.audio, stream.ch, stream.langs?.length ? names("language", stream.langs) : ""].filter(Boolean).join(" · ")
   const seen = isSeries ? shown.filter((e) => D.watched(e.item)).length : 0
-  const moviePct = !isSeries && D.selected ? D.pct(D.selected) : 0
 
   // credits by their raw (English) TMDB role; tapping a name opens the person
   const crewBy = (roles: string[]) => (D.meta?.crew ?? []).filter((c) => (c.role ?? "").split(", ").some((r) => roles.includes(r)))
@@ -79,65 +102,80 @@ export default function Detail({ id }: { id: string }) {
     [t("gtv.detail.added"), stream.added ? fmt.date(new Date(stream.added * 1000), DAY) : ""],
   ]
   const facts = [...D.chips, isSeries && seasons.length > 0 ? fmt.plural("gtv.detail.seasons", seasons.length) : "", stream.res].filter(Boolean) as string[]
-  const tabs = ([
-    ["episodes", t("gtv.detail.episodes"), isSeries],
-    ["about", t("gtv.detail.about"), true],
-    ["cast", t("gtv.detail.cast"), D.cast.length + D.crew.length > 0],
-    ["trailers", t("gtv.detail.trailers"), D.trailers.length > 0],
-    ["similar", t("gtv.detail.similar"), similar.length > 0],
-  ] as [Tab, string, boolean][]).filter(([, , on]) => on)
-  const cur = tabs.some(([k]) => k === tab) ? tab! : tabs[0][0]
   const menu = D.marks.slice(1) // marks[0] (watched) has its own button
+  const longPlot = !!plot && plot.length > LONG_PLOT
+
+  // the main button: one element from the first paint (never disabled or swapped, so focus stays on it while episodes / progress load);
+  // in progress it asks Resume from 12:34 / Play from beginning. `small` = the copy in the slim bar (no autofocus, no progress)
+  const playButton = (small?: boolean) => (
+    <ActionsMenu
+      items={[{ label: t("gtv.detail.resumeFrom", { time: mmss(D.resumeAt) }), run: () => D.playMain() }, { label: t("gtv.detail.fromStart"), run: () => D.playMain(true) }]}
+      trigger={(o) => (
+        <Pill variant="primary" data-autofocus={small ? undefined : ""} aria-haspopup={D.resumeAt > 0 ? "menu" : undefined} aria-expanded={D.resumeAt > 0 ? o.open : undefined} aria-busy={D.waiting || undefined}
+          onClick={(e) => (D.resumeAt > 0 ? o.toggle(e) : D.playMain())} className={cn("relative overflow-hidden", small ? "min-h-10 px-5 text-sm" : "gtv-play min-h-14 px-8 text-lg")}>
+          {D.waiting ? <RefreshCw className="animate-spin" /> : <Play className="fill-current" />}<span className="truncate">{mainLabel}</span>
+          {!small && barPct > 0 && barPct < 95 && <span aria-hidden dir="ltr" className="absolute inset-x-7 bottom-2 h-[3px] overflow-hidden rounded-full bg-background/25"><span className="block h-full rounded-full bg-[var(--plex)]" style={{ width: `${barPct}%` }} /></span>}
+        </Pill>
+      )}
+    />
+  )
 
   return (
     <Shell page={item.kind === "live" ? "live" : item.kind === "movie" ? "movies" : "series"} title={D.title} sub>
-      {/* fixed backdrop: outside the scroller, so it stays put while the page scrolls over it */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        {backdrops.length > 0 && <Backdrop srcs={backdrops} className="absolute inset-0" />}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/30" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/40 to-transparent rtl:bg-gradient-to-l" />
-      </div>
-      <div className="under-top under-bleed under-bottom relative -mx-[var(--gx)] overflow-y-auto">
-        {!isTv && <div className="absolute start-[var(--gx)] top-[var(--content-t)] z-10"><RoundButton label={t("gtv.back")} onClick={D.back}><ArrowLeft className="rtl-flip" /></RoundButton></div>}
+      <div ref={scroller} className="under-top under-bleed under-bottom relative -ms-[var(--gs)] -me-[var(--gx)] overflow-y-auto">
+        {!isTv && !mobile && (
+          <div className="sticky top-0 z-20 h-0">
+            {compact && (
+              <div className="m-fade absolute inset-x-0 top-0 flex items-center gap-3 border-b border-[var(--fg-10)] bg-background/85 pb-2 pe-[var(--gx)] ps-[var(--gs)] pt-[calc(var(--safe-t)+.5rem)] backdrop-blur-xl">
+                <RoundButton label={t("gtv.back")} onClick={D.back} className="size-10 bg-transparent"><ArrowLeft className="rtl-flip" /></RoundButton>
+                <div dir="auto" className="min-w-0 flex-1 truncate text-lg font-medium">{D.title}</div>
+                {playButton(true)}
+              </div>
+            )}
+          </div>
+        )}
 
-        <section className="flex items-end gap-10 px-[var(--gx)] pb-8 pt-[calc(var(--content-t)+24vh)] md:min-h-[78vh] md:pt-[calc(var(--content-t)+4rem)]">
-          {poster && (
-            <div className="m-rise hidden w-52 shrink-0 md:block lg:w-64">
-              <Art item={poster} className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10" />
-              {moviePct > 0 && moviePct < 95 && <div dir="ltr" className="mt-3 h-1 overflow-hidden rounded-full bg-foreground/15"><div className="h-full bg-[var(--plex)]" style={{ width: `${moviePct}%` }} /></div>}
+        <section aria-label={D.title} className="gtv-dhero relative flex flex-col justify-end pb-10 pe-[var(--gx)] ps-[var(--gs)]">
+          <div aria-hidden className={cn("gtv-dhero-art", !backdrops.length && "bg-gradient-to-br from-accent-blue-container via-surface to-background")}>
+            {backdrops.length > 0 && <Backdrop srcs={backdrops} className="absolute inset-0" />}
+          </div>
+          {!isTv && <div className="absolute start-[var(--gs)] top-[var(--content-t)] z-10"><RoundButton label={t("gtv.back")} onClick={D.back} className="bg-background/50 backdrop-blur"><ArrowLeft className="rtl-flip" /></RoundButton></div>}
+
+          <div className="m-rise relative min-w-0 max-w-[46rem]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold uppercase tracking-[.16em] text-foreground/70">
+              <span>{t(isSeries ? "gtv.detail.seriesLabel" : "gtv.detail.movieLabel")}</span>
+              <SourceBadge item={D.selected ?? item} className="text-xs normal-case tracking-normal" />
+              {(D.selected ?? item).imax && <span className="rounded border border-foreground/40 px-1.5 tracking-normal">IMAX</span>}
             </div>
-          )}
-          <div className="m-rise min-w-0 max-w-3xl flex-1">
-            <TitleArt title={D.title} logo={D.logo} className="text-4xl font-semibold tracking-tight md:text-6xl" />
+            <TitleArt title={D.title} logo={D.logo} className="mt-3 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl" />
 
-            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-base text-foreground/80">
-              <SourceBadge item={D.selected ?? item} className="text-sm" />
-              {(D.selected ?? item).imax && <span className="rounded border border-foreground/40 px-1.5 text-xs font-semibold">IMAX</span>}
-              {facts.map((f, i) => <Fragment key={f}>{i > 0 && <span aria-hidden className="opacity-50">·</span>}<span className={f === D.meta?.cert ? "rounded border border-foreground/40 px-1.5 text-sm" : undefined}>{f}</span></Fragment>)}
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-base text-foreground/85">
+              {facts.map((f, i) => <Fragment key={f}>{i > 0 && <span aria-hidden className="opacity-40">•</span>}<span className={f === D.meta?.cert ? "rounded border border-foreground/40 px-1.5 text-sm" : undefined}>{f}</span></Fragment>)}
+              {ratings.length > 0 && <span aria-hidden className="opacity-40">•</span>}
+              {ratings.map((r) => <Score key={r.source} r={r} name={D.ratingName(r.source)} />)}
               {loading && <RefreshCw role="status" aria-label={t("gtv.detail.loading")} className="size-4 animate-spin text-muted-foreground" />}
             </div>
-            {ratings.length > 0 && <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">{ratings.map((r) => <Score key={r.source} r={r} name={D.ratingName(r.source)} />)}</div>}
-
-            {plot ? <p dir="auto" className="mt-4 line-clamp-4 text-base leading-relaxed text-foreground/90 md:text-lg">{plot}</p>
-              : loading && <div role="status" aria-label={t("gtv.detail.loading")} className="mt-4 space-y-3"><SkelBar className="w-full" /><SkelBar className="w-2/3" /></div>}
             {D.genres.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {D.genres.map((g) => <button key={g} data-nav data-pill onClick={() => D.openGenre(g)} className="min-h-9 rounded-full border border-foreground/25 px-3.5 text-sm text-foreground/85 hover:bg-[var(--fg-10)]">{g}</button>)}
+              <div className="mt-2 flex flex-wrap items-center gap-x-1 text-base text-foreground/70">
+                {D.genres.map((g, i) => <Fragment key={g}>{i > 0 && <span aria-hidden className="opacity-50">,</span>}<button data-nav onClick={() => D.openGenre(g)} className="rounded px-0.5 underline-offset-4 hover:text-foreground hover:underline">{g}</button></Fragment>)}
               </div>
             )}
 
-            <div className="-ms-1 mt-6 flex flex-wrap items-center gap-3 p-1">
-              {D.resumeAt > 0 ? (
-                // in progress: Play asks Resume from 12:34 / Play from beginning
-                <ActionsMenu
-                  items={[{ label: t("gtv.detail.resumeFrom", { time: mmss(D.resumeAt) }), run: () => D.playMain() }, { label: t("gtv.detail.fromStart"), run: () => D.playMain(true) }]}
-                  trigger={(o) => <Pill variant="primary" data-autofocus="" aria-haspopup="menu" aria-expanded={o.open} onClick={o.toggle} disabled={!D.canPlay} className="min-h-12 px-6 text-base"><Play className="fill-current" />{mainLabel}</Pill>}
-                />
-              ) : <Pill variant="primary" data-autofocus="" onClick={() => D.playMain()} disabled={!D.canPlay} className="min-h-12 px-6 text-base"><Play className="fill-current" />{mainLabel}</Pill>}
-              {D.trailer && <Pill onClick={() => openTrailer(D.trailer!)}><Clapperboard />{t("trailer.button")}</Pill>}
-              <Pill aria-pressed={D.allWatched} onClick={D.toggleWatched} className={D.allWatched ? "bg-[var(--plex)] text-[var(--plex-fg)]" : undefined}><Check />{t(D.allWatched ? "hooks.detail.markUnwatched" : "hooks.detail.markWatched")}</Pill>
-              <Pill aria-pressed={fav} onClick={toggleFav}>{fav ? <BookmarkCheck /> : <Bookmark />}{fav ? t("gtv.home.removeWatchlist") : t("gtv.home.addWatchlist")}</Pill>
-              {menu.length > 0 && <ActionsMenu items={menu} trigger={(o) => <RoundButton label={t("common.moreOptions")} active={o.open} aria-haspopup="menu" aria-expanded={o.open} onClick={o.toggle}><MoreHorizontal /></RoundButton>} />}
+            {plot ? (
+              <div className="mt-4">
+                <p dir="auto" className={cn("text-base leading-relaxed text-foreground/90 md:text-lg", !more && "line-clamp-3")}>{plot}</p>
+                {longPlot && <button data-nav aria-expanded={more} onClick={() => setMore((x) => !x)} className="mt-1 rounded text-sm font-semibold text-foreground/80 underline-offset-4 hover:underline">{t(more ? "gtv.detail.less" : "gtv.detail.more")}</button>}
+              </div>
+            ) : loading && <div role="status" aria-label={t("gtv.detail.loading")} className="mt-4 space-y-3"><SkelBar className="w-full" /><SkelBar className="w-2/3" /></div>}
+
+            <div ref={actions} className="-ms-1 mt-7 flex flex-wrap items-center gap-x-4 gap-y-5 p-1 max-sm:flex-col max-sm:items-stretch">
+              {playButton()}
+              <div data-nav-group className="flex items-start gap-1 max-sm:grid max-sm:grid-cols-4">
+                {D.trailer && <Act caption={t("trailer.button")} onClick={() => openTrailer(D.trailer!)}><Clapperboard /></Act>}
+                <Act caption={t("gtv.detail.listShort")} label={fav ? t("gtv.home.removeWatchlist") : t("gtv.home.addWatchlist")} aria-pressed={fav} on={fav} onClick={toggleFav}>{fav ? <BookmarkCheck /> : <Bookmark />}</Act>
+                <Act caption={t("hooks.detail.watched")} label={t(D.allWatched ? "hooks.detail.markUnwatched" : "hooks.detail.markWatched")} aria-pressed={D.allWatched} on={D.allWatched} onClick={D.toggleWatched}><Check /></Act>
+                {menu.length > 0 && <ActionsMenu items={menu} trigger={(o) => <Act caption={t("gtv.detail.more")} label={t("common.moreOptions")} aria-haspopup="menu" aria-expanded={o.open} onClick={o.toggle}><MoreHorizontal /></Act>} />}
+              </div>
             </div>
             {(leads.length > 0 || D.cast.length > 0) && (
               <p className="mt-5 text-base text-foreground/75">
@@ -151,64 +189,72 @@ export default function Detail({ id }: { id: string }) {
           </div>
         </section>
 
-        <div className="px-[var(--gx)] pb-10">
-          <div data-nav-group="memory" role="tablist" aria-label={D.title} className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto border-b border-foreground/10 px-1 pb-3">
-            {tabs.map(([k, label]) => (
-              <button key={k} data-nav data-pill role="tab" aria-selected={k === cur} onClick={() => setTab(k)} onFocus={() => isTv && setTab(k)}
-                className={cn("min-h-11 shrink-0 rounded-full px-5 text-base", k === cur ? "bg-foreground font-medium text-background" : "text-muted-foreground hover:bg-[var(--fg-10)] hover:text-foreground")}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div key={cur} role="tabpanel" className="m-fade pt-5">
-            {cur === "episodes" && (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  {seasons.length > 1 ? (
-                    <div data-nav-group="memory" className="no-scrollbar flex gap-2 overflow-x-auto">
-                      {seasons.map((x) => <Pill key={x} variant={x === season ? "primary" : "tonal"} aria-pressed={x === season} onClick={() => D.setSeason(x)}>{t("gtv.detail.season", { n: x })}</Pill>)}
-                    </div>
-                  ) : <span />}
+        <div className="relative flex flex-col gap-8 pb-12 pe-[var(--gx)] ps-[var(--gs)] pt-2">
+          {isSeries && (
+            <section aria-labelledby={`${uid}-eps`}>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 id={`${uid}-eps`} className="text-[1.4rem] font-normal">{t("gtv.detail.episodes")}</h2>
                   {shown.length > 0 && <p className="text-sm text-muted-foreground">{t("gtv.detail.seasonSeen", { seen: fmt.number(seen), total: fmt.number(shown.length) })}</p>}
                 </div>
-                {season !== null
-                  ? <div className="mt-4 flex flex-col gap-2">{shown.map((e) => <EpisodeRow key={e.id} e={e} D={D} onInfo={() => setEp(e)} />)}</div>
-                  : loading
-                    ? <div aria-hidden className="mt-4 flex flex-col gap-2">{Array.from({ length: 4 }, (_, i) => <div key={i} className="flex gap-4 p-2"><div className="skel aspect-video w-40 shrink-0 rounded-xl md:w-56" /><div className="flex-1 space-y-3 py-1"><SkelBar className="w-1/2" /><SkelBar className="w-1/4" /><SkelBar className="w-full" /></div></div>)}</div>
-                    : <p className="mt-4 text-base text-muted-foreground">{t("gtv.detail.noEpisodes")}</p>}
-              </>
-            )}
-
-            {cur === "about" && (
-              <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <div className="min-w-0">
-                  {D.tagline && <p dir="auto" className="mb-3 text-xl font-semibold">{D.tagline}</p>}
-                  {plot ? <p dir="auto" className="text-base leading-relaxed text-foreground/85 md:text-lg">{plot}</p> : loading && <div className="space-y-3"><SkelBar className="w-full" /><SkelBar className="w-2/3" /></div>}
-                  <Awards text={D.awards} className="mt-4" />
-                  {D.next && <p className="mt-4 text-base text-foreground/80">{t("gtv.detail.next", { code: t("pages.episode.code", { s: D.next.s, e: D.next.e }), date: fmt.date(new Date(`${D.next.air}T12:00:00`), DAY) })}</p>}
-                </div>
-                <div className="min-w-0 content-start">
-                  <Rows rows={rows} className="rounded-3xl bg-surface/70 p-5" />
-                  <WhereToWatch avail={D.avail} className="mt-6" />
+                {/* list / grid view of the episodes (synced display preference) */}
+                <div data-nav-group className="flex gap-1 rounded-full bg-surface-2/70 p-1">
+                  {([["list", List, "gtv.detail.epList"], ["grid", LayoutGrid, "gtv.detail.epGrid"]] as const).map(([v, Icon, k]) => (
+                    <RoundButton key={v} label={t(k)} title={t(k)} aria-pressed={grid === (v === "grid")} active={grid === (v === "grid")} onClick={() => setSettings({ epView: v })}
+                      className={cn("size-10", grid !== (v === "grid") && "bg-transparent text-muted-foreground")}><Icon /></RoundButton>
+                  ))}
                 </div>
               </div>
-            )}
+              {seasons.length > 1 && (
+                <div data-nav-group="memory" className="rail !mb-0 !pb-3 !pt-4">
+                  {seasons.map((x) => <Pill key={x} variant={x === season ? "primary" : "tonal"} aria-pressed={x === season} onClick={() => D.setSeason(x)} className="shrink-0">{t("gtv.detail.season", { n: x })}</Pill>)}
+                </div>
+              )}
+              {season !== null
+                ? grid
+                  ? <div data-nav-group className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4 gap-y-6 max-sm:grid-cols-2 max-sm:gap-x-3">{shown.map((e) => <EpisodeTile key={e.id} e={e} D={D} onInfo={() => setEp(e)} />)}</div>
+                  : <div className="mt-4 flex flex-col gap-2">{shown.map((e) => <EpisodeRow key={e.id} e={e} D={D} onInfo={() => setEp(e)} />)}</div>
+                : loading
+                  ? grid
+                    ? <div aria-hidden className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4 gap-y-6 max-sm:grid-cols-2 max-sm:gap-x-3">{Array.from({ length: 6 }, (_, i) => <div key={i} className="p-1.5"><div className="skel aspect-video w-full rounded-xl" /><SkelBar className="mt-3 w-3/4" /><SkelBar className="mt-2 w-1/3" /></div>)}</div>
+                    : <div aria-hidden className="mt-4 flex flex-col gap-2">{Array.from({ length: 4 }, (_, i) => <div key={i} className="flex gap-4 p-2"><div className="skel aspect-video w-40 shrink-0 rounded-xl md:w-56" /><div className="flex-1 space-y-3 py-1"><SkelBar className="w-1/2" /><SkelBar className="w-1/4" /><SkelBar className="w-full" /></div></div>)}</div>
+                  : <p className="mt-4 text-base text-muted-foreground">{t("gtv.detail.noEpisodes")}</p>}
+            </section>
+          )}
 
-            {cur === "cast" && (
-              <div data-nav-group className="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-3">
-                {[...D.cast.slice(0, 30), ...D.crew].map((c, i) => <PersonTile key={`${c.name}:${i}`} p={c} onOpen={() => D.openPerson(c)} />)}
-              </div>
-            )}
+          {D.trailers.length > 0 && <GRail title={t("gtv.detail.trailers")}>{D.trailers.map((v) => <TrailerTile key={v.key} v={v} />)}</GRail>}
+          {D.cast.length + D.crew.length > 0 && <GRail title={t("gtv.detail.cast")}>{[...D.cast.slice(0, 30), ...D.crew].map((c, i) => <PersonTile key={`${c.name}:${i}`} p={c} onOpen={() => D.openPerson(c)} />)}</GRail>}
+          {similar.length > 0 && <GRail title={t("gtv.detail.similar")}>{similar.map((i) => <Card key={i.id} item={i} onOpen={() => open(i)} />)}</GRail>}
 
-            {cur === "trailers" && <div data-nav-group className="flex flex-wrap gap-4">{D.trailers.map((v) => <TrailerTile key={v.key} v={v} />)}</div>}
-
-            {cur === "similar" && <div data-nav-group className="flex flex-wrap gap-4">{similar.map((i) => <Card key={i.id} item={i} onOpen={() => open(i)} />)}</div>}
-          </div>
+          <section aria-labelledby={`${uid}-about`} className="grid gap-x-10 gap-y-6 md:grid-cols-[auto_minmax(0,1fr)] lg:grid-cols-[auto_minmax(0,1.25fr)_minmax(0,1fr)]">
+            {poster && <div className="hidden w-40 md:block lg:w-48"><Art item={poster} className="w-full rounded-2xl shadow-xl ring-1 ring-[var(--fg-10)]" /></div>}
+            <div className="min-w-0">
+              <h2 id={`${uid}-about`} className="text-[1.4rem] font-normal">{t("gtv.detail.about")}</h2>
+              {D.tagline && <p dir="auto" className="mt-3 text-lg font-semibold">{D.tagline}</p>}
+              {plot ? <p dir="auto" className="mt-3 text-base leading-relaxed text-foreground/85">{plot}</p> : loading && <div className="mt-3 space-y-3"><SkelBar className="w-full" /><SkelBar className="w-2/3" /></div>}
+              <Awards text={D.awards} className="mt-4" />
+              {D.next && <p className="mt-4 text-base text-foreground/80">{t("gtv.detail.next", { code: t("pages.episode.code", { s: D.next.s, e: D.next.e }), date: fmt.date(new Date(`${D.next.air}T12:00:00`), DAY) })}</p>}
+            </div>
+            <div className="min-w-0 content-start md:col-span-2 lg:col-span-1">
+              <Rows rows={rows} className="rounded-3xl bg-surface p-5" />
+              <WhereToWatch avail={D.avail} className="mt-6" />
+            </div>
+          </section>
         </div>
       </div>
       {ep && <EpisodeDialog D={D} e={ep} onPick={(e) => { if (e.season !== D.season) D.setSeason(e.season); setEp(e) }} onClose={() => setEp(null)} />}
     </Shell>
+  )
+}
+
+/** A round captioned action under the hero (Trailer, Watchlist, Watched, More): icon disc + short caption; `on` fills the disc (a toggle that is set).
+ *  `label` = the full accessible name when the caption alone is too short to say what it does. */
+function Act({ caption, label, on, children, className, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { caption: string; label?: string; on?: boolean }) {
+  return (
+    <button type="button" data-nav data-pill aria-label={label} {...p} className={cn("gtv-act", className)}>
+      <span aria-hidden className={cn("gtv-act-ico", on && "gtv-act-on")}>{children}</span>
+      <span aria-hidden={label ? true : undefined} className="gtv-act-cap">{caption}</span>
+    </button>
   )
 }
 
@@ -239,6 +285,42 @@ function EpisodeRow({ e, D, onInfo }: { e: Episode; D: D; onInfo: () => void }) 
         </div>
       </button>
       <RoundButton label={t("gtv.detail.epInfo")} title={t("gtv.detail.epInfo")} onClick={onInfo} className="bg-transparent"><Info /></RoundButton>
+    </div>
+  )
+}
+
+/** An episode's still (or its number when there is none): play mark on hover/focus, watched check, progress bar. */
+function EpStill({ e, seen, pct, className }: { e: Episode; seen: boolean; pct: number; className?: string }) {
+  return (
+    <div className={cn("relative aspect-video overflow-hidden rounded-xl bg-surface-2", className)}>
+      {e.item.logo ? <img src={e.item.logo} alt="" loading="lazy" decoding="async" className="size-full object-cover" /> : <div className="grid size-full place-items-center text-3xl font-semibold text-muted-foreground">{fmt.number(e.num)}</div>}
+      {!e.missing && <span aria-hidden className="absolute inset-0 m-auto grid size-11 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100"><Play className="size-5 fill-current" /></span>}
+      {seen && <span className="absolute end-2 top-2 grid size-7 place-items-center rounded-full bg-black/70 text-white"><Check className="size-4" /></span>}
+      {pct > 0 && !seen && <div dir="ltr" className="absolute inset-x-0 bottom-0 h-1 bg-white/30"><div className="h-full bg-[var(--plex)]" style={{ width: `${pct}%` }} /></div>}
+    </div>
+  )
+}
+
+/** The grid view of an episode: the tile plays it (still on top, "E3" + title over length · air date); (i) at the caption's end opens its details. */
+function EpisodeTile({ e, D, onInfo }: { e: Episode; D: D; onInfo: () => void }) {
+  const t = useT()
+  const meta = D.epMeta(e)
+  const seen = D.watched(e.item)
+  const pct = D.pct(e.item)
+  const current = !e.missing && D.episodes[D.resumeIdx]?.id === e.id
+  const sub = [D.epDur(e.dur), e.missing ? D.missingLabel(e) : meta?.air && fmt.date(new Date(`${meta.air}T12:00:00`), DAY)].filter(Boolean).join(" · ")
+  return (
+    <div className="relative min-w-0">
+      <button data-nav onClick={() => D.playEp(e)} aria-current={current ? "true" : undefined} aria-label={`${e.missing ? "" : t("pages.episode.play")} ${t("pages.episode.code", { s: e.season, e: e.num })} ${e.title}`} aria-disabled={e.missing || undefined}
+        className={cn("gtv-ep group block w-full rounded-2xl p-1.5 text-start", e.missing && "opacity-60")}>
+        <EpStill e={e} seen={seen} pct={pct} className={cn("w-full", current && !seen && "ring-2 ring-[var(--plex)]")} />
+        <div className="mt-2.5 min-w-0 pe-11 ps-1">
+          {current && !seen && <div className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--plex)]">{t(D.resuming ? "gtv.detail.continueEpisode" : "gtv.detail.upNext")}</div>}
+          <div dir="auto" className="line-clamp-2 text-base font-medium leading-snug"><bdi className="me-1.5 text-muted-foreground">{t("hooks.detail.ep", { n: fmt.number(e.num) })}</bdi>{e.title}</div>
+          {sub && <div className="mt-0.5 truncate text-sm text-muted-foreground">{sub}</div>}
+        </div>
+      </button>
+      <RoundButton label={t("gtv.detail.epInfo")} title={t("gtv.detail.epInfo")} onClick={onInfo} className="absolute bottom-1 end-0 size-10 bg-transparent"><Info /></RoundButton>
     </div>
   )
 }
@@ -288,12 +370,16 @@ function EpisodeDialog({ D, e, onPick, onClose }: { D: D; e: Episode; onPick: (e
 
         <div data-nav-group className="flex items-center gap-2 border-t border-foreground/10 px-6 py-4">
           {e.missing ? <span className="text-base text-muted-foreground">{D.missingLabel(e)}</span> : <>
-            {E.resumeAt > 0 ? (
-              <ActionsMenu
-                items={[{ label: t("gtv.detail.resumeFrom", { time: mmss(E.resumeAt) }), run: () => play() }, { label: t("gtv.detail.fromStart"), run: () => play(true) }]}
-                trigger={(o) => <Pill variant="primary" data-autofocus="" aria-haspopup="menu" aria-expanded={o.open} onClick={o.toggle}><Play className="fill-current" />{t("pages.episode.resume")}</Pill>}
-              />
-            ) : <Pill variant="primary" data-autofocus="" onClick={() => play()}><Play className="fill-current" />{t("pages.episode.play")}</Pill>}
+            {/* one button (never swapped, so focus stays on it when progress changes while the dialog is open); in progress it asks Resume from / Play from beginning */}
+            <ActionsMenu
+              items={[{ label: t("gtv.detail.resumeFrom", { time: mmss(E.resumeAt) }), run: () => play() }, { label: t("gtv.detail.fromStart"), run: () => play(true) }]}
+              trigger={(o) => (
+                <Pill variant="primary" data-autofocus="" aria-haspopup={E.resumeAt > 0 ? "menu" : undefined} aria-expanded={E.resumeAt > 0 ? o.open : undefined}
+                  onClick={(ev) => (E.resumeAt > 0 ? o.toggle(ev) : play())}>
+                  <Play className="fill-current" />{t(E.resumeAt > 0 ? "pages.episode.resume" : "pages.episode.play")}
+                </Pill>
+              )}
+            />
             <RoundButton label={t(E.watched ? "hooks.detail.markUnwatched" : "hooks.detail.markWatched")} aria-pressed={E.watched} onClick={() => D.toggleEpWatched(e)} className={E.watched ? "bg-[var(--plex)] text-[var(--plex-fg)]" : undefined}><Check /></RoundButton>
           </>}
           <div className="ms-auto flex gap-2">

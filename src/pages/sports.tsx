@@ -95,7 +95,7 @@ export default function Sports() {
   return (
     <Shell page="sports" title={t("pages.sports.title")}>
       {/* the page's own scroller, full width like every other page (under-top / under-bottom: runs under the bars) */}
-      <div className="under-top under-bottom no-scrollbar -mx-[var(--gx)] flex flex-col gap-5 overflow-y-auto px-[var(--gx)]">
+      <div className="under-top under-bottom no-scrollbar -ms-[var(--gs)] -me-[var(--gx)] flex flex-col gap-5 overflow-y-auto ps-[var(--gs)] pe-[var(--gx)]">
         {/* search: any team or tournament */}
         <div className="flex items-center gap-2">
           <div className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-full bg-surface-2 pe-1 ps-4 focus-within:ring-2 focus-within:ring-[var(--ring)]">
@@ -116,7 +116,7 @@ export default function Sports() {
             <h2 className="text-lg font-medium">{t("pages.sports.myTeams")}</h2>
             <button data-nav data-pill onClick={() => openSection("sports")} className="flex items-center gap-1 rounded-full px-3 py-1 text-sm text-muted-foreground">{t("pages.sports.manage")}<ChevronRight className="rtl-flip size-4" /></button>
           </div>
-          <div data-nav-group className="no-scrollbar -mx-[var(--gx)] flex gap-3 overflow-x-auto px-[var(--gx)] py-1">
+          <div data-nav-group className="no-scrollbar -ms-[var(--gs)] -me-[var(--gx)] flex gap-3 overflow-x-auto ps-[var(--gs)] pe-[var(--gx)] py-1">
             {follows.map((f) => (
               <button key={`${f.provider}:${f.teamId}`} data-nav data-pill onClick={() => openFollow(f)} className="flex w-20 shrink-0 flex-col items-center gap-1.5 rounded-2xl p-1.5 text-center">
                 {f.kind === "league"
@@ -139,7 +139,7 @@ export default function Sports() {
         )}
 
         {/* day strip */}
-        <div data-nav-group className="no-scrollbar -mx-[var(--gx)] flex gap-2 overflow-x-auto px-[var(--gx)] py-1">
+        <div data-nav-group className="no-scrollbar -ms-[var(--gs)] -me-[var(--gx)] flex gap-2 overflow-x-auto ps-[var(--gs)] pe-[var(--gx)] py-1">
           {Array.from({ length: DAYS_BACK + DAYS_FWD + 1 }, (_, i) => today + (i - DAYS_BACK) * DAY).map((d) => (
             <button key={d} data-nav data-pill aria-pressed={sameDay(d, day)} data-autofocus={sameDay(d, day) ? "" : undefined} onClick={() => setDay(d)}
               className={cn("flex min-w-16 shrink-0 flex-col items-center rounded-2xl px-3 py-2", sameDay(d, day) ? "bg-foreground text-background" : "bg-surface-2")}>
@@ -150,7 +150,7 @@ export default function Sports() {
         </div>
 
         {/* scope + sport */}
-        <div data-nav-group className="no-scrollbar -mx-[var(--gx)] flex items-center gap-2 overflow-x-auto px-[var(--gx)] py-1">
+        <div data-nav-group className="no-scrollbar -ms-[var(--gs)] -me-[var(--gx)] flex items-center gap-2 overflow-x-auto ps-[var(--gs)] pe-[var(--gx)] py-1">
           <button data-nav data-pill aria-pressed={scope === "mine"} onClick={() => setScope("mine")} className={chip(scope === "mine")}><Star className={cn("me-1.5 inline size-4", scope === "mine" && "fill-current")} />{t("pages.sports.following")}</button>
           <button data-nav data-pill aria-pressed={scope === "all"} onClick={() => setScope("all")} className={chip(scope === "all")}>{t("pages.sports.allGames")}</button>
           <span aria-hidden className="mx-1 h-6 w-px shrink-0 bg-[var(--fg-10)]" />

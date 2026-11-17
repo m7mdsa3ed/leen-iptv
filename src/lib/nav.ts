@@ -255,16 +255,16 @@ function hintsOf(els: HTMLElement[]): Hints {
       if (!b) { const r = rectOf(g); boxes.set(g, (b = { left: r.left, right: r.right, top: r.top, bottom: r.bottom })) }
       return b
     }),
-    aside: els.map((el) => !!el.closest("[data-nav-aside]")),
+    aside: els.map((el) => { const a = el.closest("[data-nav-aside]"), m = el.closest("[data-modal]"); return !!a && !(m && a.contains(m)) }), // a dialog opened from an aside (the rail's status panels) is a page of its own
   }
 }
 /** Up/Down: candidates more than this many viewport heights away are not scored, as long as one in that direction lines up inside the band. */
 const BAND = 1.5
-function pick(from: HTMLElement, dir: Dir) {
+function pick(from: HTMLElement, dir: Dir, only?: (el: HTMLElement) => boolean) {
   const a = rectOf(from)
   const vert = dir === "up" || dir === "down"
   if (vert && anchorX == null) anchorX = (a.left + a.right) / 2
-  let els = focusables().filter((el) => el !== from)
+  let els = focusables().filter((el) => el !== from && (!only || only(el)))
   const m = measure(els)
   if (vert) {
     const band = window.innerHeight * BAND, lo = anchorX ?? a.left, hi = anchorX ?? a.right
@@ -349,7 +349,7 @@ export function focusFirst() {
     const a = all.find((e) => e.dataset.autofocus !== undefined)
     if (a) return clearInterval(autoWait), focusTo(a, true)
     // after 3s: stop unless the page is still mounting (no controls of its own yet) or its main action is there but not usable yet (disabled Play)
-    if (n > 15 && all.some((e) => !e.closest("header.topbar")) && !navIn(navRoots()).some((e) => e.dataset.autofocus !== undefined)) clearInterval(autoWait)
+    if (n > 15 && all.some((e) => !e.closest("header.topbar, [data-nav-rail]")) && !navIn(navRoots()).some((e) => e.dataset.autofocus !== undefined)) clearInterval(autoWait)
   }, 200)
 }
 
@@ -362,6 +362,26 @@ function scroller(el: HTMLElement) {
   }
   return null
 }
+/* Every vertical scroller (page grids, Home, Detail, Settings panes, dialog lists, the category sidebar) keeps a gap between the focused control and its
+   edges (past its scroll-padding, i.e. clear of the bars), so the next row peeks in instead of focus sitting on the edge. Only real scrollers
+   (overflow auto/scroll that overflow): scrollIntoView alone would also shift overflow:hidden boxes, which nothing can scroll back. */
+const GAP_REM = 4
+const scrollsY = (p: HTMLElement) => { const o = getComputedStyle(p).overflowY; return (o === "auto" || o === "scroll") && p.scrollHeight - p.clientHeight > 2 }
+function vScroller(el: HTMLElement) {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (!p.classList.contains("rail") && !p.hasAttribute("data-scroll-x") && scrollsY(p)) return p
+  return null
+}
+/** how far `sc` must scroll (px, signed) to leave the gap around `el`; 0 = already clear, or the control is too tall for it */
+function comfortGap(el: HTMLElement, sc: HTMLElement) {
+  const cs = getComputedStyle(sc)
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  const gap = Math.min(GAP_REM * rem, sc.clientHeight / 4)
+  const r = el.getBoundingClientRect(), b = sc.getBoundingClientRect()
+  const top = b.top + sc.clientTop + (parseFloat(cs.scrollPaddingTop) || 0) + gap
+  const bottom = b.top + sc.clientTop + sc.clientHeight - (parseFloat(cs.scrollPaddingBottom) || 0) - gap
+  if (r.height > bottom - top) return 0
+  return r.top < top ? r.top - top : r.bottom > bottom ? r.bottom - bottom : 0
+}
 function scrollFocused(el: HTMLElement, fast: boolean) {
   const m = document.documentElement.dataset.motion
   const behavior: ScrollBehavior = fast || m === "off" || m === "reduced" ? "auto" : "smooth"
@@ -371,9 +391,11 @@ function scrollFocused(el: HTMLElement, fast: boolean) {
     const r = el.getBoundingClientRect(), pr = sc.getBoundingClientRect()
     clipped = r.left < pr.left || r.right > pr.right
   }
-  // vertical: only when the control would leave the scroller, so a list (the settings sidebar, a filter column) stays still under the focus ring;
+  // vertical: comfortGap (the scroller only moves when the control comes near its edge, so a list stays still under the focus ring while it is clear);
   // horizontal: a rail centres a clipped card, which is what keeps the next one readable
+  const v = vScroller(el), d = v ? comfortGap(el, v) : 0, from = v?.scrollTop ?? 0
   el.scrollIntoView({ block: "nearest", inline: clipped ? "center" : "nearest", behavior })
+  if (v && d) v.scrollTo({ top: Math.max(0, Math.min(v.scrollHeight - v.clientHeight, from + d)), behavior }) // replaces the "nearest" step: its target already covers it
   if (el === lastEl) { // where it is NOW, not where it was before the scroll: that is where recover() looks if the control disappears
     const r = el.getBoundingClientRect()
     lastBox = { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
@@ -448,13 +470,42 @@ function pageMove(cur: HTMLElement, sign: 1 | -1) {
   const h = (scroller(cur)?.clientHeight ?? 0) || window.innerHeight
   const y0 = rectOf(cur).top
   let el = cur
+  const rail = railOf(cur) // channel up/down pages within one side rail or within the page, never across
   for (let i = 0; i < 30; i++) {
-    const n = pick(el, dir)
+    const n = pick(el, dir, (e) => railOf(e) === rail)
     if (!n) break
     el = n
     if (Math.abs(rectOf(n).top - y0) >= h * 0.8) break
   }
   return el === cur ? null : el
+}
+
+/* Side navigation rails ([data-nav-rail]: the layout's tab column at the inline start, and a second one beside it, the category rail of Browse / Live in
+   sidebar mode). Each is a closed column: Up/Down stay in it and Up/Down from the page never enter it. Toward the page, a rail returns to the control focus
+   entered it from (the page, or the other rail), else the nearest one; away from the page it only reaches another rail (category rail -> main rail), else
+   it is a dead end. Entering a rail from outside lands on its current item ([aria-current=page] tab, [aria-pressed=true] category).
+   undefined = not a rail move, use the normal rules. */
+const railFrom = new WeakMap<Element, HTMLElement>() // per rail: where focus entered it from (TV: every focusin, so Back to the tab and the pointer count too; desktop: Left into it)
+const RAIL = "[data-nav-rail]"
+/** the rail `el` is an item of; a dialog the rail opened (status panels) is not part of it */
+const railOf = (el: Element) => (el.closest("[data-modal]") ? null : el.closest(RAIL))
+function railMove(cur: HTMLElement, dir: Dir): HTMLElement | null | undefined {
+  const rail = railOf(cur)
+  const vert = dir === "up" || dir === "down"
+  if (!rail) return vert && !topModal() ? pick(cur, dir, (el) => !railOf(el)) : undefined
+  if (vert) return pick(cur, dir, (el) => rail.contains(el))
+  const toPage = dir === (document.documentElement.dir === "rtl" ? "left" : "right")
+  const from = railFrom.get(rail)
+  if (toPage && from?.isConnected && !rail.contains(from) && focusables().includes(from)) return from
+  const n = pick(cur, dir, (el) => !rail.contains(el) && (toPage || !!railOf(el)))
+  return n && intoRail(cur, n)
+}
+function intoRail(cur: HTMLElement, next: HTMLElement) {
+  const rail = railOf(next)
+  if (!rail || rail.contains(cur)) return next
+  railFrom.set(rail, cur)
+  const home = rail.querySelector<HTMLElement>("[aria-current=page], [aria-pressed=true]") // the current tab (or Settings) / the picked category
+  return home && visible(home) ? home : next
 }
 
 /** Set by the on-screen keyboard: return true when it took over the text field (OK pressed in it). */
@@ -463,11 +514,14 @@ export const navHooks: { text?: (el: HTMLInputElement | HTMLTextAreaElement) => 
 function move(cur: HTMLElement, dir: Dir | undefined, page: 1 | -1 | 0, repeat: boolean, nowhere: boolean) {
   if (nowhere) return recover() // focus is nowhere: the key brings it back (to the last control), it does not also move
   if (dir === "left" || dir === "right") anchorX = null
-  let next = dir ? pick(cur, dir) : pageMove(cur, page as 1 | -1)
+  const r = dir && railMove(cur, dir)
+  const railOwn = r !== undefined && !!railOf(cur) // a move from inside the rail: its own rules, no row memory / wrap
+  let next = r !== undefined ? r : dir ? pick(cur, dir) : pageMove(cur, page as 1 | -1)
   if (dir === "down" && cur.closest("header.topbar")) next = firstRow(cur) ?? next
-  if (dir) {
+  if (dir && !railOwn) {
     if (next) next = viaMemory(cur, next, dir)
     next = wrap(cur, next, dir)
+    if (next) next = intoRail(cur, next)
   }
   if (dir === "up" || dir === "down") {
     const vs = cur.closest<HTMLElement>("[data-vscroll]")
@@ -540,6 +594,8 @@ export function installNav(onBack: () => void) {
     const el = (e.target as HTMLElement).closest?.<HTMLElement>("[data-nav]")
     if (!el) return
     if (el !== lastKeyTarget) anchorX = null // focus came from pointer/code: re-anchor
+    const prev = lastEl, rail = railOf(el)
+    if (rail && prev?.isConnected && !rail.contains(prev) && !prev.closest("[data-modal]")) railFrom.set(rail, prev)
     lastEl = el
     const r = el.getBoundingClientRect()
     lastBox = { left: r.left, right: r.right, top: r.top, bottom: r.bottom }

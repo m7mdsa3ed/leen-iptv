@@ -19,5 +19,5 @@ for name, size, kw in [
     mark(f"public/{name}", size, **kw)
 # webOS launch splash (appinfo bgImage/splashBackground): 1920x1080, mark centred on the splash background
 mark("/tmp/leen-mark.png", 220)
-subprocess.run(["convert", "-size", "1920x1080", "xc:#0B0D10", "/tmp/leen-mark.png", "-gravity", "center", "-composite", "public/splash.png"], check=True)
+subprocess.run(["convert", "-size", "1920x1080", "xc:#0E0F11", "/tmp/leen-mark.png", "-gravity", "center", "-composite", "public/splash.png"], check=True)
 print("ok")

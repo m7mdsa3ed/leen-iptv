@@ -9,7 +9,7 @@ import { imageUrl } from "@/lib/net"
 import { focusFirst, useRoute } from "@/lib/nav"
 import { useApp, useLists, useProfile } from "@/lib/store"
 import { openListModal } from "./lists"
-import { CARD_K } from "@/lib/cards"
+import { GRID_K } from "@/lib/cards"
 import { Card, Pill, SkelGrid, SkelRail } from "@/components/gtv"
 import { useLayoutDef } from "@/layouts"
 import { useCatalog } from "@/lib/catalog"
@@ -72,19 +72,43 @@ export function TvButton({ className, ...p }: React.ComponentProps<typeof Button
 /** Display name of a group chip: the FAV / ALL pseudo groups are localised, real categories are shown as-is. (FAV/ALL live in groups.tsx; literals here avoid an import cycle.) */
 export const groupLabel = (g: string, t: TFn) => (g === "Continue watching" ? t("common.continueWatching") : g === "Favorites" ? t("common.favorites") : g === "All" ? t("common.all") : g === "Other" ? t("common.other") : g)
 
-/** Category lists can be shown as a start-side sidebar (Settings > Display > Categories): marks the page content so CSS reserves room for it, and hands it the sidebar's width (`--cat-w`, it follows the longest category name). */
+/** Category lists can be shown as a second side rail (Settings > Display > Categories = Sidebar; not on phones): a column right after the main rail, built
+ *  like it. Collapsed it is a strip of icons / initials and the page keeps clear of only that (`data-cats` on the page content); it opens over the page
+ *  with the names and counts while D-pad / keyboard focus or a mouse is inside it, and on a first visit. Once focus, a press or the wheel goes to the page
+ *  it folds back. D-pad: it is a [data-nav-rail] (nav.ts), so Up/Down stay in it and Left goes on to the main rail.
+ *  Toggles `data-open` on the element directly: no re-render of a long category list per focus move. Look: "Categories as a second side rail" in index.css. */
 export function useCatSide() {
   const ref = useRef<HTMLDivElement>(null)
+  const mode = useMode()
+  const side = useApp((s) => s.settings.catNav === "sidebar") && mode !== "mobile"
   useEffect(() => {
     const el = ref.current, m = el?.closest<HTMLElement>("[data-page-content]")
-    if (!el || !m) return
+    if (!side || !el || !m) return
     m.setAttribute("data-cats", "")
-    const ro = new ResizeObserver(() => m.style.setProperty("--cat-w", `${el.offsetWidth}px`))
-    ro.observe(el)
-    return () => { ro.disconnect(); m.removeAttribute("data-cats"); m.style.removeProperty("--cat-w") }
-  }, [])
-  return ref
+    const show = (on: boolean) => el.toggleAttribute("data-open", on)
+    show(true)
+    const inside = (e: Event) => el.contains(e.target as Node)
+    const focus = (e: FocusEvent) => show(inside(e))
+    const away = (e: Event) => { if (!inside(e)) show(false) }
+    const enter = (e: PointerEvent) => { if (e.pointerType === "mouse") show(true) }
+    // TV: the Magic Remote focuses what it points at, so focus decides; desktop: only keyboard focus holds it open after the mouse leaves
+    const leave = (e: PointerEvent) => { if (e.pointerType === "mouse" && !(isTv ? el.contains(document.activeElement) : el.querySelector(":focus-visible"))) show(false) }
+    document.addEventListener("focusin", focus)
+    document.addEventListener("pointerdown", away, true)
+    m.addEventListener("wheel", away, { passive: true })
+    el.addEventListener("pointerenter", enter)
+    el.addEventListener("pointerleave", leave)
+    return () => {
+      document.removeEventListener("focusin", focus); document.removeEventListener("pointerdown", away, true); m.removeEventListener("wheel", away)
+      el.removeEventListener("pointerenter", enter); el.removeEventListener("pointerleave", leave)
+      m.removeAttribute("data-cats"); el.removeAttribute("data-open")
+    }
+  }, [side])
+  return { ref, side }
 }
+
+/** First letter of a category for the collapsed sidebar (prefix punctuation such as "| " skipped). */
+export const catIni = (s: string) => Array.from(s.replace(/^[^\p{L}\p{N}]+/u, ""))[0]?.toUpperCase() ?? "\u2022"
 
 /** Title count at the end of a category pill; CSS shows it only in the sidebar (.cat-count). */
 export const CatCount = ({ n }: { n?: number }) => (n == null ? null : <span className="cat-count ms-auto shrink-0 ps-2 text-sm tabular-nums text-muted-foreground">{fmt.number(n)}</span>)
@@ -93,9 +117,7 @@ export const Chips = memo(function Chips({ items, active, onPick, locked, onKey,
   const t = useT()
   const lists = useLists()
   const listNames = useMemo(() => new Set(lists.map((l) => l.name)), [lists])
-  const ref = useCatSide()
-  const mode = useMode()
-  const side = useApp((s) => s.settings.catNav === "sidebar") && mode !== "mobile" // the category list as a fixed sidebar (Settings > Display): beside the page, not a row in it
+  const { ref, side } = useCatSide() // the category list as a second side rail (Settings > Display): beside the page, not a row in it
   const row = (
     <div data-nav-group="memory" className="rail !mb-0 !gap-3 !pb-2">
       {items.map((g) => (
@@ -112,7 +134,8 @@ export const Chips = memo(function Chips({ items, active, onPick, locked, onKey,
           {g === "Continue watching" && <History className="size-4" />}
           {g === "Favorites" && <Star className="size-4" />}
           {listNames.has(g) && <List className="size-4" />}
-          {locked?.(g) && <Lock className="size-4" />}
+          {g !== "Continue watching" && g !== "Favorites" && !listNames.has(g) && <span aria-hidden className="cat-ini">{catIni(groupLabel(g, t))}</span>}
+          {locked?.(g) && <Lock className="cat-lock size-4" />}
           <bdi>{groupLabel(g, t)}</bdi>
           {count && <CatCount n={count(g)} />}
         </button>
@@ -124,7 +147,7 @@ export const Chips = memo(function Chips({ items, active, onPick, locked, onKey,
       )}
     </div>
   )
-  return cat ? <div ref={ref} data-nav-aside={side ? "" : undefined} className="cat-side">{row}</div> : row
+  return cat ? <div ref={ref} data-nav-rail={side ? "" : undefined} data-nav-aside={side ? "" : undefined} role={side ? "navigation" : undefined} aria-label={side ? t("gtv.filters.categories") : undefined} className="cat-side no-scrollbar">{row}</div> : row
 })
 
 /** TMDB posters at tile size: panels often link the `original` (about 2000x3000) and metadata uses w500; a TV decodes every one of them on its slow CPU.
@@ -250,7 +273,7 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
     return () => ro.disconnect()
   }, [])
   const k = useK()
-  const ck = CARD_K[useApp((s) => s.settings.gridSize ?? s.settings.cardSize) ?? "normal"] // grids: their own size (filter bar / Settings), else the card size
+  const ck = GRID_K[useApp((s) => s.settings.gridSize ?? s.settings.cardSize) ?? "normal"] // grids: their own size (filter bar / Settings), else the card size
   const gap = isTv ? 24 * k : mode === "mobile" ? 12 : 16
   const c = cols ?? Math.max(1, Math.floor((w + gap) / (minW * ck + gap)))
   const rowH = Math.round(((w - gap * (c - 1)) / c) * ratio + label * k) + gap
@@ -269,7 +292,7 @@ export function VGrid<T>({ items, cols, minW, ratio = 1.5, label = 64, render, h
   const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: isTv ? 1 : 3, scrollMargin: hh, observeElementRect: keepSize, useFlushSync: false })
   useEffect(() => v.measure(), [rowH, v])
   return (
-    <div ref={ref} data-vscroll className={cn("under-bottom -mx-[var(--gx)] h-full overflow-y-auto px-[var(--gx)] pb-6 pt-4", className)}>
+    <div ref={ref} data-vscroll className={cn("under-bottom -ms-[var(--gs)] -me-[var(--gx)] h-full overflow-y-auto ps-[var(--gs)] pe-[var(--gx)] pb-6 pt-4", className)}>
       {head && <div ref={headRef}>{head}</div>}
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((r) => (

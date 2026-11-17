@@ -50,7 +50,7 @@ export default function Detail({ id }: { id: string }) {
             <WhereToWatch avail={D.avail} className="mt-4" />
             {err && <p role="alert" className="mt-3 text-sm text-destructive">{err}</p>}
             <div className="-ms-1 mt-6 flex flex-wrap items-center gap-3 p-1">
-              <Pill variant="primary" data-autofocus="" onClick={() => D.playMain()} disabled={!D.canPlay}>
+              <Pill variant="primary" data-autofocus="" onClick={() => D.playMain()} aria-busy={D.waiting || undefined}>
                 <Play className="fill-current" />{D.resumeLabel}
               </Pill>
               <RoundButton label={fav ? t("pages.detail.removeFav") : t("pages.detail.addFav")} active={fav} onClick={toggleFav}>

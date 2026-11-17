@@ -27,7 +27,7 @@ export default function PersonPage({ id, name }: { id?: string; name?: string })
   const title = hookName
   return (
     <Shell page="" title={title} sub>
-    <div className="under-top under-bottom relative -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
+    <div className="under-top under-bottom relative -ms-[var(--gs)] -me-[var(--gx)] overflow-y-auto ps-[var(--gs)] pe-[var(--gx)]">
       {info?.photo && <img src={info.photo} alt="" aria-hidden decoding="async" loading="lazy" className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] w-full object-cover object-top opacity-20" />}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-t from-background via-transparent to-transparent" />
       <div className="relative">

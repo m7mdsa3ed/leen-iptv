@@ -13,4 +13,102 @@ html[data-layout=googletv] .gtv-ep { transition: background-color var(--dur-fast
 html[data-layout=googletv] .gtv-ep:focus-visible, html[data-layout=googletv] .gtv-ep[data-focused="true"], html[data-mode=tv][data-layout=googletv] .gtv-ep:focus { background: var(--surface-2); }
 /* details page (Plex look): amber Play, season tab underline, progress */
 html[data-layout=googletv] { --plex: #e5a00d; --plex-fg: #1f1f1f; }
-/* details hero: the art stays visible, a soft scrim only on the text side */
+/* Details (pages/detail.tsx): a hero that fills the first screen (the next section's title peeks under it), the art full bleed behind the transparent rail,
+   shaded only on the text side and the bottom so it fades into the sections. Phones: the art sits above the text and fades into the page. */
+html[data-layout=googletv] .gtv-dhero { min-height: calc(100vh - 4.5rem); padding-top: calc(var(--content-t) + 5rem); isolation: isolate; }
+html[data-mode=tv][data-layout=googletv] .gtv-dhero { min-height: calc(100vh - 5.5rem); }
+html[data-mode=mobile][data-layout=googletv] .gtv-dhero { min-height: 0; padding-top: calc(var(--content-t) + 34vh); }
+html[data-layout=googletv] .gtv-dhero-art { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
+html[data-layout=googletv] .gtv-dhero-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, var(--background) 0, var(--fade-to) 42%), linear-gradient(to right, var(--background) 0, var(--fade-mid) 38%, var(--fade-to) 72%); }
+html[dir=rtl][data-layout=googletv] .gtv-dhero-art::after { background: linear-gradient(to top, var(--background) 0, var(--fade-to) 42%), linear-gradient(to left, var(--background) 0, var(--fade-mid) 38%, var(--fade-to) 72%); }
+html[data-mode=mobile][data-layout=googletv] .gtv-dhero-art { bottom: auto; height: calc(var(--content-t) + 58vh); }
+html[data-mode=mobile][data-layout=googletv] .gtv-dhero-art::after { background: linear-gradient(to top, var(--background) 0, var(--fade-mid) 22%, var(--fade-to) 55%), linear-gradient(to bottom, var(--fade-mid) 0, var(--fade-to) calc(var(--content-t) + 2rem)); }
+html[data-mode=mobile][data-layout=googletv] .gtv-play { width: 100%; justify-content: center; }
+/* captioned round actions beside Play */
+html[data-layout=googletv] .gtv-act { display: flex; min-width: 4.75rem; flex-direction: column; align-items: center; gap: .375rem; padding: .375rem .25rem; border-radius: 1rem; color: var(--foreground); }
+html[data-layout=googletv] .gtv-act-ico { display: grid; width: 3rem; height: 3rem; place-items: center; border-radius: 9999px; border: 1px solid var(--fg-10); background: var(--fade-mid); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+html[data-layout=googletv] .gtv-act-ico svg { width: 1.25rem; height: 1.25rem; }
+html[data-layout=googletv] .gtv-act-on { border-color: transparent; background: var(--foreground); color: var(--background); }
+html[data-layout=googletv] .gtv-act-cap { font-size: .8125rem; line-height: 1.2; white-space: nowrap; color: var(--muted-foreground); }
+@media (hover: hover) { html[data-layout=googletv] .gtv-act:hover .gtv-act-ico:not(.gtv-act-on) { background: var(--fg-10); } }
+html[data-layout=googletv] .gtv-act:focus-visible .gtv-act-ico, html[data-mode=tv][data-layout=googletv] .gtv-act:focus .gtv-act-ico { border-color: transparent; background: none; color: inherit; } /* the whole tile fills on focus ([data-pill]) */
+html[data-layout=googletv] .gtv-act:focus-visible .gtv-act-cap, html[data-mode=tv][data-layout=googletv] .gtv-act:focus .gtv-act-cap { color: inherit; }
+html[data-mode=mobile][data-layout=googletv] .gtv-act { min-width: 0; }
+/* Home stage: tall enough to frame one title, short enough that the first rail's title peeks in under it (that peek says "scroll for more") */
+html[data-layout=googletv] .gtv-stage { min-height: min(calc(100vh - 7rem), 54rem); padding-bottom: .5rem; }
+html[data-mode=tv][data-layout=googletv] .gtv-stage { min-height: max(30rem, calc(100vh - 9rem)); }
+html[data-mode=mobile][data-layout=googletv] .gtv-stage { min-height: min(72vh, 40rem); }
+html[data-layout=googletv] .gtv-stage .rail { padding-bottom: 1.5rem; }
+/* the stage's thumbnails: the shown one at full strength, the others dimmed until focused/hovered (opacity only) */
+html[data-layout=googletv] .gtv-thumb [data-tile], html[data-layout=googletv] .gtv-thumb > div + div { transition: opacity var(--dur-fast) var(--ease); }
+html[data-layout=googletv] .gtv-thumb[aria-selected=false]:not(:focus):not(:hover) [data-tile] { opacity: .55; }
+html[data-layout=googletv] .gtv-thumb[aria-selected=false]:not(:focus):not(:hover) > div + div { opacity: .6; }
+/* rotation tick: fills the shown thumbnail's bottom edge over one rotation (stage.tsx ROTATE); gone when nothing rotates */
+@keyframes gtv-tick-k { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+html[data-layout=googletv] .gtv-tick { transform-origin: left; animation: gtv-tick-k 9s linear forwards; }
+html[dir=rtl][data-layout=googletv] .gtv-tick { transform-origin: right; }
+html[data-motion=off] .gtv-tick { display: none; }
+/* desktop/phone with full motion: the stage artwork drifts slowly (transform only); TV stays still */
+html[data-motion=full]:not([data-mode=tv]) .gtv-stage-art { animation: bg-drift-k 30s ease-in-out infinite alternate; will-change: transform; }
+
+/* Side navigation rail (desktop, tablet, TV; Shell SideRail): floats over the page at the inline start, TRANSPARENT like the TV home screens: the page
+   (hero art, rails) runs behind it, a soft shade from the start edge keeps the icons readable, and the tabs sit in the vertical middle (logo + clock top,
+   status items (metadata queue, sources, notifications) + profile bottom). There is no top bar beside it.
+   Open (hover on real pointers, or keyboard / D-pad focus inside it = [data-open]): a deeper translucent shade fades in behind the labels. No solid surface.
+   Sizes: --rail-w / --rail-open in index.css; pages keep clear of it with --gs. webOS rule: only opacity moves (the panel width snaps; it is absolute). */
+.gtv-rail { position: absolute; z-index: 31; inset-block: 0; inset-inline-start: 0; width: var(--rail-w); pointer-events: none; } /* over the top bar (30); its scrims below sit under the dialogs (z-50) */
+.gtv-rail::before, .gtv-rail::after { content: ""; position: absolute; z-index: -1; inset-block: 0; inset-inline-start: 0; pointer-events: none; transition: opacity var(--dur) var(--ease); } /* under the items: .gtv-rail (z-index 31) is their stacking context; without -1 the ::after painted OVER the labels and only the focused item (TV focus z-index 5) escaped it */
+.gtv-rail::before { width: calc(var(--rail-w) * 2); background: linear-gradient(to right, var(--fade-mid), var(--fade-to)); } /* resting shade: icons readable over bright art */
+.gtv-rail::after { width: calc(var(--rail-open) * 2); opacity: 0; background: linear-gradient(to right, var(--background) 0, var(--background) 45%, var(--fade-mid) 70%, var(--fade-to)); } /* open: solid behind the labels (page text never shows through them), then the page dims toward the rail */
+html[dir=rtl] .gtv-rail::before { background: linear-gradient(to left, var(--fade-mid), var(--fade-to)); }
+html[dir=rtl] .gtv-rail::after { background: linear-gradient(to left, var(--background) 0, var(--background) 45%, var(--fade-mid) 70%, var(--fade-to)); }
+.gtv-rail-panel { position: absolute; inset-block: 0; inset-inline-start: 0; width: var(--rail-w); display: flex; flex-direction: column; align-items: stretch; gap: .5rem; padding: calc(var(--safe-t) + 1rem) .75rem calc(var(--safe-b) + 1rem); padding-inline-start: max(.75rem, var(--safe-l)); overflow-x: hidden; overflow-y: auto; pointer-events: auto; }
+html[dir=rtl] .gtv-rail-panel { padding-inline-start: max(.75rem, var(--safe-r)); }
+.gtv-rail-logo { display: grid; flex: none; place-items: center; width: 3rem; height: 3rem; }
+.gtv-rail-top { align-items: flex-start; }
+/* three groups: top (logo, clock) and end (status items, profile) take equal shares of the free height, so the middle (Search + tabs) is centred on the screen */
+.gtv-rail-top, .gtv-rail-end { display: flex; flex: 1 1 0; flex-direction: column; gap: .5rem; min-height: min-content; }
+.gtv-rail-end { justify-content: flex-end; }
+.gtv-rail-mid { display: flex; flex: none; flex-direction: column; gap: .5rem; padding-block: 1rem; }
+.gtv-rail-clock { display: flex; align-items: center; justify-content: center; gap: .25rem; width: 3rem; font-size: .8125rem; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted-foreground); white-space: nowrap; }
+html[data-mode=tv] .gtv-rail-clock { font-size: .75rem; }
+.gtv-rail-ico { position: relative; }
+.gtv-rail-badge { position: absolute; top: -.375rem; inset-inline-end: -.5rem; min-width: 1.125rem; height: 1.125rem; padding: 0 .25rem; display: grid; place-items: center; border-radius: 9999px; background: var(--accent-blue); color: #fff; font-size: .625rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--background); }
+.gtv-rail-src .gtv-rail-badge { min-width: 0; height: auto; padding: 0; background: none; top: auto; bottom: -.125rem; inset-inline-end: -.25rem; }
+.gtv-rail-dot { display: block; width: .5rem; height: .5rem; border-radius: 9999px; box-shadow: 0 0 0 2px var(--background); }
+.gtv-rail-warn .gtv-rail-badge { background: var(--muted-foreground); color: var(--background); }
+.gtv-rail-item { position: relative; display: flex; flex: none; align-items: center; gap: 1rem; width: 100%; min-height: 3rem; padding: 0 .75rem; border-radius: 9999px; overflow: hidden; white-space: nowrap; font-size: 1rem; font-weight: 500; color: var(--muted-foreground); transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
+.gtv-rail-ico { display: grid; flex: none; place-items: center; width: 1.5rem; height: 1.5rem; }
+.gtv-rail-ico svg { width: 1.375rem; height: 1.375rem; }
+.gtv-rail-avatar { width: 2rem !important; height: 2rem !important; margin: -.25rem; font-size: .875rem; }
+.gtv-rail-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity var(--dur) var(--ease); }
+/* current tab: bright icon + a small dot at the start edge while closed (no filled pill on the transparent rail), the tonal pill once open */
+.gtv-rail-item[aria-current=page] { color: var(--foreground); font-weight: 600; }
+.gtv-rail-item[aria-current=page]::before { content: ""; position: absolute; inset-inline-start: .125rem; top: 50%; width: .25rem; height: 1.25rem; margin-top: -.625rem; border-radius: 9999px; background: var(--accent-blue); transition: opacity var(--dur-fast) var(--ease); }
+.gtv-rail[data-open] .gtv-rail-item[aria-current=page] { background: var(--fg-10); }
+.gtv-rail-item:focus-visible { background: var(--focus-bg); color: var(--focus-fg); outline: none; } /* TV: [data-pill]:focus already fills it */
+.gtv-rail-item:focus-visible::before, .gtv-rail-item[data-focused="true"]::before, html[data-mode=tv] .gtv-rail-item:focus::before { opacity: 0; }
+@media (hover: hover) { .gtv-rail-item:hover:not([aria-current=page]):not(:focus-visible) { background: var(--fg-10); color: var(--foreground); } }
+/* open */
+.gtv-rail[data-open] { z-index: 35; }
+.gtv-rail[data-open] .gtv-rail-panel { width: var(--rail-open); }
+.gtv-rail[data-open] .gtv-rail-label, .gtv-rail[data-open]::after { opacity: 1; }
+.gtv-rail[data-open]::before { opacity: 0; }
+@media (hover: hover) {
+  .gtv-rail:hover { z-index: 35; }
+  .gtv-rail:hover .gtv-rail-panel { width: var(--rail-open); }
+  .gtv-rail:hover .gtv-rail-label, .gtv-rail:hover::after { opacity: 1; }
+  .gtv-rail:hover::before { opacity: 0; }
+  .gtv-rail:hover .gtv-rail-item[aria-current=page] { background: var(--fg-10); }
+}
+/* touch tablets (no hover): the closed rail cannot be opened by hovering, so each icon carries a small caption under it (Material navigation rail); keyboard focus still opens it */
+@media (hover: none) {
+  html:not([data-mode=tv]) { --rail-w: 5.25rem; }
+  html:not([data-mode=tv]) .gtv-rail:not([data-open]) .gtv-rail-item { flex-direction: column; justify-content: center; gap: .25rem; min-height: 3.75rem; padding: .375rem 0; border-radius: 1rem; }
+  html:not([data-mode=tv]) .gtv-rail:not([data-open]) .gtv-rail-label { opacity: 1; max-width: 100%; font-size: .6875rem; line-height: 1.1; }
+  html:not([data-mode=tv]) .gtv-rail:not([data-open]) .gtv-rail-item[aria-current=page]::before { display: none; }
+  html:not([data-mode=tv]) .gtv-rail:not([data-open]) .gtv-rail-item[aria-current=page] .gtv-rail-ico { background: var(--accent-blue-container); }
+  html:not([data-mode=tv]) .gtv-rail:not([data-open]) .gtv-rail-ico { box-sizing: content-box; padding: .25rem .875rem; border-radius: 9999px; transition: background-color var(--dur-fast) var(--ease); }
+  html:not([data-mode=tv]) .gtv-rail:not([data-open]) :is(.gtv-rail-logo, .gtv-rail-clock) { width: 100%; }
+  html:not([data-mode=tv]) .gtv-rail-top { align-items: stretch; }
+}

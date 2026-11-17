@@ -25,8 +25,8 @@ const isToday = (ms: number) => { const a = new Date(ms), b = new Date(); return
 export function SkelGames({ n = 4, title = true }: { n?: number; title?: boolean }) {
   const bar = "skel h-4 rounded-full !bg-surface-3"
   return (
-    <section aria-hidden className="-mx-[var(--gx)] mb-2">
-      {title && <div className="skel mx-[var(--gx)] mb-1 h-7 w-48 rounded-full" />}
+    <section aria-hidden className="-ms-[var(--gs)] -me-[var(--gx)] mb-2">
+      {title && <div className="skel ms-[var(--gs)] me-[var(--gx)] mb-1 h-7 w-48 rounded-full" />}
       <div className="rail !mx-0 overflow-hidden">
         {Array.from({ length: n }, (_, i) => (
           <div key={i} className="flex w-64 shrink-0 flex-col gap-3 rounded-2xl bg-surface-2 p-3">

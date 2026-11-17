@@ -196,7 +196,7 @@ export default function MatchPage({ id }: { id?: string }) {
 
   return (
     <Shell page="sports" title={m ? `${m.home.team.name} - ${m.away.team.name}` : t("pages.match.title")} sub>
-    <div className="under-top under-bottom relative -mx-[var(--gx)] overflow-y-auto px-[var(--gx)]">
+    <div className="under-top under-bottom relative -ms-[var(--gs)] -me-[var(--gx)] overflow-y-auto ps-[var(--gs)] pe-[var(--gx)]">
       <div className="relative mx-auto w-full max-w-4xl">
         {!isTv && <RoundButton label={t("common.back")} onClick={back}><ArrowLeft className="rtl-flip" /></RoundButton>}
         {busy && <Skel label={t("pages.match.loading")} />}

@@ -1,6 +1,7 @@
+import { createPortal } from "react-dom"
 import { useEffect, useState, type ReactNode } from "react"
 import { Check, Clock, ImageOff, Pause, Play, RefreshCw, SearchX, Settings, TriangleAlert, X } from "lucide-react"
-import { Art, Pill } from "@/components/gtv"
+import { Art, Pill, RailItem } from "@/components/gtv"
 import { useOpen } from "@/components/tv/ui"
 import { useMode } from "@/lib/device"
 import { fmt, useT } from "@/lib/i18n"
@@ -19,7 +20,7 @@ const MAX_WAITING = 40
 
 /** Top-bar activity chip (like Plex's): the count of titles waiting for a metadata lookup; pressing it lists them (lib/meta/queue.ts).
     The panel drops from the chip on desktop / TV and is a bottom sheet on phones. Back / Esc / a click outside closes it. */
-export function MetaQueueButton() {
+export function MetaQueueButton({ rail }: { rail?: boolean } = {}) {
   const n = useMetaQueue((s) => s.n)
   const paused = useMetaQueue((s) => s.paused)
   const bad = useMetaQueue((s) => s.bad)
@@ -30,13 +31,18 @@ export function MetaQueueButton() {
   const label = n ? fmt.plural("gtv.shell.metaQueue", n) : fmt.plural("gtv.queue.needMatch", bad) // nothing queued: the chip stays for titles that need a manual match
   return (
     <>
-      {(n > 0 || bad > 0) && (
+      {(n > 0 || bad > 0) && rail && (
+        <RailItem label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} badge={fmt.number(n || bad)} className={!n ? "gtv-rail-warn" : undefined}>
+          {!n ? <SearchX /> : paused ? <Pause /> : <RefreshCw className={cn(!tv && "animate-spin")} />}
+        </RailItem>
+      )}
+      {(n > 0 || bad > 0) && !rail && (
         <button data-nav data-pill aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}
           className={cn("flex shrink-0 items-center gap-1.5 rounded-full bg-surface-2 font-medium tabular-nums text-muted-foreground", tv ? "min-h-11 px-4 text-base" : "min-h-8 px-2.5 text-xs")}>
           {!n ? <SearchX className={tv ? "size-4" : "size-3.5"} /> : paused ? <Pause className={tv ? "size-4" : "size-3.5"} /> : <RefreshCw className={cn(!tv && "animate-spin", tv ? "size-4" : "size-3.5")} />}{fmt.number(n || bad)}
         </button>
       )}
-      {open && <Panel close={() => setOpen(false)} />}
+      {open && (rail ? createPortal(<Panel close={() => setOpen(false)} />, document.body) : <Panel close={() => setOpen(false)} />)}
     </>
   )
 }
@@ -65,8 +71,8 @@ function Panel({ close }: { close: () => void }) {
   const head = (text: string, count?: number) => <h3 className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{text}{count != null && <span className="ms-1.5 tabular-nums">{fmt.number(count)}</span>}</h3>
   return (
     <div data-modal role="dialog" aria-modal="true" aria-label={t("gtv.queue.title")} onClick={(e) => e.target === e.currentTarget && close()}
-      className={cn("fixed inset-0 z-50 flex m-fade", mobile ? "items-end bg-black/50" : "items-start justify-end bg-black/30 pe-[var(--gx)] pt-[calc(var(--hdr)+.25rem)]")}>
-      <div className={cn("flex flex-col overflow-hidden bg-surface text-foreground shadow-2xl", mobile ? "m-rise max-h-[80vh] w-full rounded-t-[28px] border-t border-[var(--fg-10)] pb-[var(--safe-b)]" : "m-pop max-h-[min(36rem,calc(100vh-var(--hdr)-2rem))] w-[26rem] rounded-[28px]")}>
+      className={cn("fixed inset-0 z-50 flex m-fade", mobile ? "items-end bg-black/50" : "items-end bg-black/30 pb-[max(1rem,var(--safe-b))] ps-[calc(var(--rail-w)+.75rem)]")}>
+      <div className={cn("flex flex-col overflow-hidden bg-surface text-foreground shadow-2xl", mobile ? "m-rise max-h-[80vh] w-full rounded-t-[28px] border-t border-[var(--fg-10)] pb-[var(--safe-b)]" : "m-pop max-h-[min(36rem,calc(100vh-2rem))] w-[26rem] rounded-[28px]")}>
         <div className="flex items-center gap-2 px-5 pb-2 pt-4">
           <h2 className="min-w-0 flex-1 truncate text-lg font-medium">{t("gtv.queue.title")}</h2>
           <Pill data-autofocus className="min-h-10 px-4 text-sm" onClick={() => setQueuePaused(!paused)}>{paused ? <Play /> : <Pause />}{t(paused ? "gtv.queue.resume" : "gtv.queue.pause")}</Pill>

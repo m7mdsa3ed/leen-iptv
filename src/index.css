@@ -163,7 +163,10 @@ html, body, #root { height: 100%; background: var(--background, #0e0f11); oversc
    --safe-t/r/b/l  device insets (status bar, notch, gesture bar); 0 on TV and in desktop browsers. Use these, never env() directly.
    --gx            page gutter, always clear of a side inset (landscape notch)
    --bar-h         the top bar's own row; --hdr = --safe-t + --bar-h = where page content starts (the Shell header is exactly this tall)
+                   (with the side rail, .has-rail, there is no top bar: --bar-h is only the gap above the content, --fade 0)
    --nav-h         the mobile bottom pill + its gap incl. --safe-b (0px when there is none) = where page content ends
+   --rail-w        the side navigation rail's closed width at the inline start (desktop/tablet/TV; 0px on phones); --rail-open = its open width. The rail floats over the page (transparent)
+   --gs            the page gutter on the START side: --gx, plus --rail-w inside a Shell with the rail (.has-rail). Bleeding sections use -ms-[var(--gs)] -me-[var(--gx)] and pad back with ps-[var(--gs)] pe-[var(--gx)]
    --fade          how far each bar's gradient runs past the bar, over the content
    --content-t/b   where page content starts / ends at rest: past the bar AND its fade, so the gradient never lies on content until it scrolls (b = 0 without a bottom bar)
    Bars: .topbar paints --bar-top behind itself; .float-nav is a floating blurred pill: one gradient from solid (under the safe area) to transparent at the end of --fade.
@@ -171,6 +174,12 @@ html, body, #root { height: 100%; background: var(--background, #0e0f11); oversc
 :root { --safe-t: env(safe-area-inset-top, 0px); --safe-r: env(safe-area-inset-right, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); --fade: 1rem; }
 html { --gx: max(2.5rem, var(--safe-l), var(--safe-r)); --bar-h: 4.25rem; --nav-h: 0px; }
 html[data-mode=tv] { --gx: 3.5rem; --bar-h: 5.25rem; }
+html { --rail-w: 4.5rem; --rail-open: 15rem; --gs: var(--gx); }
+/* a Shell with the side rail has no top bar (desktop/tablet/TV): content starts a small breathing gap below the screen top. --hdr / --content-t are
+   re-declared here because a custom property computes var() where it is declared (html), so overriding --bar-h alone would not move them. */
+.has-rail { --gs: calc(var(--gx) + var(--rail-w)); --bar-h: 1.25rem; --fade: 0px; --hdr: calc(var(--safe-t) + var(--bar-h)); --content-t: calc(var(--hdr) + var(--fade)); }
+html[data-mode=tv] .has-rail { --bar-h: 1.75rem; }
+html[data-mode=mobile] { --rail-w: 0px; }
 html[data-mode=mobile] { --gx: max(1rem, var(--safe-l), var(--safe-r)); --bar-h: 3.5rem; --pill-h: 4rem; --nav-h: calc(var(--pill-h) + .75rem + var(--safe-b)); } /* floating pill + its .75rem gap above the gesture bar */
 @media (max-height: 500px) { html[data-mode=mobile] { --pill-h: 2.75rem; } } /* landscape phone: one-line tabs */
 html { --hdr: calc(var(--safe-t) + var(--bar-h)); --content-t: calc(var(--hdr) + var(--fade)); --content-b: 0px; }
@@ -236,8 +245,10 @@ html[data-mode=mobile] ::-webkit-scrollbar { display: none; }
   overflow-x: auto;
   scrollbar-width: none;
   padding: .75rem var(--gx) 2rem; /* bottom room for the focus shadow, cancelled by the negative margin below */
+  padding-inline-start: var(--gs);
   margin: -.25rem calc(var(--gx) * -1) -.75rem;
-  scroll-padding-inline: var(--gx);
+  margin-inline-start: calc(var(--gs) * -1);
+  scroll-padding-inline: var(--gs) var(--gx);
 }
 .rail::-webkit-scrollbar { display: none; }
 html[data-mode=tv] .rail { gap: 1.25rem; }
@@ -331,18 +342,49 @@ html[dir=rtl] .rtl-flip { transform: scaleX(-1); } /* directional icons (chevron
    .m-fill = the same on phones only (stand-alone button groups, Segmented: they cannot tell a wrapped line from the first one). */
 .fill-wrap > :not([data-round], svg), html[data-mode=mobile] .m-fill > :not([data-round], svg) { flex: 1 1 auto; } /* round icon buttons and icons keep their size */
 
+/* LeenMark intro (<LeenMark animate>): the monoline is written right to left (dash offset on a pathLength=1 stroke, one small SVG, played once),
+   then the three dots drop in with a spring. `backwards` fill = the resting artwork once it ends, so motion=off (which kills animations) shows the mark. */
+.lm-anim .lm-line { stroke-dasharray: 1 1; animation: lm-write 1100ms cubic-bezier(.6, 0, .3, 1) 120ms backwards; }
+.lm-anim .lm-dot { transform-box: fill-box; transform-origin: 50% 50%; animation: lm-dot 520ms cubic-bezier(.34, 1.7, .64, 1) backwards; }
+.lm-anim .lm-dot:nth-of-type(1) { animation-delay: 1050ms; }
+.lm-anim .lm-dot:nth-of-type(2) { animation-delay: 1180ms; }
+.lm-anim .lm-dot:nth-of-type(3) { animation-delay: 1280ms; }
+@keyframes lm-write { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes lm-dot { from { opacity: 0; transform: translateY(-9px) scale(.3); } }
+html[data-motion=reduced] .lm-anim .lm-line { animation: m-fade-k 250ms ease-out backwards; }
+html[data-motion=reduced] .lm-anim .lm-dot { animation: m-fade-k 250ms ease-out 150ms backwards; }
+
 /* "Leen" wordmark: Kaushan Script handwriting (always Latin, so no Arabic fallback needed); one weight only, so no synthetic bold */
 .wordmark { font-family: "Kaushan Script", "Segoe Script", cursive; font-weight: 400; font-synthesis: none; letter-spacing: 0; }
 
-/* Categories as a start-side sidebar (Settings > Display > Categories). Not on mobile or in layouts that already have a side menu.
-   Lined up with the top bar: the pills start on the --gx gutter (the logo's edge) and at the content top (--hdr); the offsets cancel the rail's .5rem/.25rem padding. */
-html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side { position: fixed; inset-inline-start: calc(var(--gx) - .5rem); top: calc(var(--content-t) - .25rem); bottom: max(.75rem, var(--safe-b)); width: max-content; min-width: 10rem; max-width: 20rem; z-index: 5; overflow-x: hidden; overflow-y: auto; }
-html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side > .rail { flex-direction: column; overflow: visible; gap: .35rem !important; margin: 0 !important; padding: .25rem .5rem !important; }
-html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button { width: 100%; justify-content: flex-start; border-radius: 1rem; text-align: start; }
-.cat-count { display: none; }
+/* Categories as a second side rail (Settings > Display > Categories = Sidebar; useCatSide in components/tv/ui.tsx). Not on mobile. Built like the main rail
+   ("Side navigation rail" in layouts/googletv/layout.css): a column of round items right after it (or at the start edge in layouts without one, --rail-w 0),
+   collapsed to icons / initials (--cat-rail), open over the page with names + counts ([data-open], --cat-open). The page keeps clear of the collapsed strip
+   only, so opening never reflows the grid. webOS rule: only opacity moves (the width snaps). */
+html { --cat-rail: 4rem; --cat-open: 17rem; }
+html[data-mode=tv] { --cat-rail: 4.25rem; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side { position: fixed; z-index: 30; inset-block: 0; inset-inline-start: var(--rail-w); width: var(--cat-rail); display: flex; flex-direction: column; padding: calc(var(--content-t) + .25rem) .5rem max(.75rem, var(--safe-b)); overflow-x: hidden; overflow-y: auto; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side::before { content: ""; position: fixed; z-index: -1; inset-block: 0; inset-inline-start: var(--rail-w); width: calc(var(--cat-open) * 1.6); pointer-events: none; opacity: 0; background: linear-gradient(to right, var(--background) 0, var(--background) 55%, var(--fade-mid) 78%, var(--fade-to)); transition: opacity var(--dur) var(--ease); }
+html[dir=rtl][data-catnav=sidebar]:not([data-mode=mobile]) .cat-side::before { background: linear-gradient(to left, var(--background) 0, var(--background) 55%, var(--fade-mid) 78%, var(--fade-to)); }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side[data-open] { z-index: 34; width: var(--cat-open); }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side[data-open]::before { opacity: 1; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side > .rail { flex-direction: column; flex: none; overflow: visible; gap: .375rem !important; margin: auto 0 !important; /* centred while it fits; scrolls from the top when it does not (justify-content would clip the first items) */ padding: .25rem 0 !important; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button { width: 100%; min-height: 3rem; justify-content: flex-start; gap: 1rem; padding-inline: .75rem; border-radius: 9999px; text-align: start; white-space: nowrap; overflow: hidden; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button:not([aria-pressed=true]) { background: transparent; color: var(--muted-foreground); }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button[aria-pressed=true] { color: var(--foreground); font-weight: 600; }
+@media (hover: hover) { html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button:hover:not([aria-pressed=true]) { background: var(--fg-10); color: var(--foreground); } }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button > svg { flex: none; width: 1.5rem; height: 1.25rem; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side bdi, html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side .cat-count { min-width: 0; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity var(--dur) var(--ease); }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side[data-open] :is(bdi, .cat-count) { opacity: 1; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side:not([data-open]) .cat-lock { display: none; } /* collapsed: one glyph per item */
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side .cat-hint { display: none; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side[data-open] .cat-hint { display: block; padding: .5rem .75rem 0; white-space: normal; }
+.cat-count, .cat-ini { display: none; }
 html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side .cat-count { display: inline; }
-html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button bdi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* names past the 20rem cap end in ... */
-html[data-catnav=sidebar]:not([data-mode=mobile]) [data-page-content][data-cats] { padding-inline-start: calc(var(--cat-w, 14rem) + var(--gx) + 1rem) !important; } /* --cat-w = measured sidebar width (useCatSide); 2rem gap after the pills */
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side .cat-ini { display: grid; flex: none; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: .5rem; background: var(--fg-10); font-size: .75rem; font-weight: 700; line-height: 1; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) .cat-side button[aria-pressed=true] .cat-ini { background: var(--accent-blue); color: #fff; }
+html[data-mode=tv][data-catnav=sidebar] .cat-side button:is(:focus, [data-focused="true"]) .cat-ini { background: transparent; }
+html[data-catnav=sidebar]:not([data-mode=mobile]) [data-page-content][data-cats] { padding-inline-start: calc(var(--rail-w) + var(--cat-rail) + var(--gx)) !important; --gs: calc(var(--rail-w) + var(--cat-rail) + var(--gx)); }
 
 /* Poster size + card details (Settings > Display). Rails zoom their tiles; grids change column width instead (VGrid). */
 .rail > [data-poster] { zoom: var(--card-k, 1); }

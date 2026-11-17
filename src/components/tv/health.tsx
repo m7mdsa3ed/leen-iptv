@@ -1,6 +1,7 @@
+import { createPortal } from "react-dom"
 import { useState } from "react"
-import { RefreshCw, Settings, X } from "lucide-react"
-import { Pill } from "@/components/gtv"
+import { RefreshCw, Server, Settings, X } from "lucide-react"
+import { Pill, RailItem } from "@/components/gtv"
 import { SourceMark, hasMark } from "@/components/source/SourceMark"
 import { useCatalog, type SrcState } from "@/lib/catalog"
 import { useMode } from "@/lib/device"
@@ -25,7 +26,7 @@ const refreshAll = () => { const { sources, settings } = useApp.getState(); void
 
 /** Top-bar source health (beside the bell): up to 3 source avatars stacked (connected first, failed dimmed), "connected/total", and a dot:
  *  green = every enabled source loaded, amber = loading or loaded with a problem, red = one failed. Pressing it lists them with Refresh. */
-export function HealthButton() {
+export function HealthButton({ rail }: { rail?: boolean } = {}) {
   const t = useT()
   const sources = useApp((s) => s.sources)
   const stat = useCatalog((s) => s.sources)
@@ -39,6 +40,13 @@ export function HealthButton() {
   const up = on.filter((s) => stat[s.id]?.status === "ready").length
   const stack = [...on].sort((a, b) => RANK[stat[a.id]?.status ?? "idle"] - RANK[stat[b.id]?.status ?? "idle"]).slice(0, 3) // stable: priority order within a state
   const label = [t("gtv.health.connected", { n: fmt.number(up), total: fmt.number(on.length) }), bad ? fmt.plural("gtv.health.down", bad) : ""].filter(Boolean).join(" · ")
+  const dot = <span aria-hidden className={cn("gtv-rail-dot", bad ? "bg-destructive" : warn ? "bg-amber-500" : "bg-emerald-500")} />
+  if (rail) return (
+    <>
+      <RailItem label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} badge={dot} className="gtv-rail-src"><Server /></RailItem>
+      {open && (rail ? createPortal(<Panel close={() => setOpen(false)} />, document.body) : <Panel close={() => setOpen(false)} />)}
+    </>
+  )
   return (
     <>
       <button data-nav data-pill aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}
@@ -49,7 +57,7 @@ export function HealthButton() {
         <span>{up === on.length ? fmt.number(up) : `${fmt.number(up)}/${fmt.number(on.length)}`}</span>
         <span aria-hidden className={cn("size-2 rounded-full", bad ? "bg-destructive" : warn ? "bg-amber-500" : "bg-emerald-500")} />
       </button>
-      {open && <Panel close={() => setOpen(false)} />}
+      {open && (rail ? createPortal(<Panel close={() => setOpen(false)} />, document.body) : <Panel close={() => setOpen(false)} />)}
     </>
   )
 }
@@ -63,8 +71,8 @@ function Panel({ close }: { close: () => void }) {
   const busy = on.some((s) => stat[s.id]?.status === "loading")
   return (
     <div data-modal role="dialog" aria-modal="true" aria-label={t("gtv.health.title")} onClick={(e) => e.target === e.currentTarget && close()}
-      className={cn("fixed inset-0 z-50 flex m-fade", mobile ? "items-end bg-black/50" : "items-start justify-end bg-black/30 pe-[var(--gx)] pt-[calc(var(--hdr)+.25rem)]")}>
-      <div className={cn("flex flex-col overflow-hidden bg-surface text-foreground shadow-2xl", mobile ? "m-rise max-h-[80vh] w-full rounded-t-[28px] border-t border-[var(--fg-10)] pb-[var(--safe-b)]" : "m-pop max-h-[min(36rem,calc(100vh-var(--hdr)-2rem))] w-[26rem] rounded-[28px]")}>
+      className={cn("fixed inset-0 z-50 flex m-fade", mobile ? "items-end bg-black/50" : "items-end bg-black/30 pb-[max(1rem,var(--safe-b))] ps-[calc(var(--rail-w)+.75rem)]")}>
+      <div className={cn("flex flex-col overflow-hidden bg-surface text-foreground shadow-2xl", mobile ? "m-rise max-h-[80vh] w-full rounded-t-[28px] border-t border-[var(--fg-10)] pb-[var(--safe-b)]" : "m-pop max-h-[min(36rem,calc(100vh-2rem))] w-[26rem] rounded-[28px]")}>
         <div data-nav-group className="flex items-center gap-2 px-5 pb-2 pt-4">
           <h2 className="min-w-0 flex-1 truncate text-lg font-medium">{t("gtv.health.title")}</h2>
           <button data-nav data-pill aria-label={t("gtv.health.refreshAll")} title={t("gtv.health.refreshAll")} disabled={busy} onClick={refreshAll} className="grid size-10 place-items-center rounded-full text-muted-foreground disabled:opacity-50"><RefreshCw className={cn("size-5", busy && "animate-spin")} /></button>

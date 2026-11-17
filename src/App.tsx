@@ -10,13 +10,11 @@ import { useLanguageAttr, useT } from "@/lib/i18n"
 import { TrailerModal, closeTrailer, useTrailer } from "@/components/TrailerModal"
 import { RecoveryGate } from "@/settings/AccountSync"
 import { Toasts } from "@/components/tv/toast"
-import { WarmUp } from "@/components/tv/warmup"
 import { ScreenSaver } from "@/components/tv/screensaver"
 import { startReminders } from "@/lib/sports/reminders"
 import { startEpisodeWatch } from "@/lib/new-episodes"
 import { CardMenu, closeCardMenu, useCardMenu } from "@/components/tv/card-menu"
 import { ListModal } from "@/components/tv/list-modal"
-import { FilterPanel, closeFilterPanel, useFilterPanel } from "@/components/tv/filter-panel"
 import { MatchModal } from "@/components/tv/match-modal"
 import { useBackfillMatches } from "@/lib/meta"
 import { closeLogoMatch, closeMatch, useLogoMatch, useMatch } from "@/components/tv/match"
@@ -108,7 +106,7 @@ const TAB_ROOT = new Set(["home", "live", "sports", "movies", "series"])
 const endAnim = (e: React.AnimationEvent<HTMLElement>) => {
   if (e.target === e.currentTarget || (e.target as HTMLElement).hasAttribute("data-page-content")) e.currentTarget.classList.remove("m-rise", "page-enter")
 }
-function TabViews({ stack, top, warming }: { stack: { name: string; p?: Record<string, unknown> }[]; top: number; warming: boolean }) {
+function TabViews({ stack, top }: { stack: { name: string; p?: Record<string, unknown> }[]; top: number }) {
   const root = stack[0]
   const [kept, setKept] = useState<string[]>(["home"]) // last opened first; home goes when it falls out, so a refresh is cheap
   useEffect(() => {
@@ -125,7 +123,7 @@ function TabViews({ stack, top, warming }: { stack: { name: string; p?: Record<s
       {names.map((n) => (
         <div key={`tab:${n}`} className="page-enter absolute inset-0" style={{ display: n === shownHere ? "block" : "none" }} onAnimationEnd={endAnim}>
           <Suspense fallback={null}>
-            <Gate frozen={warming || (n !== shownHere && !live(n))}>{n === "home" ? <Home /> : <Page r={{ name: n }} />}</Gate>
+            <Gate frozen={n !== shownHere && !live(n)}>{n === "home" ? <Home /> : <Page r={{ name: n }} />}</Gate>
           </Suspense>
         </div>
       ))}
@@ -146,7 +144,6 @@ export default function App() {
   const sources = useApp((s) => s.sources)
   const last = useRef(new Map<number, HTMLElement>())
   const top = stack.length - 1
-  const warming = useCatalog((s) => s.warm !== "off") // first load of the session: pages wait behind the warm-up screen (frozen, so nothing renders a half catalog)
   useMode() // keeps html[data-mode] in sync on resize
   useTheme()
   useMotion()
@@ -164,7 +161,6 @@ export default function App() {
       if (ask) return ask.resolve(false), usePinAsk.setState({ ask: null })
       if (useCardMenu.getState().cur) return closeCardMenu()
       if (useListModal.getState().cur) return closeListModal()
-      if (useFilterPanel.getState().kind) return closeFilterPanel()
       if (useMatch.getState().item) return closeMatch()
       if (useLogoMatch.getState().item) return closeLogoMatch()
       if (useTrailer.getState().cur) return closeTrailer()
@@ -206,23 +202,21 @@ export default function App() {
       if (el?.isConnected && el.getClientRects().length) el.focus()
       else focusFirstSoon()
     })
-  }, [top, stack[top]?.name, warming])
+  }, [top, stack[top]?.name])
 
   // stacked pages stay mounted (scroll + focus preserved), only the top is visible; the stack's root is a cached tab view instead
   return (
     <>
-      <TabViews stack={stack} top={top} warming={warming} />
+      <TabViews stack={stack} top={top} />
       {stack.map((r, i) => i === 0 ? null : (
         <div key={`${i}:${r.name}`} className={`${SHELL_PAGES.has(r.name) ? "page-enter" : "m-rise"} absolute inset-0`} style={{ display: i === top ? "block" : "none" }} onAnimationEnd={endAnim}>
-          <Suspense fallback={null}><Gate frozen={i !== top || warming}><Boundary><Page r={r} /></Boundary></Gate></Suspense>
+          <Suspense fallback={null}><Gate frozen={i !== top}><Boundary><Page r={r} /></Boundary></Gate></Suspense>
         </div>
       ))}
-      {warming && <WarmUp />}
       <PlayerHost />
       <PinModal />
       <CardMenu />
       <ListModal />
-      <FilterPanel />
       <MatchModal />
       <LogoModal />
       <ExitConfirm />

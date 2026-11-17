@@ -26,8 +26,6 @@ interface C {
   /** overall: loading until the first source is ready (then ready, keeps merging); error only when every source failed; idle = no sources */
   status: "idle" | "loading" | "ready" | "error"
   msg: string
-  /** launch warm-up: "load" = sources load without merging (the app waits behind the warm-up screen), "merge" = the one merge, "off" = app shown */
-  warm: "off" | "load" | "merge"
   items: Item[] // live (all) + primary movies/series
   byId: Map<string, Item> // EVERY item, alts included
   primaryOf: Map<string, Item> // alt id -> primary
@@ -138,7 +136,7 @@ function scheduleMerge(full: boolean, keys: Iterable<string> | "all" = []) {
   else { pendingKeys ??= new Set(); for (const k of keys) pendingKeys.add(k) }
   if (mergeTimer !== undefined) return
   const fire = () => {
-    const wait = warming ? 500 : busyFor() // the warm-up ends with its own merge
+    const wait = busyFor()
     if (wait > 0) { mergeTimer = window.setTimeout(fire, wait); return }
     mergeTimer = undefined
     const f = pendingFull, k = pendingKeys
@@ -264,24 +262,8 @@ function unreachable(id: string, e: unknown) {
   const { sourceFilter, setSourceFilter } = useApp.getState()
   if (sourceFilter.includes(id)) setSourceFilter(sourceFilter.filter((x) => x !== id)) // a stale pick must not leave the grid empty
   patch(id, { status: "error", msg: explain(e, useApp.getState().sources.find((s) => s.id === id)?.name) })
-  if (raw.delete(id) && !warming) remerge()
+  if (raw.delete(id)) remerge()
 }
-
-/**
- * Launch warm-up: the first load of a session collects every source's parts WITHOUT merging (each merge of a big catalog costs seconds on a TV,
- * and a staged load would merge once per part), then merges once, time-sliced, while the warm-up screen shows the progress. Only then is the app rendered.
- * "Continue now" (skipWarm) ends it early: what has arrived is merged and the rest keeps loading the normal staged way.
- */
-let warming = false
-let warmed = false
-async function finishWarm() {
-  if (!warming) return
-  warming = false
-  pendingFull = false; pendingKeys = undefined // this merge covers whatever was queued meanwhile (refreshed parts, posters)
-  useCatalog.setState({ warm: "merge" })
-  try { if (raw.size) await remergeAsync() } finally { useCatalog.setState({ warm: "off" }) }
-}
-export const skipWarm = () => void finishWarm()
 
 // caches written by the one-piece format: replacing a few hundred KB key with the parts, once per session
 const legacy = new Set<string>()
@@ -302,7 +284,6 @@ async function loadOne(s0: Source, proxy: string, force?: boolean) {
     if (!add.length) return void patch(s0.id, { done })
     got = got.concat(add) // a new array: raw lists are never mutated (and push(...add) overflows the stack past ~100k items)
     raw.set(s0.id, got)
-    if (warming) return void patch(s0.id, { status: "ready", msg: "", count: got.length, done }) // merged once when the warm-up ends
     const st = useCatalog.getState()
     // the first data of the launch merges in the same tick as its status (no empty frame); the parts after it are coalesced
     if (!st.items.length && !st.byKind.live.length) remerge()
@@ -387,7 +368,6 @@ export const useCatalog = create<C>(() => ({
   sources: {},
   status: "idle",
   msg: "",
-  warm: "off",
   items: [],
   byId: new Map(),
   primaryOf: new Map(),
@@ -413,15 +393,11 @@ export const useCatalog = create<C>(() => ({
     if (sigOf() !== mergedSig) remerge() // only when a source was removed/reordered/toggled
     // channel logos: start the bundled index now, so it is usually ready for the first merge instead of costing a second one
     if (on.some((s) => s.type !== "plex")) void startLogos()
-    // the first load of the session runs behind the warm-up screen and merges once at the end
-    const lead = !warmed && !force && on.some((s) => !raw.has(s.id)) // only the call that starts the warm-up ends it
-    if (lead) { warmed = warming = true; useCatalog.setState({ warm: "load" }) }
     await pool(on, isTv ? 1 : 2, (s) => {
       if (!force && raw.has(s.id)) { if (s.type === "plex" || s.type === "jellyfin") pullHistory(s, proxy); return }
       if (!force && useCatalog.getState().sources[s.id]?.status === "loading") return
       return loadOne(s, proxy, force)
     })
-    if (lead) await finishWarm()
   },
 }))
 

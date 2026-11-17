@@ -16,7 +16,7 @@ declare global {
   interface Window { __leenBoot?: { state?: { settings?: { motion?: string } } } | null }
 }
 
-// Animated boot splash (markup + CSS live in index.html). Cold start plays the intro for ~2.6s (0.9s with reduced motion, the TV default); a refresh in the same session skips it.
+// Animated boot splash (markup + CSS live in index.html). Cold start plays the intro for ~2.6s (1.7s with reduced motion, the TV default: the mark and the wordmark have landed by then); a refresh in the same session skips it.
 const splash = document.getElementById('splash')
 const t0 = performance.now()
 let motion: string | undefined
@@ -30,7 +30,7 @@ const reduced = motion === 'reduced' || matchMedia('(prefers-reduced-motion: red
 const seen = sessionStorage.getItem('leen-splash') === '1'
 if (motionOff) splash?.classList.add('static')
 sessionStorage.setItem('leen-splash', '1')
-const hold = seen ? 0 : motionOff ? 400 : reduced ? 900 : 2600
+const hold = seen ? 0 : motionOff ? 400 : reduced ? 1700 : 2600
 
 // know whether a same-origin /p proxy exists before the first fetch
 void probeProxy().finally(() => {

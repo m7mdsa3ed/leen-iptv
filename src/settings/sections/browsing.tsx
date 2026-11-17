@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { Pill, Row, SectionCard, Segmented, ToggleRow } from "../controls"
 import { HOME_ROWS } from "@/layouts/home-data"
-import { CARD_SIZES } from "@/lib/cards"
+import { GRID_SIZES } from "@/lib/cards"
 import { useT } from "@/lib/i18n"
 import { useApp } from "@/lib/store"
 
@@ -42,7 +42,7 @@ export default function BrowsingSection() {
           <Segmented label={t("settings.cardSize")} value={settings.cardSize ?? "normal"} options={[{ value: "small", label: t("settings.cardSize.small") }, { value: "normal", label: t("settings.cardSize.normal") }, { value: "large", label: t("settings.cardSize.large") }, { value: "xl", label: t("settings.cardSize.xl") }]} onChange={(v) => setSettings({ cardSize: v })} />
         </Row>
         <Row label={t("settings.gridSize")} description={t("settings.gridSize.desc")} stack>
-          <Segmented label={t("settings.gridSize")} value={settings.gridSize ?? settings.cardSize ?? "normal"} options={CARD_SIZES.map((v) => ({ value: v, label: t(`settings.cardSize.${v}`) }))} onChange={(v) => setSettings({ gridSize: v })} />
+          <Segmented label={t("settings.gridSize")} value={settings.gridSize ?? settings.cardSize ?? "normal"} options={GRID_SIZES.map((v) => ({ value: v, label: t(`settings.cardSize.${v}`) }))} onChange={(v) => setSettings({ gridSize: v })} />
         </Row>
         <Row label={t("settings.cardInfo")} description={t("settings.cardInfo.desc")} stack>
           <Segmented label={t("settings.cardInfo")} value={settings.cardInfo ?? "show"} options={[{ value: "show", label: t("settings.cardInfo.show") }, { value: "hide", label: t("settings.cardInfo.hide") }]} onChange={(v) => setSettings({ cardInfo: v })} />

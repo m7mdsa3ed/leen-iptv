@@ -1,6 +1,7 @@
+import { createPortal } from "react-dom"
 import { useState } from "react"
 import { Bell, CalendarDays, Check, Settings, Trash2, Trophy, Tv, X } from "lucide-react"
-import { Pill } from "@/components/gtv"
+import { Pill, RailItem } from "@/components/gtv"
 import { useMode } from "@/lib/device"
 import { fmt, useT } from "@/lib/i18n"
 import { clearInbox, markRead, openNote, useInbox } from "@/lib/notify"
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils"
 const ICON = { kickoff: Trophy, live: Trophy, final: Trophy, digest: CalendarDays, episode: Tv }
 
 /** Top-bar bell (beside the metadata chip): unread count; pressing it lists the notifications fired on this device. Hidden while the inbox is empty. */
-export function InboxButton() {
+export function InboxButton({ rail }: { rail?: boolean } = {}) {
   const list = useInbox((s) => s.list)
   const [open, setOpen] = useState(false)
   const tv = useMode() === "tv"
@@ -22,13 +23,16 @@ export function InboxButton() {
   const label = fmt.plural("gtv.inbox.unread", unread)
   return (
     <>
-      {list.length > 0 && (
+      {list.length > 0 && rail && (
+        <RailItem label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} badge={unread > 0 && fmt.number(unread)}><Bell /></RailItem>
+      )}
+      {list.length > 0 && !rail && (
         <button data-nav data-pill aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}
           className={cn("flex shrink-0 items-center gap-1.5 rounded-full font-medium tabular-nums", unread ? "bg-accent-blue-container text-foreground" : "bg-surface-2 text-muted-foreground", tv ? "min-h-11 px-4 text-base" : "min-h-8 px-2.5 text-xs")}>
           <Bell className={tv ? "size-4" : "size-3.5"} />{unread > 0 && fmt.number(unread)}
         </button>
       )}
-      {open && <Panel close={() => setOpen(false)} />}
+      {open && (rail ? createPortal(<Panel close={() => setOpen(false)} />, document.body) : <Panel close={() => setOpen(false)} />)}
     </>
   )
 }
@@ -40,8 +44,8 @@ function Panel({ close }: { close: () => void }) {
   const pick = (n: Note) => { markRead(n.key); close(); openNote(n.route) }
   return (
     <div data-modal role="dialog" aria-modal="true" aria-label={t("gtv.inbox.title")} onClick={(e) => e.target === e.currentTarget && close()}
-      className={cn("fixed inset-0 z-50 flex m-fade", mobile ? "items-end bg-black/50" : "items-start justify-end bg-black/30 pe-[var(--gx)] pt-[calc(var(--hdr)+.25rem)]")}>
-      <div className={cn("flex flex-col overflow-hidden bg-surface text-foreground shadow-2xl", mobile ? "m-rise max-h-[80vh] w-full rounded-t-[28px] border-t border-[var(--fg-10)] pb-[var(--safe-b)]" : "m-pop max-h-[min(36rem,calc(100vh-var(--hdr)-2rem))] w-[26rem] rounded-[28px]")}>
+      className={cn("fixed inset-0 z-50 flex m-fade", mobile ? "items-end bg-black/50" : "items-end bg-black/30 pb-[max(1rem,var(--safe-b))] ps-[calc(var(--rail-w)+.75rem)]")}>
+      <div className={cn("flex flex-col overflow-hidden bg-surface text-foreground shadow-2xl", mobile ? "m-rise max-h-[80vh] w-full rounded-t-[28px] border-t border-[var(--fg-10)] pb-[var(--safe-b)]" : "m-pop max-h-[min(36rem,calc(100vh-2rem))] w-[26rem] rounded-[28px]")}>
         <div data-nav-group className="flex items-center gap-2 px-5 pb-2 pt-4">
           <h2 className="min-w-0 flex-1 truncate text-lg font-medium">{t("gtv.inbox.title")}</h2>
           <button data-nav data-pill aria-label={t("gtv.inbox.readAll")} title={t("gtv.inbox.readAll")} onClick={() => markRead()} className="grid size-10 place-items-center rounded-full text-muted-foreground"><Check className="size-5" /></button>

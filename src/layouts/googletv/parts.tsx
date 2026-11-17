@@ -9,9 +9,9 @@ import type { Item } from "@/lib/types"
 export function GRail({ title, children, onSeeAll }: { title?: ReactNode; children: ReactNode; onSeeAll?: () => void }) {
   const staged = useStaged(children) // TV: first cards now, the rest a moment later (same as the shared Rail)
   return (
-  <section className="-mx-[var(--gx)] mb-3">
+  <section className="-ms-[var(--gs)] -me-[var(--gx)] mb-3">
     {title && (
-      <div className="px-[var(--gx)]">
+      <div className="ps-[var(--gs)] pe-[var(--gx)]">
         {onSeeAll ? (
           <button data-nav data-pill onClick={onSeeAll} className="-ms-3 inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-[1.4rem] font-normal text-foreground">{title}<ChevronRight className="rtl-flip size-5 text-muted-foreground" /></button>
         ) : <h2 className="text-[1.4rem] font-normal text-foreground">{title}</h2>}
