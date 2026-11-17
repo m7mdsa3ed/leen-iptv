@@ -1,7 +1,7 @@
 import { t } from "./i18n"
 import { useApp } from "./store"
 import { logError } from "./errlog"
-import { describeError } from "./errlog-pure"
+import { describeError, errorFacts } from "./errlog-pure"
 // ponytail: optional CORS proxy (server/proxy.mjs); packaged webOS apps usually don't need it, hosted/web ones do.
 // Proxy formats: "https://host/path?url={url}" (template, URL-encoded), "https://proxy.corsfix.com/?" (ends in ? or =, raw URL appended),
 // or a bare base like "http://lan:8787" (our server/proxy.mjs, /p?url=).
@@ -40,15 +40,28 @@ export const px = (url: string, proxy: string) => {
   return `${p.replace(/\/+$/, "")}/p?url=${encodeURIComponent(url)}`
 }
 
+/** A non-2xx answer. `url`, `method` and the start of the response `body` go to the error log's detail page (redacted). */
 export class HttpError extends Error {
   status: number
   url?: string
-  constructor(status: number, url?: string) {
+  method?: string
+  body?: string
+  constructor(status: number, url?: string, method?: string, body?: string) {
     super(`HTTP ${status}`)
     this.name = "HttpError"
     this.status = status
     this.url = url
+    this.method = method
+    this.body = body
   }
+}
+
+/** "GET host/path" of a request for the error log: the target of a /p?url= proxy URL, no query string (ids and tokens live there). */
+export function reqCtx(method: string, url: string): string {
+  let u = url
+  const m = /\/p\?url=([^&]+)/.exec(url)
+  if (m) try { u = decodeURIComponent(m[1]) } catch { /* keep the proxy URL */ }
+  try { const x = new URL(u, location.href); return `${method} ${x.host}${x.pathname}` } catch { return `${method} ${u.split("?")[0]}` }
 }
 
 export const statusMsg = (s: number) =>
@@ -67,19 +80,28 @@ export function explain(e: unknown, ctx?: string): string {
     : e instanceof DOMException && e.name === "AbortError" ? t("errors.timeout")
     : e instanceof TypeError ? corsHint()
     : e instanceof Error ? e.message : String(e)
-  const d = describeError(e)
-  logError(msg, { kind: net ? "network" : "error", ctx, detail: [d.msg !== msg ? d.msg : "", e instanceof HttpError ? e.url : "", d.detail].filter(Boolean).join("\n") || undefined })
+  // the row reads as what the viewer saw; the raw error (status, URL, body, stack) rides along as facts
+  const raw = describeError(e)
+  logError(msg, { kind: net ? "network" : undefined, ctx, detail: raw.detail, data: { ...errorFacts(e), error: raw.msg !== msg ? raw.msg : undefined } })
   return msg
 }
 
-// AbortSignal.timeout is Chrome 103; webOS 23 is Chromium 94.
-export async function fetchT(url: string, ms = 60000, init?: RequestInit): Promise<Response> {
+const bodyOf = async (r: Response) => { try { return (await r.text()).slice(0, 1500) } catch { return undefined } }
+
+/** fetch with a timeout (AbortSignal.timeout is Chrome 103; webOS 23 is Chromium 94). Throws HttpError on a non-2xx answer.
+ *  Every failure is logged as a warning (method, URL, status, start of the body) unless `o.probe`: discovery calls that are expected to miss (LAN scan, address detection). */
+export async function fetchT(url: string, ms = 60000, init?: RequestInit, o?: { probe?: boolean }): Promise<Response> {
   const c = new AbortController()
   const t = setTimeout(() => c.abort(), ms)
+  const method = (init?.method ?? "GET").toUpperCase()
   try {
     const r = await fetch(url, { ...init, signal: c.signal })
-    if (!r.ok) throw new HttpError(r.status, url)
+    if (!r.ok) throw new HttpError(r.status, url, method, await bodyOf(r))
     return r
+  } catch (e) {
+    if (e instanceof Error && !(e instanceof HttpError)) Object.assign(e, { url, method }, e.name === "AbortError" ? { timeout: `${ms} ms` } : {}) // a timeout / CORS failure says which request
+    if (!o?.probe) logError(e, { level: "warn", kind: "network", ctx: reqCtx(method, url), data: e instanceof Error && e.name === "AbortError" ? { timeout: `${ms} ms` } : undefined })
+    throw e
   } finally {
     clearTimeout(t)
   }
@@ -117,14 +139,14 @@ export const pxStream = (url: string, s: { proxy: string; proxyStreams: boolean 
   s.proxy.trim() && !s.proxyStreams ? url : px(url, s.proxy)
 
 /** Plex-style fetch: direct first (CORS-simple GETs), through the proxy when mixed content or a network/CORS TypeError. */
-export async function plexFetch(url: string, proxy: string, init?: RequestInit, ms = 30000): Promise<Response> {
-  if (mixed(url)) return fetchT(px(url, proxy), ms, init)
+export async function plexFetch(url: string, proxy: string, init?: RequestInit, ms = 30000, o?: { probe?: boolean }): Promise<Response> {
+  if (mixed(url)) return fetchT(px(url, proxy), ms, init, o)
   try {
-    return await fetchT(url, ms, init)
+    return await fetchT(url, ms, init, o)
   } catch (e) {
     const p = px(url, proxy)
     if (!(e instanceof TypeError) || p === url) throw e
-    return fetchT(p, ms, init)
+    return fetchT(p, ms, init, o)
   }
 }
 

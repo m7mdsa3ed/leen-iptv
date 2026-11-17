@@ -5,7 +5,7 @@ import { useCatalog } from "@/lib/catalog"
 import { useApp } from "@/lib/store"
 import { connInfo } from "@/lib/xtream"
 import { corsHint, statusMsg } from "@/lib/net"
-import { logError } from "@/lib/errlog"
+import { logError, logQuiet } from "@/lib/errlog"
 import { rate } from "@/lib/quality"
 import { t as tn } from "@/lib/i18n"
 import type { Item, Source } from "@/lib/types"
@@ -19,7 +19,7 @@ const LOAD = { hls: loadHls, mpegts: loadMpegts }
 
 /* hls.js plays most streams: fetch it while the app is idle once the catalog is on screen, so the first play does not wait for it */
 if (typeof window !== "undefined") {
-  const warm = () => window.setTimeout(() => void loadHls().catch(() => {}), 4000) // a failure is retried by the first play that needs it
+  const warm = () => window.setTimeout(() => void loadHls().catch(logQuiet("Preload hls.js", "network")), 4000) // a failure is retried by the first play that needs it
   if (useCatalog.getState().status === "ready") warm()
   else { const off = useCatalog.subscribe((c) => { if (c.status === "ready") { off(); warm() } }) }
 }
@@ -58,8 +58,13 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
   useEffect(() => { setAudio([]); setSubs([]) }, [item.id])
   useEffect(() => { auto.current = 0 }, [url, live])
   const need = engineToLoad({ raw, live, viaHls: viaHls === url }, { hls: eng.Hls?.isSupported(), mpegts: eng.mpegts?.isSupported() })
-  useEffect(() => { if (need) void LOAD[need]().then(() => setEng(loadedEngines()), () => setErr(tn("errors.stream.unavailable"))) }, [need, retryN]) // Retry also re-tries a script that failed to load
-  useEffect(() => { if (err) { meas.current.errTotal++; logError(err, { kind: "playback", ctx: item.name, detail: raw }) } }, [err]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (need) void LOAD[need]().then(() => setEng(loadedEngines()), (e: unknown) => { logError(e, { kind: "network", ctx: `Load ${need}` }); setErr(tn("errors.stream.unavailable")) }) }, [need, retryN]) // Retry also re-tries a script that failed to load
+  useEffect(() => {
+    if (!err) return
+    meas.current.errTotal++
+    const v = vref.current
+    logError(err, { kind: "playback", ctx: item.name, data: { item: item.id, kind: item.kind, live, engine: engineName(), url: raw, played: url !== raw ? url : undefined, mediaError: v?.error ? `${v.error.code} ${v.error.message || ""}`.trim() : undefined, retries: auto.current, position: v && isFinite(v.currentTime) ? Math.round(v.currentTime) + " s" : undefined } })
+  }, [err]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Final error, after the automatic retries (failAction). A refused stream on an Xtream account at its connection limit gets the real reason. */
   const fail = (f: Fail) => {
@@ -71,6 +76,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
     void connInfo(src, proxy, 0).then((c) => { if (g === gen.current) setErr(c && c.act >= c.max ? tn("errors.maxConn", { act: c.act, max: c.max }) : msg) })
   }
   const later = (ms: number) => { timers.current.push(window.setTimeout(() => setRetryN((n) => n + 1), ms)) }
+  const engineName = () => (hls.current ? "hls.js" : stream.current?.mp ? "mpegts.js" : "native")
 
   const first = useRef(true)
   useEffect(() => {
@@ -82,7 +88,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
     meas.current.attachAt = Date.now(); meas.current.startupMs = undefined
     const live_ = () => g === gen.current
     const start = () => {
-      const s = attach(v, eng, { url, raw, live, direct, viaHls: viaHls === url }, {
+      const s = attach(v, eng, { url, raw, live, direct, viaHls: viaHls === url, name: item.name }, {
         tracks: (t) => { if (!live_()) return; if (t.audio) setAudio(t.audio); if (t.subs) setSubs(t.subs) },
         codec: (c) => { aud.current = c },
         fatal: (f) => live_() && fail(f),
@@ -90,6 +96,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
         mpegtsError: (code) => {
           if (!live_()) return
           const a = mpegtsAction(code, auto.current++)
+          if (a.do === "retry") logError(`mpegts.js error ${code ?? "?"}: retrying`, { kind: "playback", level: "warn", ctx: item.name, data: { engine: "mpegts", code, url, attempt: auto.current } })
           if (a.do === "retry") later(a.ms)
           else fail(a.fail)
         },

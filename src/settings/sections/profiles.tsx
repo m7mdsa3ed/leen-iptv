@@ -7,6 +7,7 @@ import { isTv } from "@/lib/device"
 import { useApp, useProfile } from "@/lib/store"
 import { photoFromFile } from "@/lib/photo"
 import { Avatar } from "@/components/gtv"
+import { logError } from "@/lib/errlog"
 
 export default function ProfilesSection() {
   const t = useT()
@@ -24,7 +25,7 @@ export default function ProfilesSection() {
           <input ref={file} type="file" accept="image/*" hidden onChange={async (e) => {
             const f = e.target.files?.[0]
             e.target.value = ""
-            if (f) try { updateProfile(p.id, { photo: await photoFromFile(f) }) } catch { /* not an image the browser can decode */ }
+            if (f) try { updateProfile(p.id, { photo: await photoFromFile(f) }) } catch (e) { logError(e, { level: "warn", ctx: `Profile photo: ${f.name}` }) } // not an image the browser can decode
           }} />
           <Pill onClick={() => file.current?.click()}>{t("settings.profiles.photo.change")}</Pill>
           {p.photo && <Pill onClick={() => updateProfile(p.id, { photo: undefined })}>{t("settings.profiles.photo.remove")}</Pill>}

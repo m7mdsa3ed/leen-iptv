@@ -1,5 +1,6 @@
 import { t } from "../i18n"
 import { loadConfig, syncBackend as api, type Config, type Session } from "@/lib/api"
+import { logQuiet } from "../errlog"
 
 // Sign a TV in with a phone. The TV shows a QR code + short code. The phone page signs in with its OWN session and sends it to the TV
 // encrypted (ECDH P-256 -> AES-GCM-256) for the TV's one-time public key, through the user-link functions in the schema file.
@@ -51,7 +52,7 @@ export async function pollLink(l: TvLink): Promise<Session | null> {
   const key = await crypto.subtle.deriveKey({ name: "ECDH", public: phonePub }, l.priv, { name: "AES-GCM", length: 256 }, false, ["decrypt"])
   const [iv, ct] = r.payload.split(".")
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, key, unb64(ct))
-  void api.rpc(cfg(), "link_finish", { p_id: l.id }).catch(() => {})
+  void api.rpc(cfg(), "link_finish", { p_id: l.id }).catch(logQuiet("Phone sign-in: finish", "network"))
   return JSON.parse(new TextDecoder().decode(plain)) as Session
 }
 

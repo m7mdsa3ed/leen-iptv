@@ -35,6 +35,7 @@ import Detail from "@/pages/detail"
 import GenrePage from "@/pages/genre"
 import MultiviewPage from "@/pages/multiview"
 import HistoryPage from "@/pages/history"
+import LogPage from "@/pages/log"
 import StatsPage from "@/pages/stats"
 import DiagnosticsPage from "@/pages/diagnostics"
 import Home from "@/pages/home"
@@ -68,11 +69,11 @@ function RestoreQueue({ item }: { item: Item }) {
 }
 
 // pages rendered inside a layout Shell: their top bar stays put and only [data-page-content] (the Shell's <main>) animates
-const SHELL_PAGES = new Set(["home", "live", "sports", "movies", "series", "search", "settings", "category", "genre", "history", "stats", "diagnostics", "detail", "person", "team", "match", "league"])
+const SHELL_PAGES = new Set(["home", "live", "sports", "movies", "series", "search", "settings", "category", "genre", "history", "stats", "diagnostics", "log", "detail", "person", "team", "match", "league"])
 
 /** Default page per route; a layout can replace any of these via LayoutDef.pages (same props). */
 const DEFAULT_PAGES: Record<string, ComponentType<any>> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, league: LeaguePage, detail: Detail, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage, multi: MultiviewPage,
+  profiles: Profiles, welcome: Welcome, link: LinkPage, live: Live, movies: Browse, series: Browse, settings: Settings, genre: GenrePage, category: CategoryPage, sports: Sports, person: PersonPage, team: TeamPage, match: MatchPage, league: LeaguePage, detail: Detail, history: HistoryPage, stats: StatsPage, diagnostics: DiagnosticsPage, log: LogPage, multi: MultiviewPage,
 }
 
 const Page = memo(function Page({ r }: { r: { name: string; p?: Record<string, unknown> } }) {

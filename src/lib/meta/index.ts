@@ -10,6 +10,7 @@ import type { EpisodeMeta, Ids, Meta, PersonInfo, PersonRef, Provider, ProviderC
 import { matchKeyCached } from "@/lib/merge-pure"
 import { applyPart, emptyMeta, isEmptyMeta, personKey, seasonKey } from "./vault-pure"
 import { forgetVault, personGet, personPut, seasonGet, seasonPut, vaultGet, vaultPut } from "./vault"
+import { logError, logQuiet } from "../errlog"
 
 
 /** Saved config merged with the registry: unknown ids dropped, new providers appended (disabled). */
@@ -113,7 +114,7 @@ export function useBackfillMatches() {
           const cur = useApp.getState().settings.metaMatch
           if (!live || !r || matchId(cur?.[k]) !== matchId(v)) continue // reset or changed meanwhile
           setSettings({ metaMatch: { ...cur, [k]: { id: r.id, title: r.title, year: r.year, poster: r.poster?.replace("/w185/", "/w500/"), backdrop: r.backdrop } } })
-        } catch { /* offline / bad id: the Detail page fills it in when the title is opened */ }
+        } catch (e) { logError(e, { level: "warn", ctx: "Backfill metadata match", data: { title: k } }) } // offline / bad id: the Detail page fills it in when the title is opened
       }
     })()
     return () => { live = false }
@@ -206,7 +207,7 @@ export function useSeasonMeta(tmdb: string | undefined, season: number | null, r
     }
     cached(`season:${cfg?.id ?? "shared"}:${tmdb}:${season}:${cfg?.lang ?? ""}`, META_TTL, load, airing)
       .then((r) => live && setEps(r))
-      .catch(() => {}) // a season the provider does not have (numbering differs) just leaves the panel's episodes as they are
+      .catch((e: unknown) => logError(e, { level: "warn", ctx: "TMDB season", data: { title: `tmdb ${tmdb} season ${season}` } })) // a season the provider does not have (numbering differs) just leaves the panel's episodes as they are
     return () => { live = false }
   }, [tmdb, season, cfg, share, rev])
   return eps
@@ -307,7 +308,7 @@ export function useGenres(kind: "movie" | "series") {
         const n = await PROVIDERS.find((p) => p.id === cfg.id)!.genres!(kind, cfg)
         if (n?.length) { void set(key, { at: Date.now(), n }); return live && void setNames(n) }
       }
-    })().catch(() => {})
+    })().catch(logQuiet(`Genres (${kind})`))
     return () => { live = false }
   }, [kind, sig, own.length]) // eslint-disable-line react-hooks/exhaustive-deps
   return own.length ? own : names

@@ -21,7 +21,7 @@ async function inflate(b: Uint8Array): Promise<Uint8Array> {
 
 /** Subtitle track `streamIndex` (order of tracks in the file = Plex/ffmpeg stream index) as WebVTT.
     Cues near `startAt` (seconds) load first; onUpdate gets the partial text as it fills in; resolves with the full text. */
-export async function mkvSubtitle(get: GetRange, streamIndex: number, o: { startAt?: number; alive: () => boolean; onUpdate: (vtt: string) => void }): Promise<string> {
+export async function mkvSubtitle(get: GetRange, streamIndex: number, o: { startAt?: number; alive: () => boolean; onUpdate: (vtt: string) => void; skipped?: (e: unknown) => void }): Promise<string> {
   const head = parseHead(await get(0, 65535))
   if (!head) throw new Error("mkv: not a Matroska file")
   const { seg, seek } = head
@@ -58,7 +58,7 @@ export async function mkvSubtitle(get: GetRange, streamIndex: number, o: { start
           const dur = f.dur ?? r.dur
           cues.push({ start: sec(r.time), end: dur ? sec(r.time + dur) : undefined, text: frameText(tr.codec, new TextDecoder().decode(bytes)) })
         }
-      } catch { /* one unreadable block: skip it */ }
+      } catch (e) { o.skipped?.(e) } // one unreadable block: skip it (the caller logs it)
       done++
       if (done === 20 || done - shown >= 150) { shown = done; if (o.alive()) o.onUpdate(toVtt(cues)) }
     }

@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { del } from "idb-keyval"
+import { logError } from "./errlog"
 import type { ColorThemeId } from "@/lib/themes"
 import { persist, type PersistStorage } from "zustand/middleware"
 import { LAYOUT_IDS } from "./layouts"
@@ -71,7 +72,7 @@ export function lazyStorage<T>(): PersistStorage<T> {
   const flush = () => {
     clearTimeout(timer)
     timer = 0
-    for (const [k, v] of pend) try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* full / private mode */ }
+    for (const [k, v] of pend) try { localStorage.setItem(k, JSON.stringify(v)) } catch (e) { logError(e, { kind: "storage", ctx: `Save ${k}` }) } // full / private mode
     pend.clear()
   }
   if (typeof document !== "undefined") {

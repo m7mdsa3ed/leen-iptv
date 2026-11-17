@@ -318,7 +318,7 @@ async function handleAuthRedirect() {
     if (h.type === "recovery") return void useS.setState({ recovery: h.access })
     const u = await api.user(cfg, h.access)
     await signedIn({ access: h.access, refresh: h.refresh, exp: h.exp, id: u.id, email: u.email ?? "" })
-  } catch { /* an expired link: the user just signs in normally */ }
+  } catch (e) { logError(e, { level: "warn", ctx: "Sign-in link" }) } // an expired link: the user just signs in normally
 }
 
 export function initSync() {
@@ -327,7 +327,7 @@ export function initSync() {
   try { const s = JSON.parse(localStorage.getItem(SESS) || "null") as Session | null; if (s?.access) useS.setState({ session: s }) } catch { /* ignore */ }
   try {
     const k = JSON.parse(localStorage.getItem(KEYS) || "null")
-    if (k && canEncrypt()) void importKey(k).then((x) => { key = x; useS.setState({ hasPass: true }) }).catch(() => localStorage.removeItem(KEYS))
+    if (k && canEncrypt()) void importKey(k).then((x) => { key = x; useS.setState({ hasPass: true }) }).catch((e: unknown) => { logError(e, { level: "warn", ctx: "Saved sync passphrase (dropped)" }); localStorage.removeItem(KEYS) })
   } catch { /* ignore */ }
   idle()
   if (!cfgOk(useS.getState().cfg)) return // sync off: no stamping, no store subscription, no timers (a later session starts them in setSession)
@@ -388,12 +388,12 @@ const actions = {
     if (session) try {
       await presenceWrite
       if (active) await api.presenceRemove(cfg, session, presenceId(), active.item.id)
-    } catch { /* local sign-out is what matters */ }
+    } catch (e) { logError(e, { level: "warn", ctx: "Sign out: presence" }) } // local sign-out is what matters
     presenceStore.setState({ devices: [], error: null })
     setSession(null)
     dropAccount()
     useSyncMeta.setState({ uid: null })
-    if (session) try { await api.logout(cfg, session) } catch { /* local sign-out is what matters */ }
+    if (session) try { await api.logout(cfg, session) } catch (e) { logError(e, { level: "warn", ctx: "Sign out" }) } // local sign-out is what matters
   },
   syncNow,
   async setPassphrase(p: string, remember: boolean) {

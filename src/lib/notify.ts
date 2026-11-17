@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { useApp } from "@/lib/store"
 import { useRoute } from "@/lib/nav"
 import { addNote, pruneInbox, type Inbox, type NoteKind, type NoteRoute } from "@/lib/notify-pure"
+import { logError } from "@/lib/errlog"
 
 export type ToastMsg = { id: number; title: string; body?: string; route?: NoteRoute }
 
@@ -54,7 +55,7 @@ export function notify(title: string, body?: string, o?: { kind: NoteKind; key: 
       const n = new Notification(title, { body, tag: o?.key ?? title, icon: "./icon-192.png" })
       n.onclick = () => { window.focus(); n.close(); if (o) { markRead(o.key); openNote(o.route) } }
     }
-  } catch { /* unsupported */ }
+  } catch (e) { logError(e, { level: "warn", ctx: "System notification" }) } // unsupported (Android Chrome wants a service worker)
   return true
 }
 

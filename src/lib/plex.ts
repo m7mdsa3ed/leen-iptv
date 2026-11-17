@@ -9,6 +9,7 @@ import { mkvSubtitle } from "./mkv"
 import { useApp } from "./store"
 import { allowedConns, srtToVtt, buildUrl, connKind, directType, fileOf, identity, type SrvTrack, mapDetail, mapMeta, mapStreams, photoUrl, plexWatch, sortConns, plexMode, type Conn, type ConnMode } from "./plex-pure"
 import { hasStreamFacts, plexStream } from "./meta/facts-pure"
+import { logError, logQuiet } from "./errlog"
 
 export { sortConns }
 export type PlexServer = { name: string; id: string; token: string; owned: boolean; connections: Conn[] }
@@ -78,7 +79,7 @@ const noRoute = (name: string, mode: ConnMode) => t(mode === "local" ? "errors.p
 /** First reachable address the mode allows, in priority order (GET /identity, 5s each). */
 export async function pickConnection(s: PlexServer, mode: ConnMode = "auto"): Promise<string> {
   for (const c of sortConns(allowedConns(s.connections, mode))) {
-    try { return await reach(c.uri, s.token) } catch { /* next */ }
+    try { return await reach(c.uri, s.token) } catch (e) { logError(e, { level: "warn", ctx: `Plex ${s.name}: ${c.uri} did not answer` }) } // next
   }
   throw new Error(noRoute(s.name, mode))
 }
@@ -89,14 +90,14 @@ export async function ensureConnection(s: Source, force = false): Promise<Source
   const conns = s.conns ?? []
   const cur = (s.server ?? "").replace(/\/+$/, "")
   const allowedNow = !conns.length || allowedConns(conns, mode).some((c) => c.uri.replace(/\/+$/, "") === cur)
-  if (allowedNow && !force) { try { await reach(cur, s.token ?? "", 4000); return s } catch { if (!conns.length) return s /* manual source: nothing else to try */ } }
+  if (allowedNow && !force) { try { await reach(cur, s.token ?? "", 4000); return s } catch (e) { logError(e, { level: "warn", ctx: `Plex ${s.name}: ${cur} did not answer` }); if (!conns.length) return s /* manual source: nothing else to try */ } }
   if (!conns.length) return s
   for (const c of sortConns(allowedConns(conns, mode))) {
     try {
       const uri = await reach(c.uri, s.token ?? "")
       if (uri !== cur) useApp.getState().updateSource(s.id, { server: uri })
       return { ...s, server: uri }
-    } catch { /* next */ }
+    } catch (e) { logError(e, { level: "warn", ctx: `Plex ${s.name}: ${c.uri} did not answer` }) } // next
   }
   throw new Error(noRoute(s.name, mode))
 }
@@ -234,7 +235,7 @@ export function plexDirectUrl(s: Source, item: Item, q: StreamQ, tr: { audio?: n
 function ping(s: Source, path: string, params: Record<string, string | number>) {
   const u = sUrl(s, path, params)
   const p = mixed(u) ? px(u, proxy()) : u
-  fetch(p, p === u ? { mode: "no-cors" } : undefined).catch(() => {})
+  fetch(p, p === u ? { mode: "no-cors" } : undefined).catch(logQuiet(`Plex report ${path}`, "network"))
 }
 
 export function plexTimeline(s: Source, item: Item, state: "playing" | "paused" | "stopped", posSec: number, durSec: number) {
@@ -264,7 +265,7 @@ export async function plexSubtitle(s: Source, item: Item, tr: SrvTrack, o: { ali
     if (r.status !== 206) { void r.body?.cancel(); throw new Error("no range support") } // never pull the whole file
     return new Uint8Array(await r.arrayBuffer())
   }
-  const vtt = await mkvSubtitle(getRange, tr.index, { startAt: item.resume, ...o })
+  const vtt = await mkvSubtitle(getRange, tr.index, { startAt: item.resume, ...o, skipped: (e) => logError(e, { kind: "playback", level: "warn", ctx: "MKV subtitles: unreadable block skipped", data: { title: item.name } }) })
   if (o.alive()) subCache.set(key, vtt) // only complete loads are cached
   return vtt
 }
@@ -287,7 +288,7 @@ export async function detectPlex(typed = "", onProgress?: (pct: number) => void)
   for (const h of hosts) { cands.add(`http://${h}:32400`); cands.add(`https://${h}:32400`) }
   const found = await Promise.all([...cands].map(async (server) => {
     try {
-      const j = await (await plexFetch(plexUrl(server, "/identity"), proxy(), { headers: JSON_H }, 2500)).json()
+      const j = await (await plexFetch(plexUrl(server, "/identity"), proxy(), { headers: JSON_H }, 2500, { probe: true })).json()
       const id = j?.MediaContainer?.machineIdentifier
       return id ? { server, name: String(id) } : null
     } catch { return null }
@@ -296,7 +297,7 @@ export async function detectPlex(typed = "", onProgress?: (pct: number) => void)
   const quick = found.filter((x): x is { server: string; name: string } => !!x).filter((x) => !seen.has(x.name) && !!seen.add(x.name))
   if (quick.length) return quick
   return scanLan(32400, async (base) => {
-    const j = await (await fetchT(plexUrl(base, "/identity"), 800, { headers: JSON_H })).json()
+    const j = await (await fetchT(plexUrl(base, "/identity"), 800, { headers: JSON_H }, { probe: true })).json()
     return j?.MediaContainer?.machineIdentifier ? String(j.MediaContainer.machineIdentifier) : null
   }, onProgress)
 }

@@ -17,6 +17,8 @@ import type { Item } from "@/lib/types"
 import { closePlayer, usePlayerHost } from "./host"
 import { FITS, prefs, setPrefs, usePrefs } from "./prefs"
 import { useFlash } from "./indicators"
+import { playRefused } from "./engine"
+import { logQuiet } from "@/lib/errlog"
 import { usePlayback } from "./use-playback"
 import { useNextUp } from "./use-next-up"
 import { useSidecar } from "./use-sidecar"
@@ -129,7 +131,7 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
   useEffect(() => { if (E.err) setLayer("none") }, [E.err])
 
   /* ---------- transport ---------- */
-  const play = () => { void vref.current?.play().catch(() => {}); fire("play") }
+  const play = () => { void vref.current?.play().catch(playRefused({ name: item.name })); fire("play") }
   const pause = () => { vref.current?.pause(); fire("pause") }
   const toggle = () => (vref.current?.paused ? play() : pause())
   const seek = (d: number) => {
@@ -281,7 +283,7 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
   }
   const canPip = !isTv && typeof document !== "undefined" && !!document.pictureInPictureEnabled
   const [pip, setPip] = useState(false)
-  const togglePip = () => { const v = vref.current; if (v) void (document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture()).catch(() => {}) }
+  const togglePip = () => { const v = vref.current; if (v) void (document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture()).catch(logQuiet("Picture in picture", "playback")) }
   useEffect(() => {
     const v = vref.current
     if (!v || !canPip) return

@@ -29,7 +29,10 @@ export const envConfigured = !!(ENV.url && ENV.anonKey)
 type J = Record<string, unknown>
 export class ApiError extends Error {
   status: number
-  constructor(status: number, msg: string) { super(msg); this.status = status }
+  url?: string
+  method?: string
+  body?: string
+  constructor(status: number, msg: string, o?: { url?: string; method?: string; body?: string }) { super(msg); this.name = "ApiError"; this.status = status; Object.assign(this, o) }
 }
 
 async function req(cfg: Config, path: string, o: { method?: string; body?: unknown; token?: string; headers?: Record<string, string>; onResponse?: (r: Response) => void } = {}): Promise<unknown> {
@@ -40,12 +43,13 @@ async function req(cfg: Config, path: string, o: { method?: string; body?: unkno
   const c = new AbortController()
   const timer = setTimeout(() => c.abort(), 30000)
   try {
-    const r = await fetch(cfg.url + path, { method: o.method ?? (o.body !== undefined ? "POST" : "GET"), headers, body: o.body === undefined ? undefined : JSON.stringify(o.body), signal: c.signal })
+    const method = o.method ?? (o.body !== undefined ? "POST" : "GET")
+    const r = await fetch(cfg.url + path, { method, headers, body: o.body === undefined ? undefined : JSON.stringify(o.body), signal: c.signal }).catch((e: unknown) => { throw e instanceof Error ? Object.assign(e, { url: cfg.url + path.split("?")[0], method }) : e })
     o.onResponse?.(r)
     const t = await r.text()
     let j: J | null = null
     try { j = t ? JSON.parse(t) : null } catch { /* not json */ }
-    if (!r.ok) throw new ApiError(r.status, readable(r.status, j))
+    if (!r.ok) throw new ApiError(r.status, readable(r.status, j), { url: cfg.url + path.split("?")[0], method, body: t.slice(0, 1500) })
     return j
   } finally {
     clearTimeout(timer)

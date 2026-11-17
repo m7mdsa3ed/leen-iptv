@@ -6,6 +6,7 @@ import { DAY } from "./cache"
 import { isEmptyMeta, validAvail, validPerson, validSeason, validVault, vaultBody, vaultKey } from "./vault-pure"
 import type { SeasonRec, PersonRec } from "./vault-pure"
 import type { Avail, EpisodeMeta, Meta, PersonInfo, Query } from "./types"
+import { logError, logQuiet } from "../errlog"
 
 /**
  * The metadata middleman: one merged record per thing looked up, shared by every account.
@@ -43,9 +44,9 @@ async function read<T>(key: string, ttlDays: number, memHours: number, valid: (j
     if (!a) return null
     const row = await limit(api.vaultGet(a.cfg, a.session, key))
     if (!row || Date.now() - Date.parse(row.fetched_at) > ttlDays * DAY || !valid(row.data)) return null
-    void set(memKey(key), { at: Date.now(), m: row.data }).catch(() => {})
+    void set(memKey(key), { at: Date.now(), m: row.data }).catch(logQuiet("Save shared metadata", "storage"))
     return row.data
-  } catch { pause(); return null }
+  } catch (e) { logError(e, { level: "warn", ctx: "Shared metadata read (paused 5 min)" }); pause(); return null }
 }
 
 /** Store a record for everyone. Called only after a real provider call, so the vault is a set of answers somebody produced. */
@@ -56,8 +57,8 @@ function write(key: string, data: unknown, ttlDays: number) {
       const a = await sharedAuth()
       if (!a) return
       await limit(api.vaultPut(a.cfg, a.session, key, data, ttlDays), 15000)
-      void set(memKey(key), { at: Date.now(), m: data }).catch(() => {}) // this device reads it back from disk, not the server
-    } catch { pause() }
+      void set(memKey(key), { at: Date.now(), m: data }).catch(logQuiet("Save shared metadata", "storage")) // this device reads it back from disk, not the server
+    } catch (e) { logError(e, { level: "warn", ctx: "Shared metadata write (paused 5 min)" }); pause() }
   })()
 }
 

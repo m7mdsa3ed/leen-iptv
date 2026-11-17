@@ -19,6 +19,7 @@ import type { Episode, Item } from "@/lib/types"
 import { plexDetail, plexScrobble, plexUnscrobble } from "@/lib/plex"
 import { jellyfinDetail, jellyfinMarkPlayed, jellyfinMarkUnplayed } from "@/lib/jellyfin"
 import { seriesInfo, vodInfo } from "@/lib/xtream"
+import { logError, logQuiet } from "@/lib/errlog"
 
 type Info = Record<string, string | number | undefined>
 const DETAIL_FRESH = 60 * 60_000 // an Xtream title's info/episodes cached within the hour is shown without asking the panel again
@@ -100,8 +101,8 @@ export function useDetail(id: string) {
         : selected.kind === "series"
         ? seriesInfo(src, proxy, selected).then((r) => ({ info: r.info, episodes: r.episodes }))
         : vodInfo(src, proxy, selected.sid!).then((r) => ({ info: r, episodes: [] }))
-      run.then((r) => { apply(r); void set(key, { at: Date.now(), v: r }).catch(() => {}) })
-        .catch((e) => live && !shown && setErr(explain(e, selected.name))) // the cached copy on screen: a failed refresh stays quiet
+      run.then((r) => { apply(r); void set(key, { at: Date.now(), v: r }).catch(logQuiet("Cache title details", "storage")) })
+        .catch((e) => { if (live && !shown) setErr(explain(e, selected.name)); else logError(e, { level: "warn", ctx: "Refresh title details", data: { title: selected.name } }) }) // the cached copy on screen: a failed refresh stays quiet
         .finally(() => live && setLoaded(true))
     }
     void get<{ at: number; v: Got }>(key).then((c) => {

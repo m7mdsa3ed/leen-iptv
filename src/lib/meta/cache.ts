@@ -1,4 +1,5 @@
 import { del, get, getMany, keys, set } from "idb-keyval"
+import { logError, logQuiet } from "../errlog"
 
 /** Metadata cache (IndexedDB + session memory) so a title/person/genre is fetched from a provider once, not on every visit.
     Entries: `{ at, v, e? }` (e = empty result: re-checked after a day, not a week). In-flight requests are shared, so two screens asking at once cost one API call. */
@@ -21,12 +22,12 @@ export function cached<T>(key: string, ttl: number, load: () => Promise<T>, isEm
   const m = mem.get(key) as Entry<T> | undefined
   if (m && Date.now() - m.at < (m.e ? DAY : ttl)) return Promise.resolve(m.v)
   const p = (async () => {
-    const c = await get<Entry<T>>(key).catch(() => undefined)
+    const c = await get<Entry<T>>(key).catch((e: unknown) => { logError(e, { kind: "storage", level: "warn", ctx: "Read metadata cache" }); return undefined })
     if (c && Date.now() - c.at < (c.e ? DAY : ttl)) { keep(key, c); return c.v }
     const v = await load()
     const e: Entry<T> = { at: Date.now(), v, ...(isEmpty?.(v) ? { e: 1 as const } : {}) }
     keep(key, e)
-    void set(key, e).catch(() => {})
+    void set(key, e).catch(logQuiet("Save metadata cache", "storage"))
     return v
   })().finally(() => flight.delete(key))
   flight.set(key, p)
@@ -55,7 +56,7 @@ export function scheduleCachePrune() {
       const vals = await getMany<Entry<unknown> | undefined>(ks)
       const old = ks.map((k, i) => ({ k, at: vals[i]?.at ?? 0 })).sort((a, b) => a.at - b.at).slice(0, Math.ceil(ks.length * 0.3))
       await Promise.all(old.map((o) => del(o.k)))
-    } catch { /* cache pruning is best effort */ }
+    } catch (e) { logError(e, { kind: "storage", level: "warn", ctx: "Prune metadata cache" }) } // best effort
   }, 8000)
 }
 

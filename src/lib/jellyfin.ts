@@ -8,6 +8,7 @@ import { useApp } from "./store"
 import { clientId } from "./plex"
 import { firstReachable } from "./plex-pure"
 import { authHeader, imageUrl, jfActiveKind, jfCands, jfUrl, jfWatch, mapChannel, mapDetail, mapEpisode, mapItem, mapStreams, normServer, toTicks, type Img } from "./jellyfin-pure"
+import { logError, logQuiet } from "./errlog"
 
 export { normServer }
 type J = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -60,7 +61,7 @@ export async function ensureJellyfinConnection(s: Source, force = false): Promis
   const save = (uri: string) => { if (uri !== cur) useApp.getState().updateSource(s.id, { server: uri }); return { ...s, server: uri } }
   if (cands.length === 1) return save(cands[0].uri) // nothing to choose between; the load reports real errors
   const now = cands.find((c) => c.uri === cur)
-  if (now && !force) { try { await jfProbe(s, now); return s } catch { /* try the others */ } }
+  if (now && !force) { try { await jfProbe(s, now); return s } catch (e) { logError(e, { level: "warn", ctx: `Jellyfin ${s.name}: ${now.uri} did not answer` }) } } // try the others
   const { cand, errs } = await firstReachable(cands, (c) => jfProbe(s, c))
   if (!cand) throw errs.find((e) => (e as { auth?: boolean })?.auth) ?? new Error(t("source.conn.noRoute", { name: s.name }))
   return save(cand.uri)
@@ -133,7 +134,7 @@ export async function loadJellyfin(s: Source, px_: string, step: (m: string) => 
     step(t("errors.source.loadingChannels"))
     const ch = await get<{ Items?: J[] }>(s, px_, "/LiveTv/Channels", { userId: uid, EnableImages: "true", SortBy: "SortName" })
     for (const c of ch.Items ?? []) out.push(mapChannel(c, s.id, img))
-  } catch { /* no live TV on this server (or no access): movies and series only */ }
+  } catch (e) { logError(e, { level: "warn", ctx: `Jellyfin ${s.name}: no live TV` }) } // no live TV on this server (or no access): movies and series only
   return out
 }
 
@@ -193,7 +194,7 @@ export const jellyfinStreamUrl = (s: Source, item: Item, q: StreamQ = STREAM_QS[
 
 // Fire-and-forget: reports must never break playback.
 function send(s: Source, method: string, path: string, params: Record<string, string | number | undefined> = {}, body?: unknown) {
-  plexFetch(jfUrl(base(s), path, params, s.token), proxy(), body === undefined ? { method } : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, 15000).catch(() => {})
+  plexFetch(jfUrl(base(s), path, params, s.token), proxy(), body === undefined ? { method } : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, 15000).catch(logQuiet(`Jellyfin report ${path}`, "network"))
 }
 
 /** start = POST /Sessions/Playing, progress = .../Progress, stopped = .../Stopped (call on pause too with paused=true). */
@@ -228,7 +229,7 @@ export async function detectJellyfin(typed = "", onProgress?: (pct: number) => v
   for (const h of hosts) for (const u of [`http://${h}:8096`, `https://${h}:8920`, `http://${h}`, `https://${h}`]) cands.add(u)
   const found = await Promise.all([...cands].map(async (server) => {
     try {
-      const r = await plexFetch(jfUrl(server, "/System/Info/Public"), proxy(), { headers: { Accept: "application/json" } }, 2500)
+      const r = await plexFetch(jfUrl(server, "/System/Info/Public"), proxy(), { headers: { Accept: "application/json" } }, 2500, { probe: true })
       const j = await r.json()
       return j?.Id ? { server, name: String(j.ServerName || "Jellyfin") } : null
     } catch { return null }
@@ -238,7 +239,7 @@ export async function detectJellyfin(typed = "", onProgress?: (pct: number) => v
   if (quick.length) return quick
   // nothing at the usual addresses: sweep the local network
   return scanLan(8096, async (base) => {
-    const j = await (await fetchT(jfUrl(base, "/System/Info/Public"), 800, { headers: { Accept: "application/json" } })).json()
+    const j = await (await fetchT(jfUrl(base, "/System/Info/Public"), 800, { headers: { Accept: "application/json" } }, { probe: true })).json()
     return j?.Id ? String(j.ServerName || "Jellyfin") : null
   }, onProgress)
 }

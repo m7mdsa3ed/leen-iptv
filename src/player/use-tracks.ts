@@ -13,6 +13,7 @@ import { SIDECAR_ID } from "./use-sidecar"
 import type { Picked } from "./use-source"
 import type { usePlayback } from "./use-playback"
 import type { useSource } from "./use-source"
+import { logError } from "@/lib/errlog"
 
 type Src = ReturnType<typeof useSource>
 type Play = ReturnType<typeof usePlayback>
@@ -140,7 +141,7 @@ export function useTracks(o: { vref: RefObject<HTMLVideoElement | null>; item: I
         const name = langName(best.lang || want, ui)
         L.current.pickExt(vtt, `${name} · ${best.name}`)
         o.onAuto(name)
-      })().catch(() => {}) // quiet: the user can still search by hand
+      })().catch((e: unknown) => logError(e, { level: "warn", ctx: "Automatic subtitles", data: { title: item.name } })) // nothing on screen: the user can still search by hand
     }, 100)
     return () => clearTimeout(t0)
   }, [item.id, S.tracksReady, E.started, cfg?.auto]) // eslint-disable-line react-hooks/exhaustive-deps

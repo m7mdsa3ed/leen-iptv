@@ -2,7 +2,7 @@ import { create } from "zustand"
 import { del, get, set } from "idb-keyval"
 import type { Item, Kind, Source } from "./types"
 import { explain, fetchText, px } from "./net"
-import { logError } from "./errlog"
+import { logError, logQuiet } from "./errlog"
 import { t } from "./i18n"
 import { parseM3U } from "./parse"
 import { loadXtreamKind, xtreamAuth, type XtreamKind } from "./xtream"
@@ -165,7 +165,7 @@ useApp.subscribe((s, p) => {
     Settings > Metadata > Use metadata turns it off. Older saved data is a bare poster url per key. */
 let posters: Record<string, Found | string> = {}
 const POSTERS = "leen-posters"
-const postersLoaded = get<Record<string, Found | string>>(POSTERS).then((v) => { if (v) { posters = { ...v, ...posters }; if (raw.size) scheduleMerge(false, Object.keys(v)) } }).catch(() => {})
+const postersLoaded = get<Record<string, Found | string>>(POSTERS).then((v) => { if (v) { posters = { ...v, ...posters }; if (raw.size) scheduleMerge(false, Object.keys(v)) } }).catch(logQuiet("Read saved posters", "storage"))
 export const hasPoster = (key: string) => typeof posters[key] === "object" // a bare poster url (older data) is looked up again for the rest
 /* The queue flushes after every few titles while you browse: the IndexedDB write clones the whole map, so it waits for a 2 s lull (and for the
    D-pad to rest), then only the titles found since the last flush are re-applied. ponytail: one timer for both, split them if the save ever needs to be sooner */
@@ -180,12 +180,12 @@ export function addPosters(add: Record<string, Found>) {
     posterTimer = undefined
     const keys = posterKeys
     posterKeys = new Set()
-    void set(POSTERS, posters).catch(() => {})
+    void set(POSTERS, posters).catch(logQuiet("Save posters", "storage"))
     if (raw.size && useApp.getState().settings.metaPosters !== false) scheduleMerge(false, keys)
   }
   posterTimer ??= window.setTimeout(fire, 2000)
 }
-export const clearPosters = () => { posters = {}; void del(POSTERS).catch(() => {}); if (raw.size) scheduleMerge(false, "all") }
+export const clearPosters = () => { posters = {}; void del(POSTERS).catch(logQuiet("Clear posters", "storage")); if (raw.size) scheduleMerge(false, "all") }
 
 /** Channel logos: manual logo matches, then the source's own, then the bundled index by name (loaded once, then re-applied). */
 let logoIx: LogoIndex | null = null
@@ -228,9 +228,9 @@ const PARTS: Record<Source["type"], readonly Part[]> = { xtream: ["live", "movie
 type Cached = { at: number; v: number; items: Item[]; server?: string }
 const partKey = (id: string, part: Part) => `cat:${id}:${part}`
 async function readPart(id: string, part: Part): Promise<Cached | undefined> {
-  try { return await get<Cached>(partKey(id, part)) } catch { return undefined } // private mode / no IndexedDB: just load it
+  try { return await get<Cached>(partKey(id, part)) } catch (e) { logError(e, { kind: "storage", level: "warn", ctx: `Read catalog cache ${id}:${part}` }); return undefined } // private mode / no IndexedDB: just load it
 }
-const writePart = (id: string, part: Part, c: Cached) => { void set(partKey(id, part), c).catch(() => {}) }
+const writePart = (id: string, part: Part, c: Cached) => { void set(partKey(id, part), c).catch(logQuiet(`Cache catalog ${id}:${part}`, "storage")) }
 
 /** Fetch one part of a source's catalog. */
 async function fetchPart(src: Source, part: Part, proxy: string, step: (m: string) => void): Promise<Item[]> {
@@ -240,7 +240,7 @@ async function fetchPart(src: Source, part: Part, proxy: string, step: (m: strin
     return parseM3U(await fetchText(px(src.url!, proxy)), src.id)
   }
   const run = (s: Source) => s.type === "plex" ? loadPlex(s, proxy, step) : loadJellyfin(s, proxy, step)
-  try { return await run(src) } catch { return await run(await ensure(src, true)) } // one retry on the other address (the second error is the one shown)
+  try { return await run(src) } catch (e) { logError(e, { level: "warn", ctx: `${src.name} (${part}): retrying on another address` }); return await run(await ensure(src, true)) } // one retry on the other address (the second error is the one shown)
 }
 
 /** Refresh ONE cached part behind the screen (its stale copy is already showing); a failure leaves the cache alone. */

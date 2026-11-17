@@ -6,6 +6,7 @@ import { addPosters, hasPoster, useCatalog } from "../catalog"
 import { isEmptyMeta, matchKey, normalizeCfg, titleLookupKey, titleMeta } from "./index"
 import { forget } from "./cache"
 import { foundOf, type Found } from "../merge-pure"
+import { logError } from "../errlog"
 
 /** Background metadata queue: every movie / series a card shows is looked up once (the same cached lookup as Replace posters and Fix matches),
     newest first, 3 at a time, so posters and Detail are ready by the time they are opened. Skipped: live, Plex / Jellyfin (their server brings the
@@ -96,7 +97,7 @@ async function run() {
           if (m.poster || m.backdrop || m.title) found[k] = foundOf(m)
           recent = [{ item, poster: m.poster }, ...recent].slice(0, 30)
         }
-        catch { failed++; todo.set(k, item) } // rate limited / offline: back in line (titleMeta does not cache a failure)
+        catch (e) { failed++; todo.set(k, item); logError(e, { level: "warn", ctx: "Metadata lookup", data: { title: item.srcName ?? item.name } }) } // rate limited / offline: back in line (titleMeta does not cache a failure)
       }))
       if (Object.keys(empty).length) setUnmatched({ ...unmatched(), ...empty }) // one settings write per batch
       now = []

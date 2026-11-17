@@ -52,11 +52,11 @@ function PhoneSignIn({ onCancel }: { onCancel: () => void }) {
         const tick = async () => {
           if (!live) return
           if (Date.now() - t0 > 10 * 60_000) return void setErr(t("sync.link.expired"))
-          try { const ses = await pollLink(l); if (ses) return void (await s.adoptSession(ses)) } catch { /* transient: keep polling */ }
+          try { const ses = await pollLink(l); if (ses) return void (await s.adoptSession(ses)) } catch (e) { logError(e, { level: "warn", ctx: "Phone sign-in: poll" }) } // transient: keep polling
           timer = window.setTimeout(tick, 2000)
         }
         void tick()
-      } catch (e) { if (live) setErr(explain(e)) }
+      } catch (e) { if (live) setErr(explain(e, "Phone sign-in")) }
     })()
     return () => { live = false; clearTimeout(timer) }
   }, [round]) // eslint-disable-line react-hooks/exhaustive-deps

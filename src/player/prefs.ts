@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import { logError } from "@/lib/errlog"
 // Per-device player preferences (volume, mute, aspect, speed). Plain localStorage; never synced.
 export const FITS = ["contain", "cover", "fill"] as const
 export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const
@@ -66,7 +67,7 @@ export const prefs = (): P => (cache ??= read())
 const subs = new Set<() => void>()
 export function setPrefs(p: Partial<P>) {
   cache = { ...prefs(), ...p }
-  try { localStorage.setItem(K, JSON.stringify(cache)) } catch { /* storage full / blocked */ }
+  try { localStorage.setItem(K, JSON.stringify(cache)) } catch (e) { logError(e, { kind: "storage", level: "warn", ctx: "Save player settings" }) } // storage full / blocked
   subs.forEach((f) => f())
 }
 /** Re-render on any change (the subtitle look is edited from the player sheet and from Settings). */
