@@ -101,7 +101,7 @@ export function useDetail(id: string) {
         ? seriesInfo(src, proxy, selected).then((r) => ({ info: r.info, episodes: r.episodes }))
         : vodInfo(src, proxy, selected.sid!).then((r) => ({ info: r, episodes: [] }))
       run.then((r) => { apply(r); void set(key, { at: Date.now(), v: r }).catch(() => {}) })
-        .catch((e) => live && !shown && setErr(explain(e))) // the cached copy on screen: a failed refresh stays quiet
+        .catch((e) => live && !shown && setErr(explain(e, selected.name))) // the cached copy on screen: a failed refresh stays quiet
         .finally(() => live && setLoaded(true))
     }
     void get<{ at: number; v: Got }>(key).then((c) => {

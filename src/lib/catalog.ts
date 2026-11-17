@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { del, get, set } from "idb-keyval"
 import type { Item, Kind, Source } from "./types"
 import { explain, fetchText, px } from "./net"
+import { logError } from "./errlog"
 import { t } from "./i18n"
 import { parseM3U } from "./parse"
 import { loadXtreamKind, xtreamAuth, type XtreamKind } from "./xtream"
@@ -251,7 +252,7 @@ async function refreshPart(src: Source, part: Part, proxy: string, tk: number) {
     writePart(src.id, part, { at: Date.now(), v: CACHE_V, items, server: src.type === "plex" || src.type === "jellyfin" ? src.server : undefined })
     raw.set(src.id, part === "all" ? items : [...cur.filter((i) => i.kind !== part), ...items])
     scheduleMerge(true)
-  } catch { /* offline / provider down: what is on screen stays */ }
+  } catch (e) { logError(e, { ctx: `${src.name} (${part})` }) } // offline / provider down: what is on screen stays
 }
 
 /**
@@ -262,7 +263,7 @@ async function refreshPart(src: Source, part: Part, proxy: string, tk: number) {
 function unreachable(id: string, e: unknown) {
   const { sourceFilter, setSourceFilter } = useApp.getState()
   if (sourceFilter.includes(id)) setSourceFilter(sourceFilter.filter((x) => x !== id)) // a stale pick must not leave the grid empty
-  patch(id, { status: "error", msg: explain(e) })
+  patch(id, { status: "error", msg: explain(e, useApp.getState().sources.find((s) => s.id === id)?.name) })
   if (raw.delete(id) && !warming) remerge()
 }
 
@@ -340,7 +341,7 @@ async function loadOne(s0: Source, proxy: string, force?: boolean) {
     if (!live()) return
     if (multi) return unreachable(s0.id, e)
     // a part may already be on screen (staged load): keep it and say why the rest is missing, Settings > Sources shows the reason
-    patch(s0.id, { status: got.length ? "ready" : "error", msg: explain(e) })
+    patch(s0.id, { status: got.length ? "ready" : "error", msg: explain(e, s0.name) })
   }
 }
 

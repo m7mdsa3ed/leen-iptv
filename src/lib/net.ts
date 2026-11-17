@@ -1,5 +1,7 @@
 import { t } from "./i18n"
 import { useApp } from "./store"
+import { logError } from "./errlog"
+import { describeError } from "./errlog-pure"
 // ponytail: optional CORS proxy (server/proxy.mjs); packaged webOS apps usually don't need it, hosted/web ones do.
 // Proxy formats: "https://host/path?url={url}" (template, URL-encoded), "https://proxy.corsfix.com/?" (ends in ? or =, raw URL appended),
 // or a bare base like "http://lan:8787" (our server/proxy.mjs, /p?url=).
@@ -40,9 +42,12 @@ export const px = (url: string, proxy: string) => {
 
 export class HttpError extends Error {
   status: number
-  constructor(status: number) {
+  url?: string
+  constructor(status: number, url?: string) {
     super(`HTTP ${status}`)
+    this.name = "HttpError"
     this.status = status
+    this.url = url
   }
 }
 
@@ -55,12 +60,16 @@ export const statusMsg = (s: number) =>
 
 export const corsHint = () => t("errors.cors")
 
-/** Turn any thrown value into a sentence a viewer can act on. */
-export function explain(e: unknown): string {
-  if (e instanceof HttpError) return statusMsg(e.status)
-  if (e instanceof DOMException && e.name === "AbortError") return t("errors.timeout")
-  if (e instanceof TypeError) return corsHint()
-  return e instanceof Error ? e.message : String(e)
+/** Turn any thrown value into a sentence a viewer can act on, and record it in the error log (Settings > Logs) with what it was about (`ctx`). */
+export function explain(e: unknown, ctx?: string): string {
+  const net = e instanceof HttpError || (e instanceof DOMException && e.name === "AbortError") || e instanceof TypeError
+  const msg = e instanceof HttpError ? statusMsg(e.status)
+    : e instanceof DOMException && e.name === "AbortError" ? t("errors.timeout")
+    : e instanceof TypeError ? corsHint()
+    : e instanceof Error ? e.message : String(e)
+  const d = describeError(e)
+  logError(msg, { kind: net ? "network" : "error", ctx, detail: [d.msg !== msg ? d.msg : "", e instanceof HttpError ? e.url : "", d.detail].filter(Boolean).join("\n") || undefined })
+  return msg
 }
 
 // AbortSignal.timeout is Chrome 103; webOS 23 is Chromium 94.
@@ -69,7 +78,7 @@ export async function fetchT(url: string, ms = 60000, init?: RequestInit): Promi
   const t = setTimeout(() => c.abort(), ms)
   try {
     const r = await fetch(url, { ...init, signal: c.signal })
-    if (!r.ok) throw new HttpError(r.status)
+    if (!r.ok) throw new HttpError(r.status, url)
     return r
   } finally {
     clearTimeout(t)

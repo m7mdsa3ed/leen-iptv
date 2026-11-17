@@ -7,6 +7,9 @@ import { probeProxy } from './lib/net'
 import { initSync } from './lib/sync'
 import { registerPwa } from './lib/pwa'
 import { isTv } from './lib/device'
+import { installErrorLog } from './lib/errlog'
+
+installErrorLog() // before anything else runs: uncaught errors and rejections land in Settings > Logs
 
 declare global {
   /** the persisted `iptv-app` store, parsed once by the pre-paint script in index.html (null when absent or unreadable) */

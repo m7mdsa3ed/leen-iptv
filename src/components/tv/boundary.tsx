@@ -2,11 +2,13 @@ import { Component, type ReactNode } from "react"
 import { Pill } from "@/components/gtv"
 import { t } from "@/lib/i18n"
 import { useRoute } from "@/lib/nav"
+import { logError } from "@/lib/errlog"
 
 /** A crashing page shows a message instead of a black screen; Back still works. */
 export class Boundary extends Component<{ children: ReactNode }, { err: Error | null }> {
   state = { err: null as Error | null }
   static getDerivedStateFromError(err: Error) { return { err } }
+  componentDidCatch(err: Error, info: { componentStack?: string | null }) { logError(err, { kind: "crash", detail: [err.stack, info.componentStack].filter(Boolean).join("\n") }) }
   render() {
     if (!this.state.err) return this.props.children
     return (

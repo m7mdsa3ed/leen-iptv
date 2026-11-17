@@ -33,7 +33,7 @@ export function MatchModal() {
     const n = ++seq.current // only the latest search may write
     setBusy(true); setErr("")
     try { const r = await tmdbSearch(kind, query, cfg); if (n === seq.current) setRes(r) }
-    catch (e) { if (n === seq.current) { setErr(explain(e)); setRes(null) } }
+    catch (e) { if (n === seq.current) { setErr(explain(e, `TMDB: ${query}`)); setRes(null) } }
     finally { if (n === seq.current) setBusy(false) }
   }
   useEffect(() => {

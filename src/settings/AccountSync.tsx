@@ -4,6 +4,7 @@ import { QrCode } from "@/components/QrCode"
 import { canLink, createLink, linkBase, linkUrl, pollLink, prettyCode, type TvLink } from "@/lib/sync/link"
 import { useSync } from "@/lib/sync"
 import { explain } from "@/lib/net"
+import { logError } from "@/lib/errlog"
 import { fmt, t as tn, useT } from "@/lib/i18n"
 import { ConfirmButton, Field, Pill, Row, SectionCard, Segmented, Toggle } from "./controls"
 
@@ -16,7 +17,7 @@ export function useAct() {
   const [ok, setOk] = useState("")
   const run = async (f: () => Promise<string | void>) => {
     setBusy(true); setErr(""); setOk("")
-    try { setOk((await f()) || "") } catch (e) { setErr(e instanceof TypeError ? tn("sync.err.unreachable") : explain(e)) } finally { setBusy(false) }
+    try { setOk((await f()) || "") } catch (e) { setErr(e instanceof TypeError ? (logError(e, { ctx: "Account" }), tn("sync.err.unreachable")) : explain(e, "Account")) } finally { setBusy(false) }
   }
   return { busy, err, ok, run }
 }

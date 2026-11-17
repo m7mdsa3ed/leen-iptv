@@ -4,6 +4,7 @@ import { get as idbGet, set as idbSet } from "idb-keyval"
 import { useApp } from "../store"
 import { useHistory, flushHistory } from "../history"
 import { explain } from "../net"
+import { logError } from "../errlog"
 import { t } from "../i18n"
 import { useNotify } from "../notify"
 import { ApiError, badKey, envConfigured, loadConfig, parseAuthHash, syncBackend as api, type Config, type PlaybackPresence, type Session } from "@/lib/api"
@@ -58,7 +59,7 @@ export function publishPlaybackPresence(item: Item, status: PlaybackPresence["st
         const auth = await sharedAuth()
         if (auth) await api.presenceRemove(auth.cfg, auth.session, deviceId, item.id)
         presenceStore.setState({ error: null })
-      } catch (e) { presenceStore.setState({ error: explain(e) }) }
+      } catch (e) { presenceStore.setState({ error: explain(e, "Presence") }) }
     })
     return presenceWrite
   }
@@ -76,7 +77,7 @@ export function publishPlaybackPresence(item: Item, status: PlaybackPresence["st
       const auth = await sharedAuth()
       if (auth) await api.presencePut(auth.cfg, auth.session, presence)
       presenceStore.setState({ error: null })
-    } catch (e) { presenceStore.setState({ error: explain(e) }) }
+    } catch (e) { presenceStore.setState({ error: explain(e, "Presence") }) }
   })
   return presenceWrite
 }
@@ -94,7 +95,7 @@ async function pollPresence() {
     }
     const devices = await api.presenceGet(auth.cfg, auth.session)
     presenceStore.setState({ devices, error: null })
-  } catch (e) { presenceStore.setState({ error: explain(e) }) }
+  } catch (e) { presenceStore.setState({ error: explain(e, "Presence") }) }
 }
 
 export function usePlaybackPresence() {
@@ -119,7 +120,7 @@ function writePresence() {
     try {
       const auth = await sharedAuth()
       if (auth) await api.presencePut(auth.cfg, auth.session, presence)
-    } catch (e) { presenceStore.setState({ error: explain(e) }) }
+    } catch (e) { presenceStore.setState({ error: explain(e, "Presence") }) }
   })
 }
 
@@ -267,7 +268,7 @@ async function cycle() {
 function fail(e: unknown) {
   fails++
   blockedUntil = Date.now() + Math.min(300000, 15000 * 2 ** fails)
-  setStatus({ state: "error", error: e instanceof TypeError ? t("sync.err.unreachable") : explain(e), needPass: e instanceof WrongPassphrase })
+  setStatus({ state: "error", error: e instanceof TypeError ? (logError(e, { ctx: "Sync" }), t("sync.err.unreachable")) : explain(e, "Sync"), needPass: e instanceof WrongPassphrase })
 }
 
 /** Manual or automatic; never two at once (a request during a run triggers one more pass). */

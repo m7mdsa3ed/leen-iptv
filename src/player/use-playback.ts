@@ -5,6 +5,7 @@ import { useCatalog } from "@/lib/catalog"
 import { useApp } from "@/lib/store"
 import { connInfo } from "@/lib/xtream"
 import { corsHint, statusMsg } from "@/lib/net"
+import { logError } from "@/lib/errlog"
 import { rate } from "@/lib/quality"
 import { t as tn } from "@/lib/i18n"
 import type { Item, Source } from "@/lib/types"
@@ -58,7 +59,7 @@ export function usePlayback(o: { vref: RefObject<HTMLVideoElement | null>; item:
   useEffect(() => { auto.current = 0 }, [url, live])
   const need = engineToLoad({ raw, live, viaHls: viaHls === url }, { hls: eng.Hls?.isSupported(), mpegts: eng.mpegts?.isSupported() })
   useEffect(() => { if (need) void LOAD[need]().then(() => setEng(loadedEngines()), () => setErr(tn("errors.stream.unavailable"))) }, [need, retryN]) // Retry also re-tries a script that failed to load
-  useEffect(() => { if (err) meas.current.errTotal++ }, [err])
+  useEffect(() => { if (err) { meas.current.errTotal++; logError(err, { kind: "playback", ctx: item.name, detail: raw }) } }, [err]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Final error, after the automatic retries (failAction). A refused stream on an Xtream account at its connection limit gets the real reason. */
   const fail = (f: Fail) => {
