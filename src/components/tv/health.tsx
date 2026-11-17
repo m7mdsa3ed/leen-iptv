@@ -1,4 +1,4 @@
-import { createPortal } from "react-dom"
+import { createPortal, flushSync } from "react-dom" // flushSync: a row that opens a page freezes this one (App Gate); the portalled panel must close first
 import { useState } from "react"
 import { RefreshCw, Server, Settings, X } from "lucide-react"
 import { Pill, RailItem } from "@/components/gtv"
@@ -44,7 +44,7 @@ export function HealthButton({ rail }: { rail?: boolean } = {}) {
   if (rail) return (
     <>
       <RailItem label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} badge={dot} className="gtv-rail-src"><Server /></RailItem>
-      {open && (rail ? createPortal(<Panel close={() => setOpen(false)} />, document.body) : <Panel close={() => setOpen(false)} />)}
+      {open && (rail ? createPortal(<Panel close={() => flushSync(() => setOpen(false))} />, document.body) : <Panel close={() => setOpen(false)} />)}
     </>
   )
   return (
@@ -57,7 +57,7 @@ export function HealthButton({ rail }: { rail?: boolean } = {}) {
         <span>{up === on.length ? fmt.number(up) : `${fmt.number(up)}/${fmt.number(on.length)}`}</span>
         <span aria-hidden className={cn("size-2 rounded-full", bad ? "bg-destructive" : warn ? "bg-amber-500" : "bg-emerald-500")} />
       </button>
-      {open && (rail ? createPortal(<Panel close={() => setOpen(false)} />, document.body) : <Panel close={() => setOpen(false)} />)}
+      {open && (rail ? createPortal(<Panel close={() => flushSync(() => setOpen(false))} />, document.body) : <Panel close={() => setOpen(false)} />)}
     </>
   )
 }

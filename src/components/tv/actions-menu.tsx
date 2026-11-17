@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { createPortal } from "react-dom"
+import { createPortal, flushSync } from "react-dom"
 import { Check } from "lucide-react"
 import { KEY } from "@/lib/nav"
 
@@ -15,7 +15,9 @@ export function ActionsMenu({ items, trigger }: { items: Act[]; trigger: (t: Tri
   const [pos, setPos] = useState<null | { top?: number; bottom?: number; start: number; max: number }>(null)
   const trig = useRef<HTMLElement | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const close = (refocus = true) => { setPos(null); if (refocus) trig.current?.focus() }
+  // committed at once (flushSync): an action that opens a page (Resume -> the player) freezes this one (App's Gate), and a batched close would then
+  // never render, leaving the portalled menu (and its [data-modal], which takes the player's keys) over the new page
+  const close = (refocus = true) => { flushSync(() => setPos(null)); if (refocus) trig.current?.focus() }
   const toggle = (e: React.MouseEvent<HTMLElement>) => {
     if (pos) return close()
     trig.current = e.currentTarget

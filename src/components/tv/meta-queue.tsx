@@ -1,4 +1,4 @@
-import { createPortal } from "react-dom"
+import { createPortal, flushSync } from "react-dom" // flushSync: a row that opens a page freezes this one (App Gate); the portalled panel must close first
 import { useEffect, useState, type ReactNode } from "react"
 import { Check, Clock, ImageOff, Pause, Play, RefreshCw, SearchX, Settings, TriangleAlert, X } from "lucide-react"
 import { Art, Pill, RailItem } from "@/components/gtv"
@@ -42,7 +42,7 @@ export function MetaQueueButton({ rail }: { rail?: boolean } = {}) {
           {!n ? <SearchX className={tv ? "size-4" : "size-3.5"} /> : paused ? <Pause className={tv ? "size-4" : "size-3.5"} /> : <RefreshCw className={cn(!tv && "animate-spin", tv ? "size-4" : "size-3.5")} />}{fmt.number(n || bad)}
         </button>
       )}
-      {open && (rail ? createPortal(<Panel close={() => setOpen(false)} />, document.body) : <Panel close={() => setOpen(false)} />)}
+      {open && (rail ? createPortal(<Panel close={() => flushSync(() => setOpen(false))} />, document.body) : <Panel close={() => setOpen(false)} />)}
     </>
   )
 }

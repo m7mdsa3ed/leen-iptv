@@ -1,4 +1,4 @@
-import { createPortal } from "react-dom"
+import { createPortal, flushSync } from "react-dom" // flushSync: a row that opens a page freezes this one (App Gate); the portalled panel must close first
 import { useState } from "react"
 import { Bell, CalendarDays, Check, Settings, Trash2, Trophy, Tv, X } from "lucide-react"
 import { Pill, RailItem } from "@/components/gtv"
@@ -32,7 +32,7 @@ export function InboxButton({ rail }: { rail?: boolean } = {}) {
           <Bell className={tv ? "size-4" : "size-3.5"} />{unread > 0 && fmt.number(unread)}
         </button>
       )}
-      {open && (rail ? createPortal(<Panel close={() => setOpen(false)} />, document.body) : <Panel close={() => setOpen(false)} />)}
+      {open && (rail ? createPortal(<Panel close={() => flushSync(() => setOpen(false))} />, document.body) : <Panel close={() => setOpen(false)} />)}
     </>
   )
 }
