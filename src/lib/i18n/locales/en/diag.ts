@@ -55,7 +55,7 @@ const d: Dict = {
   "diag.dev.mic.ok": "Available, {n} audio input(s) listed",
   "diag.dev.mic.none": "API present but no audio input is listed",
   "diag.dev.mic.no": "Not available in this browser",
-  "diag.dev.mic.hint": "webOS does not give web apps the Magic Remote microphone. Voice mode needs a mic the browser can see; use Chat and the remote's voice button instead.",
+  "diag.dev.mic.hint": "webOS does not give web apps the Magic Remote microphone. Use the remote's voice button inside a text field instead.",
   "diag.dev.camera": "Camera access (getUserMedia)",
   "diag.dev.camera.ok": "Available, {n} video input(s) listed",
   "diag.dev.camera.none": "API present but no camera is listed",

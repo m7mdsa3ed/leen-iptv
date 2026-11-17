@@ -13,7 +13,6 @@ import { jellyfinStopTranscode } from "@/lib/jellyfin"
 import { fmt, useT } from "@/lib/i18n"
 import { askPin } from "@/components/tv/ui"
 import type { NewEpisodesEvent } from "@/lib/new-episodes"
-import { registerPlayer, type PlayerCtl } from "@/lib/agent/bus"
 import type { Item } from "@/lib/types"
 import { closePlayer, usePlayerHost } from "./host"
 import { FITS, prefs, setPrefs } from "./prefs"
@@ -281,10 +280,6 @@ export function usePlayer(o: { queue: Item[]; index: number; start?: boolean; vr
   const stop = () => { back(); closePlayer() }
   const stopRef = useRef(stop)
   stopRef.current = stop
-  // the voice agent (lib/agent) drives the player that is on screen through these; the getter always returns the latest closures
-  const ctl = useRef<PlayerCtl>(null!)
-  ctl.current = { id: item.id, live, paused: E.paused, play, pause, seek, next, prev, stop, playItem }
-  useEffect(() => registerPlayer(() => ctl.current), [])
   useEffect(() => {
     if (!sleepAt) return
     const id = window.setTimeout(() => { vref.current?.pause(); setSleepMin(0); setSleepAt(null); stopRef.current() }, Math.max(0, sleepAt - Date.now()))

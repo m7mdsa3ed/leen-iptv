@@ -1,4 +1,4 @@
-// CORS proxy handler: /p?url=<encoded> (any method; body and x-plex-*/accept/content-type/authorization/x-api-key/anthropic-*/x-goog-api-key/range/api-key/x-user-agent headers are forwarded). Shared by `pnpm proxy` and the Vite dev/preview server.
+// CORS proxy handler: /p?url=<encoded> (any method; body and x-plex-*/accept/content-type/authorization/x-api-key/range/api-key/x-user-agent headers are forwarded). Shared by `pnpm proxy` and the Vite dev/preview server.
 // A GET's redirect is handed back to the browser as /p?url=<target> (providers 302 streams to other hosts that send no CORS headers,
 // and to per-session token URLs that must be the ones the player keeps hitting); a POST's is followed here. HLS playlists are
 // rewritten so every segment/key goes back through /p too. Returns true when it handled the request.
@@ -49,7 +49,7 @@ function streamThrough(req, res, target, CORS) {
   ;(async () => {
     try {
       const headers = {}
-      for (const [k, v] of Object.entries(req.headers)) if (/^(x-plex-.*|x-emby-authorization|accept|content-type|range|api-key|x-user-agent|authorization|x-api-key|anthropic-version|anthropic-beta|x-goog-api-key|openai-organization)$/.test(k)) headers[k] = v
+      for (const [k, v] of Object.entries(req.headers)) if (/^(x-plex-.*|x-emby-authorization|accept|content-type|range|api-key|x-user-agent|authorization|x-api-key)$/.test(k)) headers[k] = v
       const init = { method: req.method, headers, redirect: "manual", signal: ctl.signal }
       if (req.method !== "GET" && req.method !== "HEAD") {
         const chunks = []
